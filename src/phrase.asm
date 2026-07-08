@@ -204,6 +204,18 @@ cell_addr:
 .ACCU 8
     rts
 
+; A = instrument byte of the cursor row ($FF if none)
+phrase_cursor_instr:
+    lda ed_col
+    pha
+    lda #$01
+    sta ed_col
+    jsr cell_addr
+    pla
+    sta ed_col
+    lda.l $7E0000 + SB_PHRASES,x
+    rts
+
 ; --- B tap: insert/edit --------------------------------------------------------
 cell_tap:
     jsr cell_addr

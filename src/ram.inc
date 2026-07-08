@@ -45,6 +45,15 @@ trk_songrow  ds 8    ; $38  per-track: song grid row
 ; --- end pinned blocks ---
 trk_cpos     ds 8    ; per-track: position within chain
 trk_tsp      ds 8    ; per-track: active transpose (chain entry)
+trk_instr    ds 8    ; per-track: current instrument id ($FF = none yet)
+trk_instr_active ds 8 ; per-voice: instrument whose regs are loaded ($FF = force)
+trig_id      db      ; instrument id being applied
+trig_note    db      ; final note index of the main trigger (GRP base)
+grp_track    db      ; GRP fanout state
+grp_span     db
+grp_m        db
+ed_instr     db      ; instrument id under edit (INSTR screen)
+if_cur       db      ; INSTR screen field cursor
 kon_mask     db      ; voices to key on at end of row tick
 koff_mask    db      ; voices to key off at end of row tick
 trig_voice   db      ; note_on target voice

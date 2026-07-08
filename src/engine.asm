@@ -62,6 +62,17 @@ song_init:
     inx
     cpx #GROOVE_SZ
     bne @groove
+    ; instrument 0: SMP, sample 0, ADSR a15/d2/s6/r10, vol 50/50, no GRP
+    lda #$00
+    sta.l $7E0000 + SB_INSTR + 0    ; type SMP
+    sta.l $7E0000 + SB_INSTR + 1    ; sample 0
+    lda #$2F
+    sta.l $7E0000 + SB_INSTR + 2    ; ADSR1 (bit7 forced on at apply time)
+    lda #$CA
+    sta.l $7E0000 + SB_INSTR + 3    ; ADSR2
+    lda #$50
+    sta.l $7E0000 + SB_INSTR + 4    ; vol L
+    sta.l $7E0000 + SB_INSTR + 5    ; vol R
     ; header
     lda #$00
     sta.l $7E0000 + SB_HEADER + SH_GROOVE
@@ -212,6 +223,14 @@ engine_halt_all:
     rts
 
 engine_go:
+    ldx #$0000
+    lda #$FF
+@no_instr_yet:
+    sta.w trk_instr,x
+    sta.w trk_instr_active,x
+    inx
+    cpx #TRACKS
+    bne @no_instr_yet
     lda #$0F
     sta eng_row
     stz eng_tickwait
@@ -356,7 +375,11 @@ track_row:
     lda.w trk_songrow,x
     inc a
     cmp #SONG_ROWS
-    bcs @halt
+    bcc @row_ok
+    lda #$FF                ; end of grid: halt this track
+    sta.w trk_phrase,x
+    rts
+@row_ok:
     sta.w trk_songrow,x
     jsr track_load_songrow
     bra @check
@@ -387,8 +410,11 @@ track_row:
     sep #$20
 .ACCU 8
     lda.l $7E0000 + SB_PHRASES,x
+    sta tmp1                ; note byte
+    lda.l $7E0000 + SB_PHRASES + 1,x
+    sta tmp1 + 1            ; instrument byte
     plx
-    cmp #$00                ; plx clobbered the flags; re-test the note byte
+    lda tmp1
     beq @done               ; empty
     cmp #NOTE_OFF
     bne @note
@@ -398,7 +424,24 @@ track_row:
     sta koff_mask
     rts
 @note:
+    sta trig_note           ; raw note byte (apu_send clobbers tmp1)
+    ; instrument column selects the track's instrument (empty = keep)
+    lda tmp1 + 1
+    cmp #INSTR_NONE
+    beq @no_new_instr
+    sta.w trk_instr,x
+@no_new_instr:
+    txa
+    sta trig_voice
+    lda.w trk_instr,x
+    cmp #INSTR_NONE
+    beq @no_apply
+    phx
+    jsr apply_instrument    ; loads SRCN/ADSR/VOL if not already active
+    plx
+@no_apply:
     ; apply transpose (signed), clamp to note range
+    lda trig_note
     clc
     adc.w trk_tsp,x
     dec a                   ; note byte 1..96 -> index 0..95
@@ -406,21 +449,103 @@ track_row:
     bcc @in_range
     lda #NOTE_MAX - 1       ; clamp (also catches signed underflow wraps)
 @in_range:
-    pha
-    txa
-    sta trig_voice
-    pla
+    sta trig_note
     phx
     jsr note_pitch          ; writes VxPITCH for trig_voice
     plx
     lda.w bit_for_track,x
     ora kon_mask
     sta kon_mask
+    jsr grp_fanout          ; GRP span drives voices to the right
 @done:
     rts
 @halt:
     lda #$FF
     sta.w trk_phrase,x
+    rts
+
+; --- GRP: instrument on track X drives voices X+1..X+span with offsets --------
+; trig_note = the (transposed) base note index. Preserves X.
+grp_fanout:
+    lda.w trk_instr,x
+    cmp #INSTR_NONE
+    bne @has
+    rts
+@has:
+    phx
+    sta trig_id
+    txa
+    sta grp_track
+    rep #$30
+.ACCU 16
+    lda trig_id
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR + 8,x  ; span
+    and #$03
+    sta grp_span
+    beq @out
+    lda #$01
+    sta grp_m
+@member:
+    lda grp_track
+    clc
+    adc grp_m
+    cmp #TRACKS
+    bcs @out
+    sta trig_voice
+    ; member offset = rec[8 + m]
+    rep #$30
+.ACCU 16
+    lda trig_id
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    sta tmp2
+    lda grp_m
+    and #$00FF
+    clc
+    adc tmp2
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR + 8,x
+    clc
+    adc trig_note
+    cmp #NOTE_MAX
+    bcc @m_ok
+    lda #NOTE_MAX - 1
+@m_ok:
+    pha
+    lda trig_id
+    jsr apply_instrument
+    pla
+    jsr note_pitch
+    lda trig_voice
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w bit_for_track,x
+    ora kon_mask
+    sta kon_mask
+    inc grp_m
+    lda grp_m
+    cmp grp_span
+    bcc @member
+    beq @member
+@out:
+    plx
     rts
 
 bit_for_track:

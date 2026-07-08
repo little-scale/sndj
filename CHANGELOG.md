@@ -11,6 +11,12 @@
   IPL protocol; flip-bit mailbox with timeouts everywhere; SCB register
   writes land in the DSP; APU tick telemetry on port 3; a dead APU shows an
   `APU?` warning instead of hanging.
+- **M6 — Instruments.** INSTR screen (field-list editor: type, sample, full
+  ADSR, stereo volume, GRP span + three semitone offsets); per-track
+  instrument selection from the phrase column with per-voice register
+  shadows (regs only ship when the instrument changes); GRP chords: one
+  phrase column drives up to three extra voices with offsets; auditions
+  use the row's instrument.
 - **M5 — Data model complete.** SONG (8 tracks x 128 rows) and CHAIN screens;
   A+d-pad navigates the screen map (SONG <-> CHAIN <-> PHRASE, descending
   through the cursor's context); 8-track chain playback with per-entry

@@ -38,6 +38,7 @@
 .INCLUDE "phrase.asm"
 .INCLUDE "chainscr.asm"
 .INCLUDE "songscr.asm"
+.INCLUDE "instrscr.asm"
 .INCLUDE "splash.asm"
 
 ; --- main loop ---------------------------------------------------------------

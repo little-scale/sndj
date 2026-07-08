@@ -14,6 +14,7 @@
 .DEFINE SCREEN_PHRASE 1
 .DEFINE SCREEN_CHAIN  2
 .DEFINE SCREEN_SONG   3
+.DEFINE SCREEN_INSTR  4
 
 ; called every frame from the main loop
 screen_update:
@@ -25,11 +26,15 @@ screen_update:
     beq @phrase
     cmp #SCREEN_CHAIN
     beq @chain
+    cmp #SCREEN_INSTR
+    beq @instr
     jmp song_update
 @phrase:
     jmp phrase_update
 @chain:
     jmp chain_update
+@instr:
+    jmp instr_update
 @splash:
     jmp splash_update
 
@@ -63,7 +68,9 @@ nav_update:
     and #PAD_DPAD
     sep #$20
 .ACCU 8
-    beq @done
+    bne @has_dpad
+    rts
+@has_dpad:
     lda #$01
     sta a_used
     ; left/right along the spine
@@ -74,18 +81,42 @@ nav_update:
     sep #$20
 .ACCU 8
     beq @try_left
-    ; deeper: SONG -> CHAIN -> PHRASE
+    ; deeper: SONG -> CHAIN -> PHRASE -> INSTR
     lda ui_mode
     cmp #SCREEN_SONG
     beq @to_chain
     cmp #SCREEN_CHAIN
     beq @to_phrase
+    cmp #SCREEN_PHRASE
+    beq @to_instr
+    rts
+@to_instr:
+    ; instrument under the phrase cursor row, else the insert default
+    jsr phrase_cursor_instr
+    cmp #INSTR_NONE
+    bne @instr_ok
+    lda ed_lastinstr
+    cmp #INSTR_NONE
+    beq @done_far
+    ; fall through with the default
+@instr_ok:
+    sta ed_instr
+    jsr instr_init
+    rep #$20
+.ACCU 16
+    lda #$0000
+    sta pad_event
+    sep #$20
+.ACCU 8
+@done_far:
     rts
 @to_chain:
     ; enter the chain under the SONG cursor (if any)
     jsr song_cursor_cell
     cmp #$FF
-    beq @done
+    bne @chain_ok
+    rts
+@chain_ok:
     sta ed_chain
     jsr chain_init
     ; eat the d-pad event so the new screen's cursor doesn't move
@@ -99,7 +130,9 @@ nav_update:
 @to_phrase:
     jsr chain_cursor_phrase
     cmp #$FF
-    beq @done
+    bne @phrase_ok
+    rts
+@phrase_ok:
     sta ed_phrase
     jsr phrase_init
     rep #$20
@@ -122,7 +155,12 @@ nav_update:
     beq @to_chain2
     cmp #SCREEN_CHAIN
     beq @to_song
+    cmp #SCREEN_INSTR
+    beq @to_phrase2
     rts
+@to_phrase2:
+    jsr phrase_init
+    bra @eat
 @to_chain2:
     jsr chain_init
     bra @eat

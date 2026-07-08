@@ -68,6 +68,7 @@ Reset:
     lda #$01
     sta ed_lastcmd
     stz ed_lastval
+    stz ed_instr
 
     ; init complete: mark it, enable NMI + auto-joypad, screen on
     lda #MAGIC_BOOT_OK

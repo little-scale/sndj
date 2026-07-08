@@ -325,10 +325,110 @@ note_pitch:
     ora #DSP_V0PITCHH
     jmp apu_dsp_write
 
+; --- load instrument A's registers onto voice trig_voice (if not active) ------
+; SRCN, ADSR (bit7 forced on), VOL L/R from the record at SB_INSTR + id*16.
+; Preserves X; returns A = id.
+apply_instrument:
+    sta trig_id
+    phx
+    lda trig_voice
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w trk_instr_active,x
+    cmp trig_id
+    beq @skip
+    lda trig_id
+    sta.w trk_instr_active,x
+    rep #$30
+.ACCU 16
+    lda trig_id
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax                     ; record offset
+    sep #$20
+.ACCU 8
+    ; SRCN
+    lda.l $7E0000 + SB_INSTR + 1,x
+    tay
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0SRCN
+    phx
+    jsr apu_dsp_write
+    plx
+    ; ADSR1 (ADSR mode always on)
+    lda.l $7E0000 + SB_INSTR + 2,x
+    ora #$80
+    tay
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0ADSR1
+    phx
+    jsr apu_dsp_write
+    plx
+    ; ADSR2
+    lda.l $7E0000 + SB_INSTR + 3,x
+    tay
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0ADSR2
+    phx
+    jsr apu_dsp_write
+    plx
+    ; VOL L/R
+    lda.l $7E0000 + SB_INSTR + 4,x
+    tay
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0VOLL
+    phx
+    jsr apu_dsp_write
+    plx
+    lda.l $7E0000 + SB_INSTR + 5,x
+    tay
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0VOLR
+    phx
+    jsr apu_dsp_write
+    plx
+@skip:
+    plx
+    lda trig_id
+    rts
+
 ; --- audition: immediate note on voice 0 (editor insert/nudge) ----------------
+; Uses the last-inserted instrument so what you hear is what the row plays.
 audition_note:
     pha
     stz trig_voice
+    lda ed_lastinstr
+    cmp #INSTR_NONE
+    beq @no_instr
+    jsr apply_instrument
+@no_instr:
     pla
     jsr note_pitch
     lda #DSP_KON
