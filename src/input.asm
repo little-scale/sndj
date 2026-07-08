@@ -9,10 +9,6 @@
 .DEFINE DAS_RATE  3         ; frames between repeats
 
 input_update:
-    lda tap_timer           ; B double-tap (paste) window
-    beq +
-    dec tap_timer
-+
     rep #$30
 .ACCU 16
     lda pad_raw

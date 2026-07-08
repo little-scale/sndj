@@ -42,6 +42,7 @@ screen_update:
     jsr screen_reopen
 @no_select:
     jsr nav_update
+    jsr chan_update
     lda ui_mode
     cmp #SCREEN_PHRASE
     beq @phrase
@@ -292,6 +293,158 @@ nav_update:
 .ACCU 8
 @done:
     rts
+
+; --- channel switching: L/R shoulders, or Y + left/right -------------------------
+; SONG: moves the cursor column. CHAIN/PHRASE: re-target the screen at the
+; adjacent track's chain (and phrase) for this song row; no-op on empties.
+chan_update:
+    lda ui_mode
+    cmp #SCREEN_PHRASE
+    beq @scr_ok
+    cmp #SCREEN_CHAIN
+    beq @scr_ok
+    cmp #SCREEN_SONG
+    beq @scr_ok
+    rts
+@scr_ok:
+    lda a_down
+    ora blk_mode
+    beq @mods_ok
+    rts
+@mods_ok:
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_L
+    sep #$20
+.ACCU 8
+    beq @not_l
+    lda #$FF
+    bra @have
+@not_l:
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_R
+    sep #$20
+.ACCU 8
+    beq @not_r
+    lda #$01
+    bra @have
+@not_r:
+    rep #$20
+.ACCU 16
+    lda pad_held
+    and #PAD_Y
+    sep #$20
+.ACCU 8
+    bne @y_held
+    rts
+@y_held:
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_LEFT
+    sep #$20
+.ACCU 8
+    beq @not_yl
+    lda #$FF
+    bra @have_eat
+@not_yl:
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_RIGHT
+    sep #$20
+.ACCU 8
+    bne @yr
+    rts
+@yr:
+    lda #$01
+@have_eat:
+    pha
+    rep #$20
+.ACCU 16
+    lda #$0000
+    sta pad_event
+    sep #$20
+.ACCU 8
+    pla
+@have:
+    ; A = signed delta -> candidate track in es3+1
+    clc
+    adc song_cx
+    and #$07
+    sta es3 + 1
+    lda ui_mode
+    cmp #SCREEN_SONG
+    bne @lookup
+    lda es3 + 1
+    sta song_cx
+    rts
+@lookup:
+    ; chain cell at (candidate track, song_cy)
+    rep #$30
+.ACCU 16
+    lda es3 + 1
+    and #$00FF
+    xba
+    lsr                     ; track * 128
+    sta es2
+    lda song_cy
+    and #$00FF
+    clc
+    adc es2
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_SONG,x
+    cmp #$FF
+    bne @chain_ok
+    rts
+@chain_ok:
+    sta es2
+    lda ui_mode
+    cmp #SCREEN_PHRASE
+    beq @re_phrase
+    lda es3 + 1
+    sta song_cx
+    lda es2
+    sta ed_chain
+    jmp chain_init
+@re_phrase:
+    ; that chain's phrase at the current chain row
+    rep #$30
+.ACCU 16
+    lda es2
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    asl                     ; * 32
+    sta es1
+    lda chain_cy
+    and #$00FF
+    asl
+    clc
+    adc es1
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_CHAINS,x
+    cmp #$FF
+    bne @phrase_ok
+    rts
+@phrase_ok:
+    pha
+    lda es3 + 1
+    sta song_cx
+    lda es2
+    sta ed_chain
+    pla
+    sta ed_phrase
+    jmp phrase_init
 
 ; true (A returned non-FF) helpers implemented by the screens:
 ;   song_cursor_cell   -> A = chain id under SONG cursor

@@ -1,11 +1,13 @@
 ; chainscr.asm — the CHAIN screen: 16 rows of (PHRASE id, TRANSPOSE).
-; Same B-grammar as everywhere: tap insert, B+d-pad nudge, Y+B cut.
+; Same B-grammar as everywhere: tap insert, B+d-pad nudge, Y+B block
+; select (B copy / Y cut / A cancel, B double-tap paste).
 ; Transpose is a signed byte, displayed as hex.
 
 .ACCU 8
 .INDEX 16
 
 chain_init:
+    stz blk_mode
     lda #SCREEN_CHAIN
     sta ui_mode
     jsr text_clear
@@ -139,7 +141,12 @@ chain_update:
     sta ed_chain
     jmp chain_hdr
 @edit_ok:
-    ; Y+B cut
+    ; block mode: B copy / Y cut / A cancel / d-pad stretch
+    lda blk_mode
+    beq @no_blk
+    jmp chain_block
+@no_blk:
+    ; Y held + B pressed: enter block select
     rep #$20
 .ACCU 16
     lda pad_held
@@ -154,21 +161,10 @@ chain_update:
     sep #$20
 .ACCU 8
     beq @no_cut
-    jsr chain_cell_addr_p
-    lda chain_cx
-    bne @cut_tsp
-    lda.l $7E0000 + SB_CHAINS,x
-    cmp #$FF
-    beq @cut_wr
-    sta ed_lastphrid
-@cut_wr:
-    lda #$FF
-    sta.l $7E0000 + SB_CHAINS,x
-    bra @cut_done
-@cut_tsp:
-    lda #$00
-    sta.l $7E0000 + SB_CHAINS + 1,x
-@cut_done:
+    lda #$01
+    sta blk_mode
+    lda chain_cy
+    sta blk_start
     lda #$01
     sta b_used
     bra @cursor
@@ -196,6 +192,20 @@ chain_update:
     stz b_down
     lda b_used
     bne @cursor
+    lda frame_cnt
+    sec
+    sbc tap_timer
+    cmp #7                  ; double-tap = two taps within 6 frames
+    bcs @single
+    lda frame_cnt
+    clc
+    adc #$80
+    sta tap_timer           ; close the window
+    jsr chain_paste         ; B double-tap = paste
+    bra @draw
+@single:
+    lda frame_cnt
+    sta tap_timer
     ; tap: insert
     jsr chain_cell_addr_p
     lda chain_cx
@@ -230,6 +240,245 @@ chain_update:
     jsr chain_cursor_move
 @draw:
     jmp chain_draw
+
+; --- block mode on CHAIN: 2-byte rows, kind 2 -------------------------------
+chain_block:
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_A
+    sep #$20
+.ACCU 8
+    beq @not_cancel
+    stz blk_mode
+    lda #$01
+    sta a_used
+    jmp chain_draw
+@not_cancel:
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_B
+    sep #$20
+.ACCU 8
+    beq @not_copy
+    jsr chain_blk_copy
+    stz blk_mode
+    lda #$01
+    sta b_used
+    stz b_down
+    jmp chain_draw
+@not_copy:
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_Y
+    sep #$20
+.ACCU 8
+    beq @not_cut
+    jsr chain_blk_copy
+    jsr chain_blk_clear
+    stz blk_mode
+    jmp chain_draw
+@not_cut:
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #(PAD_UP | PAD_DOWN)
+    sep #$20
+.ACCU 8
+    beq @blk_done
+    jsr chain_cursor_move
+@blk_done:
+    jmp chain_draw
+
+; carry set when drawn row (tmp0+1) is inside the block
+chain_blk_range_row:
+    jsr chain_blk_range
+    lda tmp0 + 1
+    cmp es0
+    bcc @out
+    lda es0
+    clc
+    adc es0 + 1
+    dec a
+    cmp tmp0 + 1
+    bcc @out
+    sec
+    rts
+@out:
+    clc
+    rts
+
+chain_blk_range:
+    lda blk_start
+    cmp chain_cy
+    bcc @fwd
+    lda chain_cy
+    sta es0
+    lda blk_start
+    sec
+    sbc chain_cy
+    inc a
+    sta es0 + 1
+    rts
+@fwd:
+    sta es0
+    lda chain_cy
+    sec
+    sbc blk_start
+    inc a
+    sta es0 + 1
+    rts
+
+chain_blk_copy:
+    jsr chain_blk_range
+    lda #$02
+    sta clip_kind
+    lda es0 + 1
+    sta clip_len
+    rep #$30
+.ACCU 16
+    lda ed_chain
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    asl                     ; * 32
+    sta es1
+    lda es0
+    and #$00FF
+    asl                     ; * 2
+    clc
+    adc es1
+    sta es1
+    lda es0 + 1
+    and #$00FF
+    asl
+    sta es2
+    ldy #$0000
+@copy:
+    tya
+    clc
+    adc es1
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_CHAINS,x
+    pha
+    rep #$30
+.ACCU 16
+    tyx
+    sep #$20
+.ACCU 8
+    pla
+    sta.l $7E7400,x
+    rep #$30
+.ACCU 16
+    iny
+    cpy es2
+    bne @copy
+    sep #$20
+.ACCU 8
+    rts
+
+chain_blk_clear:
+    jsr chain_blk_range
+    rep #$30
+.ACCU 16
+    lda ed_chain
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    asl
+    sta es1
+    lda es0
+    and #$00FF
+    asl
+    clc
+    adc es1
+    tax
+    sep #$20
+.ACCU 8
+@row:
+    lda #$FF
+    sta.l $7E0000 + SB_CHAINS,x
+    lda #$00
+    sta.l $7E0000 + SB_CHAINS + 1,x
+    rep #$30
+.ACCU 16
+    inx
+    inx
+    sep #$20
+.ACCU 8
+    dec es0 + 1
+    bne @row
+    rts
+
+chain_paste:
+    lda clip_kind
+    cmp #$02
+    beq @kind_ok
+    rts
+@kind_ok:
+    lda #$10
+    sec
+    sbc chain_cy
+    cmp clip_len
+    bcc @have_n
+    lda clip_len
+@have_n:
+    sta es0 + 1
+    beq @done
+    rep #$30
+.ACCU 16
+    lda ed_chain
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    asl
+    sta es1
+    lda chain_cy
+    and #$00FF
+    asl
+    clc
+    adc es1
+    sta es1
+    lda es0 + 1
+    and #$00FF
+    asl
+    sta es2
+    ldy #$0000
+@copy:
+    tyx
+    sep #$20
+.ACCU 8
+    lda.l $7E7400,x
+    pha
+    rep #$30
+.ACCU 16
+    tya
+    clc
+    adc es1
+    tax
+    sep #$20
+.ACCU 8
+    pla
+    sta.l $7E0000 + SB_CHAINS,x
+    rep #$30
+.ACCU 16
+    iny
+    cpy es2
+    bne @copy
+    sep #$20
+.ACCU 8
+@done:
+    rts
 
 chain_hdr:
     lda #7
@@ -449,6 +698,21 @@ chain_draw:
     rts
 
 chain_cell_attr:
+    lda blk_mode
+    beq @no_blk_hl
+    jsr chain_blk_range_row
+    bcc @no_blk_hl
+    lda tmp0 + 1
+    cmp chain_cy
+    beq @no_blk_hl
+    rep #$20
+.ACCU 16
+    lda #ATTR_HILITE
+    sta text_attr
+    sep #$20
+.ACCU 8
+    rts
+@no_blk_hl:
     lda tmp0 + 1
     cmp chain_cy
     bne @plain

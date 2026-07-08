@@ -52,6 +52,24 @@ local script = {
   [120] = { start = true }, [122] = {},
   -- stop
   [190] = { start = true }, [192] = {},
+  -- block copy rows 0-2, paste at row 8 (B double-tap)
+  [212] = { up = true }, [214] = {},
+  [218] = { up = true }, [220] = {},
+  [224] = { up = true }, [226] = {},
+  [230] = { y = true },
+  [232] = { y = true, b = true },
+  [234] = {},
+  [238] = { down = true }, [240] = {},
+  [244] = { down = true }, [246] = {},
+  [250] = { b = true }, [252] = {},        -- copy + exit
+  [256] = { down = true }, [258] = {},
+  [262] = { down = true }, [264] = {},
+  [268] = { down = true }, [270] = {},
+  [274] = { down = true }, [276] = {},
+  [280] = { down = true }, [282] = {},
+  [286] = { down = true }, [288] = {},     -- cursor on row 8
+  [294] = { b = true }, [296] = {},
+  [298] = { b = true }, [300] = {},        -- double-tap = paste
 }
 
 emu.addEventCallback(function() emu.setInput(pad, 0) end, emu.eventType.inputPolled)
@@ -96,7 +114,13 @@ emu.addEventCallback(function()
     check(dp == p, "DSP V0 pitch matches engine")
   elseif frames == 198 then
     check(wram(0x0016) == 0, "Start stopped playback")
-  elseif frames == 205 then
+  elseif frames == 254 then
+    check(wram(0xE4) == 1 and wram(0xE5) == 3, "block copy: 3 phrase rows in the clip")
+  elseif frames == 308 then
+    check(wram(0x4320) == 50, "paste row 8 = C#4")
+    check(wram(0x4324) == 0, "paste row 9 empty (from empty row 1)")
+    check(wram(0x4328) == 50, "paste row 10 = C#4")
+  elseif frames == 315 then
     local out = os.getenv("SNESDJ_PHRASE_SHOT")
     if out then
       local png = emu.takeScreenshot()

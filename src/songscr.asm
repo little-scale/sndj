@@ -1,12 +1,14 @@
 ; songscr.asm — the SONG screen: 8 track columns x a 16-row window into the
 ; 128-row grid. Cells are chain ids. B tap = insert (last chain), B+d-pad =
-; nudge, Y+B = cut (value goes to the insert buffer). Playheads highlight
+; nudge, Y+B = block select (B copy / Y cut / A cancel, B double-tap
+; paste). Playheads highlight
 ; each track's current song row while playing.
 
 .ACCU 8
 .INDEX 16
 
 song_init_screen:
+    stz blk_mode
     lda #SCREEN_SONG
     sta ui_mode
     jsr text_clear
@@ -142,7 +144,12 @@ song_update:
     jsr song_snap_window
     jmp @draw
 @edit_ok:
-    ; Y+B: cut
+    ; block mode: B copy / Y cut / A cancel / d-pad stretch
+    lda blk_mode
+    beq @no_blk
+    jmp song_block
+@no_blk:
+    ; Y held + B pressed: enter block select on this track column
     rep #$20
 .ACCU 16
     lda pad_held
@@ -157,14 +164,10 @@ song_update:
     sep #$20
 .ACCU 8
     beq @no_cut
-    jsr song_cell_addr
-    lda.l $7E0000 + SB_SONG,x
-    cmp #$FF
-    beq @cut_done
-    sta ed_lastchain        ; cut into the insert buffer
-@cut_done:
-    lda #$FF
-    sta.l $7E0000 + SB_SONG,x
+    lda #$01
+    sta blk_mode
+    lda song_cy
+    sta blk_start
     lda #$01
     sta b_used
     bra @cursor
@@ -193,6 +196,20 @@ song_update:
     stz b_down
     lda b_used
     bne @cursor
+    lda frame_cnt
+    sec
+    sbc tap_timer
+    cmp #7                  ; double-tap = two taps within 6 frames
+    bcs @single
+    lda frame_cnt
+    clc
+    adc #$80
+    sta tap_timer           ; close the window
+    jsr song_paste          ; B double-tap = paste
+    bra @draw
+@single:
+    lda frame_cnt
+    sta tap_timer
     ; tap: insert last chain
     jsr song_cell_addr
     lda ed_lastchain
@@ -419,6 +436,212 @@ song_draw:
 @done:
     rts
 
+; --- block mode on SONG: 1-byte cells along the cursor track, kind 3 --------
+song_block:
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_A
+    sep #$20
+.ACCU 8
+    beq @not_cancel
+    stz blk_mode
+    lda #$01
+    sta a_used
+    jmp song_draw
+@not_cancel:
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_B
+    sep #$20
+.ACCU 8
+    beq @not_copy
+    jsr song_blk_copy
+    stz blk_mode
+    lda #$01
+    sta b_used
+    stz b_down
+    jmp song_draw
+@not_copy:
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_Y
+    sep #$20
+.ACCU 8
+    beq @not_cut
+    jsr song_blk_copy
+    jsr song_blk_clear
+    stz blk_mode
+    jmp song_draw
+@not_cut:
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #(PAD_UP | PAD_DOWN)
+    sep #$20
+.ACCU 8
+    beq @blk_done
+    jsr song_cursor_move
+@blk_done:
+    jmp song_draw
+
+song_blk_range:
+    lda blk_start
+    cmp song_cy
+    bcc @fwd
+    lda song_cy
+    sta es0
+    lda blk_start
+    sec
+    sbc song_cy
+    inc a
+    sta es0 + 1
+    rts
+@fwd:
+    sta es0
+    lda song_cy
+    sec
+    sbc blk_start
+    inc a
+    sta es0 + 1
+    rts
+
+song_blk_copy:
+    jsr song_blk_range
+    lda #$03
+    sta clip_kind
+    lda es0 + 1
+    sta clip_len
+    ; src = track*128 + first
+    rep #$30
+.ACCU 16
+    lda song_cx
+    and #$00FF
+    xba
+    lsr
+    sta es1
+    lda es0
+    and #$00FF
+    clc
+    adc es1
+    sta es1
+    lda es0 + 1
+    and #$00FF
+    sta es2
+    ldy #$0000
+@copy:
+    tya
+    clc
+    adc es1
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_SONG,x
+    pha
+    rep #$30
+.ACCU 16
+    tyx
+    sep #$20
+.ACCU 8
+    pla
+    sta.l $7E7400,x
+    rep #$30
+.ACCU 16
+    iny
+    cpy es2
+    bne @copy
+    sep #$20
+.ACCU 8
+    rts
+
+song_blk_clear:
+    jsr song_blk_range
+    rep #$30
+.ACCU 16
+    lda song_cx
+    and #$00FF
+    xba
+    lsr
+    sta es1
+    lda es0
+    and #$00FF
+    clc
+    adc es1
+    tax
+    sep #$20
+.ACCU 8
+@row:
+    lda #$FF
+    sta.l $7E0000 + SB_SONG,x
+    rep #$30
+.ACCU 16
+    inx
+    sep #$20
+.ACCU 8
+    dec es0 + 1
+    bne @row
+    rts
+
+song_paste:
+    lda clip_kind
+    cmp #$03
+    beq @kind_ok
+    rts
+@kind_ok:
+    ; n = min(clip_len, 128 - song_cy)
+    lda #SONG_ROWS
+    sec
+    sbc song_cy
+    cmp clip_len
+    bcc @have_n
+    lda clip_len
+@have_n:
+    sta es0 + 1
+    beq @done
+    rep #$30
+.ACCU 16
+    lda song_cx
+    and #$00FF
+    xba
+    lsr
+    sta es1
+    lda song_cy
+    and #$00FF
+    clc
+    adc es1
+    sta es1
+    lda es0 + 1
+    and #$00FF
+    sta es2
+    ldy #$0000
+@copy:
+    tyx
+    sep #$20
+.ACCU 8
+    lda.l $7E7400,x
+    pha
+    rep #$30
+.ACCU 16
+    tya
+    clc
+    adc es1
+    tax
+    sep #$20
+.ACCU 8
+    pla
+    sta.l $7E0000 + SB_SONG,x
+    rep #$30
+.ACCU 16
+    iny
+    cpy es2
+    bne @copy
+    sep #$20
+.ACCU 8
+@done:
+    rts
+
 ; attr for cell (track tmp0, visible row tmp0+1): cursor accent beats
 ; playhead hilite beats plain text
 song_cell_attr:
@@ -440,6 +663,30 @@ song_cell_attr:
 .ACCU 8
     rts
 @not_cursor:
+    ; block-select rows on the cursor track render hilite
+    lda blk_mode
+    beq @no_blk_hl
+    lda tmp0
+    cmp song_cx
+    bne @no_blk_hl
+    jsr song_blk_range
+    lda tmp1                ; absolute row of this cell
+    cmp es0
+    bcc @no_blk_hl
+    lda es0
+    clc
+    adc es0 + 1
+    dec a
+    cmp tmp1
+    bcc @no_blk_hl
+    rep #$20
+.ACCU 16
+    lda #ATTR_HILITE
+    sta text_attr
+    sep #$20
+.ACCU 8
+    rts
+@no_blk_hl:
     lda eng_playing
     beq @plain
     phx
