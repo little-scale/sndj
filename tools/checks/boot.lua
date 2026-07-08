@@ -6,6 +6,7 @@
 
 local frames = 0
 local fails = 0
+local fc_sample = -1
 local pad = {}   -- table of buttons to hold, applied at every input poll
 
 local function wram(addr)
@@ -45,8 +46,7 @@ local function onFrame()
 
   if frames == 20 then
     check(wram(0x0001) == 0x5D, "magic_boot set (init completed)")
-    local fc = wram16(0x0002)
-    check(fc > 10 and fc < 30, "frame counter advancing (" .. fc .. ")")
+    fc_sample = wram16(0x0002)
     local s = "SNESDJ"
     local ok = true
     for i = 1, #s do
@@ -58,6 +58,9 @@ local function onFrame()
     check(wram(0x000C) == 0, "ui_mode is splash")
     pad = { start = true }
   elseif frames == 26 then
+    local fc = wram16(0x0002)
+    check(fc > fc_sample and fc <= fc_sample + 7,
+      "frame counter advancing (" .. fc_sample .. " -> " .. fc .. ")")
     check(wram16(0x0006) & 0x1000 == 0x1000, "pad_held echoes Start bit")
     check(wram(0x000C) == 1, "Start entered the grid stub")
     pad = { right = true }   -- hold Right: DAS delay 14 + repeats every 3

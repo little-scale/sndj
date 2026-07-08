@@ -15,7 +15,7 @@ WLASPC   := wla-spc700
 WLALINK  := wlalink
 MESEN    ?= $(HOME)/.local/opt/Mesen.app/Contents/MacOS/Mesen
 
-SRCS := $(wildcard src/*.asm src/*.inc)
+SRCS := $(wildcard src/*.asm src/*.inc src/apu/*.asm)
 
 .PHONY: all run check test shot clean dist FORCE
 
@@ -39,7 +39,15 @@ $(BUILD)/font.bin: tools/makefont.py | $(BUILD)
 $(BUILD)/pal.bin $(BUILD)/gradient.bin: tools/maketables.py | $(BUILD)
 	python3 tools/maketables.py $(BUILD)
 
-$(BUILD)/main.o: $(SRCS) $(BUILD)/buildid.inc $(BUILD)/font.bin $(BUILD)/pal.bin $(BUILD)/gradient.bin
+# SPC700 driver blob
+$(BUILD)/driver.o: src/apu/driver.asm | $(BUILD)
+	$(WLASPC) -o $@ src/apu/driver.asm
+
+$(BUILD)/driver.spc700.bin: $(BUILD)/driver.o
+	@printf '[objects]\n%s\n' "$(BUILD)/driver.o" > $(BUILD)/linkfile-apu
+	$(WLALINK) -S $(BUILD)/linkfile-apu $@
+
+$(BUILD)/main.o: $(SRCS) $(BUILD)/buildid.inc $(BUILD)/font.bin $(BUILD)/pal.bin $(BUILD)/gradient.bin $(BUILD)/driver.spc700.bin
 	$(WLA65816) -I src -I $(BUILD) -o $@ src/main.asm
 
 $(BUILD)/linkfile: | $(BUILD)

@@ -31,6 +31,7 @@
 .INCLUDE "nmi.asm"
 .INCLUDE "text.asm"
 .INCLUDE "input.asm"
+.INCLUDE "apu.asm"
 .INCLUDE "splash.asm"
 
 ; --- main loop ---------------------------------------------------------------
@@ -45,6 +46,8 @@ main_loop:
     stz frame_flag
 
     jsr input_update
+    jsr apu_update
+    jsr draw_apu_status
 
     lda ui_mode
     beq @splash
@@ -54,6 +57,34 @@ main_loop:
     jsr splash_update
 @frame_done:
     jmp main_loop
+
+; top-right APU health widget: dim "APU" when alive, accent "APU?" on timeout
+draw_apu_status:
+    lda #27
+    sta text_x
+    stz text_y
+    lda apu_status
+    bne @bad
+    rep #$20
+.ACCU 16
+    lda #ATTR_DIM
+    sta text_attr
+    sep #$20
+.ACCU 8
+    ldx #str_apu_ok
+    jmp text_puts
+@bad:
+    rep #$20
+.ACCU 16
+    lda #ATTR_ACCENT
+    sta text_attr
+    sep #$20
+.ACCU 8
+    ldx #str_apu_bad
+    jmp text_puts
+
+str_apu_ok:  .DB "APU ", 0
+str_apu_bad: .DB "APU?", 0
 
 ; --- data ---------------------------------------------------------------------
 str_version:
@@ -73,6 +104,11 @@ pal_data:
 ; HDMA backdrop gradient table
 gradient_data:
     .INCBIN "gradient.bin"
+
+; SPC700 driver blob, uploaded via the IPL protocol at boot
+driver_blob:
+    .INCBIN "driver.spc700.bin"
+driver_blob_end:
 
 ; --- internal header (hand-rolled; checksum fixed by tools/fixsum.py) --------
 .ORG $7FC0

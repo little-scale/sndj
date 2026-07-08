@@ -55,6 +55,7 @@ Reset:
 
     jsr init_regs
     jsr init_video
+    jsr apu_upload_driver   ; on timeout: apu_status=1, UI shows "APU?"
 
     ; init complete: mark it, enable NMI + auto-joypad, screen on
     lda #MAGIC_BOOT_OK

@@ -21,6 +21,10 @@ ui_mode      db      ; $0C  0=splash 1=song-stub
 apu_status   db      ; $0D  0=ok, 1=timeout ("APU?")  (M2)
 cur_x        db      ; $0E  editor cursor column
 cur_y        db      ; $0F  editor cursor row
+; --- check-visible APU block: also frozen for tools/checks/ ---
+apu_seq      db      ; $10  last mailbox port-0 byte sent (flip handshake)
+apu_tick     db      ; $11  APU master tick (port-3 telemetry mirror)
+hb_val       db      ; $12  M2 heartbeat value (lands in DSP MVOLL)
 ; --- end frozen block ---
 pad_prev     dw
 pad_das_dir  dw      ; d-pad bits DAS is tracking
