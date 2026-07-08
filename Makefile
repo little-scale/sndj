@@ -79,15 +79,12 @@ shot: all
 	SNESDJ_SHOT=$(abspath $(BUILD)/shot.png) "$(MESEN)" --testrunner $(abspath $(ROM)) $(abspath tools/shot.lua)
 	@echo "shot: $(BUILD)/shot.png"
 
+# splash comparison masks pixel rows 88-96 (the git-stamp text line)
 shot-diff: shot
-	@cmp -s $(BUILD)/shot.png tools/goldens/splash.png \
-	  && echo "shot-diff: splash matches golden" \
-	  || { echo "shot-diff: MISMATCH vs tools/goldens/splash.png"; exit 1; }
+	@python3 tools/shotdiff.py $(BUILD)/shot.png tools/goldens/splash.png 88 96
 	@for g in phrase song; do \
 	  if [ -f $(BUILD)/shot-$$g.png ]; then \
-	    cmp -s $(BUILD)/shot-$$g.png tools/goldens/$$g.png \
-	      && echo "shot-diff: $$g matches golden" \
-	      || { echo "shot-diff: MISMATCH vs tools/goldens/$$g.png"; exit 1; }; \
+	    python3 tools/shotdiff.py $(BUILD)/shot-$$g.png tools/goldens/$$g.png; \
 	  fi; \
 	done
 
