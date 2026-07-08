@@ -62,11 +62,11 @@ local function onFrame()
     check(fc > fc_sample and fc <= fc_sample + 7,
       "frame counter advancing (" .. fc_sample .. " -> " .. fc .. ")")
     check(wram16(0x0006) & 0x1000 == 0x1000, "pad_held echoes Start bit")
-    check(wram(0x000C) == 1, "Start entered the PHRASE screen")
+    check(wram(0x000C) == 3, "Start entered the SONG screen")
     pad = { down = true }   -- hold Down: DAS delay 14 + repeats every 3
   elseif frames == 55 then
-    local cy = wram(0x000F)
-    check(cy >= 3 and cy <= 12, "DAS auto-repeat moved cursor (cur_y=" .. cy .. ")")
+    local cy = wram(0x001C)
+    check(cy >= 3 and cy <= 12, "DAS auto-repeat moved cursor (song_cy=" .. cy .. ")")
     if fails == 0 then
       print("ALL PASS boot.lua")
       emu.stop(0)

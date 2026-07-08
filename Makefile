@@ -70,6 +70,7 @@ check: all
 	@for c in $(CHECKS); do \
 	  echo "== $$c"; \
 	  SNESDJ_PHRASE_SHOT=$(abspath $(BUILD)/shot-phrase.png) \
+	  SNESDJ_SONG_SHOT=$(abspath $(BUILD)/shot-song.png) \
 	  "$(MESEN)" --testrunner $(abspath $(ROM)) $(abspath $$c) || exit 1; \
 	done
 
@@ -82,11 +83,13 @@ shot-diff: shot
 	@cmp -s $(BUILD)/shot.png tools/goldens/splash.png \
 	  && echo "shot-diff: splash matches golden" \
 	  || { echo "shot-diff: MISMATCH vs tools/goldens/splash.png"; exit 1; }
-	@if [ -f $(BUILD)/shot-phrase.png ]; then \
-	  cmp -s $(BUILD)/shot-phrase.png tools/goldens/phrase.png \
-	    && echo "shot-diff: phrase matches golden" \
-	    || { echo "shot-diff: MISMATCH vs tools/goldens/phrase.png"; exit 1; }; \
-	fi
+	@for g in phrase song; do \
+	  if [ -f $(BUILD)/shot-$$g.png ]; then \
+	    cmp -s $(BUILD)/shot-$$g.png tools/goldens/$$g.png \
+	      && echo "shot-diff: $$g matches golden" \
+	      || { echo "shot-diff: MISMATCH vs tools/goldens/$$g.png"; exit 1; }; \
+	  fi; \
+	done
 
 # host-side unit tests, no emulator
 test:

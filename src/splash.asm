@@ -1,6 +1,4 @@
-; splash.asm — boot splash (build stamp, pad echo) + M1 cursor-grid stub.
-; The stub SONG grid exists to exercise input/DAS end-to-end; the real SONG
-; screen replaces it in M5.
+; splash.asm — boot splash (build stamp, pad echo). Start opens SONG.
 
 .ACCU 8
 .INDEX 16
@@ -85,7 +83,7 @@ splash_update:
     sep #$20
 .ACCU 8
     beq @done
-    jsr phrase_init
+    jsr song_init_screen
 @done:
     rts
 
@@ -121,5 +119,3 @@ str_subtitle: .DB "SNES/SFC MUSIC TRACKER", 0
 str_family:   .DB "SIBLING OF SMSGGDJ + GENMDDJ", 0
 str_start:    .DB "PRESS START", 0
 str_pad:      .DB "PAD", 0
-str_song:     .DB "SONG", 0
-str_stub:     .DB "M1 INPUT STUB", 0

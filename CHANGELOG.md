@@ -11,6 +11,16 @@
   IPL protocol; flip-bit mailbox with timeouts everywhere; SCB register
   writes land in the DSP; APU tick telemetry on port 3; a dead APU shows an
   `APU?` warning instead of hanging.
+- **M5 — Data model complete.** SONG (8 tracks x 128 rows) and CHAIN screens;
+  A+d-pad navigates the screen map (SONG <-> CHAIN <-> PHRASE, descending
+  through the cursor's context); 8-track chain playback with per-entry
+  transpose, per-track song-row advance, batched KON/KOF; Y+B is cut
+  (deleted value becomes the next insert); Start plays what the current
+  screen shows (song / looped chain / looped phrase).
+- **M4 — Engine core.** WRAM song block (128 phrases, 64 chains, grooves);
+  groove-driven row engine clocked by the APU timer (region-free 60.15 Hz
+  ticks); PHRASE screen with the sibling B-grammar (tap insert+audition,
+  B+d-pad nudge by semitone/octave, Y+B clear), playhead.
 - **M3 — First voice.** BRR encoder/decoder (`tools/sndj_brr.py`, brute-force
   filter/range search, bit-exact decode, self-tested); factory loop-pad
   sample + directory bulk-uploaded to ARAM; pitch table generated from a

@@ -192,7 +192,9 @@ apu_audio_init:
     ldx #(sample0_brr_end - sample0_brr)
     stx up_len
     jsr apu_upload_block
-    bcs @fail
+    bcc +
+    jmp @fail
++
     ; directory (entry 0: start/loop = ARAM_SAMPLES) -> ARAM_DIR
     ldx #dir0_data
     stx up_src
@@ -201,7 +203,9 @@ apu_audio_init:
     ldx #(dir0_data_end - dir0_data)
     stx up_len
     jsr apu_upload_block
-    bcs @fail
+    bcc +
+    jmp @fail
++
     ; global DSP state
     lda #DSP_DIR
     ldy #(ARAM_DIR >> 8)
@@ -224,28 +228,60 @@ apu_audio_init:
     lda #DSP_FLG
     ldy #$20                ; unmute; echo buffer writes stay disabled
     jsr apu_dsp_write
-    ; voice 0: volumes, sample 0, musical ADSR
-    lda #DSP_V0VOLL
+    ; all 8 voices: volumes, sample 0, musical ADSR (per-instrument in M6)
+    ; (counter must survive apu_send, which clobbers tmp1)
+    stz trig_voice
+@voice:
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl                     ; voice * 16 = register base
+    ora #DSP_V0VOLL
     ldy #$50
     jsr apu_dsp_write
-    lda #DSP_V0VOLR
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0VOLR
     ldy #$50
     jsr apu_dsp_write
-    lda #DSP_V0SRCN
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0SRCN
     ldy #$00
     jsr apu_dsp_write
-    lda #DSP_V0ADSR1
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0ADSR1
     ldy #$AF                ; adsr on, attack 15, decay 2
     jsr apu_dsp_write
-    lda #DSP_V0ADSR2
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0ADSR2
     ldy #$CA                ; sustain level 6, sustain rate 10
     jsr apu_dsp_write
+    inc trig_voice
+    lda trig_voice
+    cmp #$08
+    bne @voice
 @fail:
     rts
 
-; --- audition: play note A (0-95) on voice 0 ----------------------------------
+; --- set VxPITCH for note A (0-95) on voice trig_voice (no KON) ---------------
 ; pitch = pitch_octave7[semitone] >> (7 - octave); tables from maketables.py
-audition_note:
+note_pitch:
     rep #$20
 .ACCU 16
     and #$00FF
@@ -271,14 +307,30 @@ audition_note:
     sta last_pitch
     sep #$20
 .ACCU 8
-    lda #DSP_V0PITCHL
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl                     ; voice * 16
+    ora #DSP_V0PITCHL
     ldy last_pitch
     jsr apu_dsp_write
-    ldy #$0000
     lda last_pitch + 1
     tay
-    lda #DSP_V0PITCHH
-    jsr apu_dsp_write
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0PITCHH
+    jmp apu_dsp_write
+
+; --- audition: immediate note on voice 0 (editor insert/nudge) ----------------
+audition_note:
+    pha
+    stz trig_voice
+    pla
+    jsr note_pitch
     lda #DSP_KON
     ldy #$0001
     jsr apu_dsp_write

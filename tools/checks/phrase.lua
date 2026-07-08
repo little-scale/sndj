@@ -23,25 +23,29 @@ local function check(cond, msg)
 end
 
 local script = {
-  [30] = { start = true }, [32] = {},
+  [30] = { start = true }, [32] = {},          -- SONG
+  [34] = { b = true }, [36] = {},              -- insert chain 00
+  [38] = { a = true }, [40] = { a = true, right = true }, [42] = {},  -- CHAIN
+  [44] = { b = true }, [46] = {},              -- insert phrase 00
+  [48] = { a = true }, [50] = { a = true, right = true }, [52] = {},  -- PHRASE
   -- B tap on row 0 note column -> insert C-4
-  [40] = { b = true }, [42] = {},
+  [56] = { b = true }, [58] = {},
   -- B held + Right tap -> nudge to C#4
-  [46] = { b = true },
-  [50] = { b = true, right = true },
-  [52] = { b = true },
-  [56] = {},
+  [62] = { b = true },
+  [64] = { b = true, right = true },
+  [66] = { b = true },
+  [68] = {},
   -- down twice -> row 2, B tap -> insert C#4 (last note propagates)
-  [60] = { down = true }, [62] = {},
-  [64] = { down = true }, [66] = {},
-  [68] = { b = true }, [70] = {},
-  -- row 3: insert then Y+B clear
+  [70] = { down = true }, [72] = {},
   [74] = { down = true }, [76] = {},
-  [80] = { b = true }, [82] = {},
-  [86] = { y = true },
-  [88] = { y = true, b = true },
-  [90] = {},
-  -- play
+  [78] = { b = true }, [80] = {},
+  -- row 3: insert then Y+B clear
+  [82] = { down = true }, [84] = {},
+  [86] = { b = true }, [88] = {},
+  [90] = { y = true },
+  [92] = { y = true, b = true },
+  [94] = {},
+  -- play (phrase mode: loops this phrase on track 0)
   [100] = { start = true }, [102] = {},
   -- stop
   [170] = { start = true }, [172] = {},
@@ -53,16 +57,16 @@ emu.addEventCallback(function()
   frames = frames + 1
   if script[frames] then pad = script[frames] end
 
-  if frames == 36 then
-    check(wram(0x000C) == 1, "Start opened the PHRASE screen")
+  if frames == 54 then
+    check(wram(0x000C) == 1, "navigated to the PHRASE screen")
     check(wram(0x5782) == 0xD7, "song block initialised (magic)")
-  elseif frames == 45 then
+  elseif frames == 60 then
     check(wram(0x2000) == 49, "B tap inserted C-4 (note 49) at row 0")
     check(wram(0x0015) == 1, "insert auditioned (1 KON)")
-  elseif frames == 58 then
+  elseif frames == 69 then
     check(wram(0x2000) == 50, "B+Right nudged row 0 to C#4 (50)")
     check(wram(0x0015) == 2, "nudge auditioned (2 KONs)")
-  elseif frames == 72 then
+  elseif frames == 81 then
     check(wram(0x000F) == 2, "cursor on row 2")
     check(wram(0x2008) == 50, "B tap inserted last note (C#4) at row 2")
   elseif frames == 96 then

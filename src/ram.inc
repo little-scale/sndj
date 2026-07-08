@@ -28,10 +28,26 @@ hb_val       db      ; $12  heartbeat value (lands in DSP unused reg $1D)
 last_pitch   dw      ; $13  last DSP pitch value sent (audition/engine)
 kon_count    db      ; $15  count of KON commands issued
 eng_playing  db      ; $16  sequencer running
-eng_row      db      ; $17  current phrase row (0-15)
-eng_phrase   db      ; $18  phrase id being played/edited
-ed_col       db      ; $19  editor cursor column (0=note 1=instr 2=cmd 3=val)
-; --- end frozen block ---
+eng_row      db      ; $17  track-0 phrase row mirror (playhead/checks)
+ed_phrase    db      ; $18  phrase id under edit (PHRASE screen)
+ed_col       db      ; $19  phrase cursor column (0=note 1=instr 2=cmd 3=val)
+; --- second pinned block ($1A-$3F): editor + track state for checks ---
+ed_chain     db      ; $1A  chain id under edit (CHAIN screen)
+song_cx      db      ; $1B  SONG cursor track (0-7)
+song_cy      db      ; $1C  SONG cursor row (0-127)
+song_top     db      ; $1D  SONG scroll window top row
+chain_cy     db      ; $1E  CHAIN cursor row (0-15)
+chain_cx     db      ; $1F  CHAIN cursor column (0=phrase 1=transpose)
+trk_chain    ds 8    ; $20  per-track: chain id ($FF = halted)
+trk_phrase   ds 8    ; $28  per-track: phrase id ($FF = halted)
+trk_prow     ds 8    ; $30  per-track: phrase row
+trk_songrow  ds 8    ; $38  per-track: song grid row
+; --- end pinned blocks ---
+trk_cpos     ds 8    ; per-track: position within chain
+trk_tsp      ds 8    ; per-track: active transpose (chain entry)
+kon_mask     db      ; voices to key on at end of row tick
+koff_mask    db      ; voices to key off at end of row tick
+trig_voice   db      ; note_on target voice
 eng_tickwait db      ; ticks left in current row
 eng_gpos     db      ; groove position
 eng_tick_last db     ; last consumed apu_tick
@@ -39,8 +55,14 @@ ed_lastnote  db
 ed_lastinstr db
 ed_lastcmd   db
 ed_lastval   db
+ed_lastchain db      ; SONG insert default
+ed_lastphrid db      ; CHAIN insert default (phrase id)
+ed_lasttsp   db      ; CHAIN insert default (transpose)
+ui_cnt       db      ; screen-draw loop counter (text_* clobber tmp0/tmp1)
 b_down       db      ; B modifier edge state
 b_used       db      ; B was used as a modifier (suppress tap on release)
+a_down       db      ; A (screen) modifier edge state
+a_used       db
 up_src       dw      ; bulk upload: source (DB-relative)
 up_dest      dw      ;              dest ARAM address
 up_len       dw      ;              byte count (multiple of 3)

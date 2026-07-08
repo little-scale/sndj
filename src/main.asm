@@ -33,8 +33,11 @@
 .INCLUDE "text.asm"
 .INCLUDE "input.asm"
 .INCLUDE "apu.asm"
+.INCLUDE "screens.asm"
 .INCLUDE "engine.asm"
 .INCLUDE "phrase.asm"
+.INCLUDE "chainscr.asm"
+.INCLUDE "songscr.asm"
 .INCLUDE "splash.asm"
 
 ; --- main loop ---------------------------------------------------------------
@@ -53,13 +56,7 @@ main_loop:
     jsr engine_update
     jsr draw_apu_status
 
-    lda ui_mode
-    beq @splash
-    jsr phrase_update
-    bra @frame_done
-@splash:
-    jsr splash_update
-@frame_done:
+    jsr screen_update
     jmp main_loop
 
 ; top-right APU health widget: dim "APU" when alive, accent "APU?" on timeout

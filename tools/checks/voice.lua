@@ -30,20 +30,22 @@ end
 -- frame-scripted input: B tap inserts C-4 (auditions), then four B+Right
 -- nudges walk the note up to E-4, auditioning each step
 local script = {
-  [30] = { start = true },
-  [32] = {},
-  [40] = { b = true },
-  [42] = {},
-  [50] = { b = true },
-  [52] = { b = true, right = true },
-  [54] = { b = true },
-  [56] = { b = true, right = true },
-  [58] = { b = true },
-  [60] = { b = true, right = true },
-  [62] = { b = true },
-  [64] = { b = true, right = true },
-  [66] = { b = true },
-  [68] = {},
+  [30] = { start = true }, [32] = {},          -- SONG
+  [36] = { b = true }, [38] = {},              -- insert chain 00
+  [42] = { a = true }, [44] = { a = true, right = true }, [46] = {},  -- CHAIN
+  [50] = { b = true }, [52] = {},              -- insert phrase 00
+  [56] = { a = true }, [58] = { a = true, right = true }, [60] = {},  -- PHRASE
+  [64] = { b = true }, [66] = {},              -- insert C-4 (audition)
+  [70] = { b = true },
+  [72] = { b = true, right = true },
+  [74] = { b = true },
+  [76] = { b = true, right = true },
+  [78] = { b = true },
+  [80] = { b = true, right = true },
+  [82] = { b = true },
+  [84] = { b = true, right = true },
+  [86] = { b = true },
+  [88] = {},
 }
 
 local function onPoll()
@@ -70,13 +72,14 @@ local function onFrame()
     check(aram(0x1200 + 63 * 1) ~= nil and (aram(0x1200 + 7 * 9) & 0x03) == 0x03,
           "BRR sample in ARAM with END+LOOP flags")
     check(wram(0x0015) == 0, "no KONs yet")
-  elseif frames == 48 then
+  elseif frames == 68 then
+    check(wram(0x000C) == 1, "navigated SONG -> CHAIN -> PHRASE")
     check(wram(0x0015) == 1, "first audition sent one KON")
     check(wram(0x0013) == 0x00 and wram(0x0014) == 0x08,
           "C-4 pitch $0800 recorded")
     check(dsp(0x02) == 0x00 and dsp(0x03) == 0x08, "DSP V0 pitch = C-4")
     check(dsp(0x4C) == 0x01, "KON hit voice 0")
-  elseif frames == 75 then
+  elseif frames == 95 then
     check(wram(0x2000) == 53, "four nudges wrote E-4 (note 53) to row 0")
     check(wram(0x0015) == 5, "each nudge auditioned (5 KONs)")
     -- E-4: round(16384 * 2^(4/12)) >> 3 = 20643 >> 3 = 2580 = $0A14

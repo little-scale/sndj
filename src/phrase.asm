@@ -11,9 +11,8 @@ col_x:  .DB 4, 8, 11, 13
 col_w:  .DB 3, 2, 1, 2
 
 phrase_init:
-    lda #$01
+    lda #SCREEN_PHRASE
     sta ui_mode
-    stz eng_phrase
     stz ed_col
     stz cur_y
     stz b_down
@@ -30,7 +29,7 @@ phrase_init:
 .ACCU 8
     ldx #str_phrase
     jsr text_puts
-    lda eng_phrase
+    lda ed_phrase
     jsr text_hex8
     rts
 
@@ -48,6 +47,10 @@ phrase_update:
     beq @no_start
     jsr engine_toggle
 @no_start:
+    lda a_down
+    beq @edit_ok
+    jmp phrase_draw
+@edit_ok:
 
     ; Y held + B pressed: clear cell
     rep #$20
@@ -179,7 +182,7 @@ cursor_move:
 cell_addr:
     rep #$30
 .ACCU 16
-    lda eng_phrase
+    lda ed_phrase
     and #$00FF
     xba
     lsr
@@ -227,16 +230,41 @@ cell_tap:
     sta.l $7E0000 + SB_PHRASES,x
     rts
 
-; --- Y+B: clear ----------------------------------------------------------------
+; --- Y+B: cut (deleted value becomes the next B-tap insert) --------------------
 cell_clear:
     jsr cell_addr
+    lda.l $7E0000 + SB_PHRASES,x
+    sta tmp1
     lda ed_col
     cmp #1
     bne @zero
+    lda tmp1
+    cmp #INSTR_NONE
+    beq @i_wr
+    sta ed_lastinstr
+@i_wr:
     lda #INSTR_NONE
     sta.l $7E0000 + SB_PHRASES,x
     rts
 @zero:
+    ; note/cmd/val columns: 0 = empty
+    lda ed_col
+    bne @not_note
+    lda tmp1
+    beq @wr
+    sta ed_lastnote
+    bra @wr
+@not_note:
+    cmp #2
+    bne @is_val
+    lda tmp1
+    beq @wr
+    sta ed_lastcmd
+    bra @wr
+@is_val:
+    lda tmp1
+    sta ed_lastval
+@wr:
     lda #$00
     sta.l $7E0000 + SB_PHRASES,x
     rts
@@ -385,6 +413,9 @@ phrase_draw:
     sta text_x
     lda eng_playing
     beq @nohead
+    lda trk_phrase
+    cmp ed_phrase
+    bne @nohead
     lda eng_row
     cmp tmp0 + 1
     bne @nohead
@@ -404,7 +435,7 @@ phrase_draw:
     ; fetch the row's 4 bytes into str_buf+32..35
     rep #$30
 .ACCU 16
-    lda eng_phrase
+    lda ed_phrase
     and #$00FF
     xba
     lsr
