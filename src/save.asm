@@ -617,5 +617,6 @@ load_slot:
     sta sv_src + 2
     jsr rle_unpack
     jsr stage_in
+    jsr apu_echo_apply      ; the loaded song's room comes back with it
     lda #SV_OK
     rts

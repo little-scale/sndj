@@ -41,6 +41,7 @@
 .INCLUDE "instrscr.asm"
 .INCLUDE "save.asm"
 .INCLUDE "filescr.asm"
+.INCLUDE "echoscr.asm"
 .INCLUDE "splash.asm"
 
 ; --- main loop ---------------------------------------------------------------

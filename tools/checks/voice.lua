@@ -61,7 +61,6 @@ local function onFrame()
   if frames == 25 then
     -- audio init landed via bulk upload + SCB writes
     check(dsp(0x5D) == 0x10, "DSP DIR points at ARAM directory page")
-    check(dsp(0x6C) == 0x20, "DSP FLG unmuted, echo writes disabled")
     check(dsp(0x0C) == 0x60 and dsp(0x1C) == 0x60, "master volume set")
     check(dsp(0x05) == 0xAF and dsp(0x06) == 0xCA, "voice 0 ADSR configured")
     check(aram(0x1000) == 0x00 and aram(0x1001) == 0x12 and
@@ -74,6 +73,7 @@ local function onFrame()
     check(wram(0x0015) == 0, "no KONs yet")
   elseif frames == 68 then
     check(wram(0x000C) == 1, "navigated SONG -> CHAIN -> PHRASE")
+    check(dsp(0x6C) == 0x00, "DSP FLG unmuted after echo init")
     check(wram(0x0015) == 1, "first audition sent one KON")
     check(wram(0x0013) == 0x00 and wram(0x0014) == 0x08,
           "C-4 pitch $0800 recorded")

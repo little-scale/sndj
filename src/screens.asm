@@ -16,6 +16,7 @@
 .DEFINE SCREEN_SONG   3
 .DEFINE SCREEN_INSTR  4
 .DEFINE SCREEN_FILES  5
+.DEFINE SCREEN_ECHO   6
 
 ; called every frame from the main loop
 screen_update:
@@ -31,11 +32,15 @@ screen_update:
     beq @instr
     cmp #SCREEN_FILES
     beq @files
+    cmp #SCREEN_ECHO
+    beq @echo
     jmp song_update
 @phrase:
     jmp phrase_update
 @files:
     jmp files_update
+@echo:
+    jmp echo_update
 @chain:
     jmp chain_update
 @instr:
@@ -88,8 +93,13 @@ nav_update:
     beq @not_down
     lda ui_mode
     cmp #SCREEN_SONG
-    bne @not_down
+    bne @down_not_song
     jsr files_init
+    bra @eat_far
+@down_not_song:
+    cmp #SCREEN_INSTR
+    bne @not_down
+    jsr echo_init
     bra @eat_far
 @not_down:
     rep #$20
@@ -101,8 +111,13 @@ nav_update:
     beq @not_up
     lda ui_mode
     cmp #SCREEN_FILES
-    bne @not_up
+    bne @up_not_files
     jsr song_init_screen
+    bra @eat_far
+@up_not_files:
+    cmp #SCREEN_ECHO
+    bne @not_up
+    jsr instr_init
 @eat_far:
     rep #$20
 .ACCU 16

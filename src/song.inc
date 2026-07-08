@@ -46,6 +46,12 @@
 .DEFINE SH_GROOVE     0                ; default groove id
 .DEFINE SH_TRANSPOSE  1
 .DEFINE SH_MAGIC      2                ; $DJ ($D7) once initialised
+.DEFINE SH_EDL        3                ; echo delay 0-15 (x16 ms, x2 KB ARAM)
+.DEFINE SH_EFB        4                ; echo feedback (signed)
+.DEFINE SH_EVL        5                ; echo volume L
+.DEFINE SH_EVR        6                ; echo volume R
+.DEFINE SH_EON        7                ; per-voice echo send mask
+.DEFINE SH_FIR        8                ; FIR preset 0-7
 
 ; phrase row cell values
 .DEFINE NOTE_EMPTY    0                ; note byte: 0=empty, 1-96=C-0..B-7

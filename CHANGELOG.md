@@ -11,6 +11,13 @@
   IPL protocol; flip-bit mailbox with timeouts everywhere; SCB register
   writes land in the DSP; APU tick telemetry on port 3; a dead APU shows an
   `APU?` warning instead of hanging.
+- **M9 — Echo & FIR.** The ECHO screen: delay (with its ARAM cost shown
+  live), feedback, echo volume L/R, per-voice send mask, FIR preset with
+  tap display; 8 factory FIR curves; X (echo send on/off) and Y (FIR
+  preset) commands. EDL/ESA changes run a driver-side safe sequence that
+  also waits out the DSP's free-running echo offset — without that wait, a
+  shrunk delay line writes past its buffer and wraps into low ARAM,
+  eating samples (now a regression check). Echo config saves with the song.
 - **M8 — Save/load.** SNDJ1 SRAM format (SAVEFORMAT.md): 4 journalled slots
   over 5 regions — a save packs into an always-free region and flips the
   table entry last, so a power cut can't eat the previous good save.

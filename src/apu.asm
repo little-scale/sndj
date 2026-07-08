@@ -9,6 +9,7 @@
 .DEFINE CMD_DSP_WRITE $01
 .DEFINE CMD_UPLOAD    $02
 .DEFINE CMD_TICKRATE  $03
+.DEFINE CMD_ECHO_CFG  $04
 
 ; DSP register numbers
 .DEFINE DSP_V0VOLL   $00
@@ -118,6 +119,7 @@ apu_send:
     lda apu_seq
     jsr apu_wait_p0
     bcs @timeout
+    stz apu_status          ; a completed send heals a stale APU? flag
     clc
     rts
 @timeout:
@@ -279,6 +281,91 @@ apu_audio_init:
     bne @voice
 @fail:
     rts
+
+; --- apply the song header's echo config to the DSP ---------------------------
+; EVOL/EFB/FIR/EON are plain register writes; EDL/ESA go through the
+; driver's safe reconfiguration service (CMD_ECHO_CFG).
+apu_echo_apply_light:
+    lda.l $7E0000 + SB_HEADER + SH_EVL
+    tay
+    lda #DSP_EVOLL
+    jsr apu_dsp_write
+    lda.l $7E0000 + SB_HEADER + SH_EVR
+    tay
+    lda #DSP_EVOLR
+    jsr apu_dsp_write
+    lda.l $7E0000 + SB_HEADER + SH_EFB
+    tay
+    lda #DSP_EFB
+    jsr apu_dsp_write
+    lda.l $7E0000 + SB_HEADER + SH_EON
+    tay
+    lda #DSP_EON
+    jsr apu_dsp_write
+    lda.l $7E0000 + SB_HEADER + SH_FIR
+    jmp apu_fir_preset
+
+apu_echo_apply:
+    jsr apu_echo_apply_light
+    ; EDL/ESA: echo buffer at the top of ARAM (ESA = $100 - EDL*8 pages)
+    lda.l $7E0000 + SB_HEADER + SH_EDL
+    and #$0F
+    sta tmp2                ; payload lo = EDL
+    asl
+    asl
+    asl                     ; pages
+    eor #$FF
+    inc a                   ; $100 - pages (mod 256; EDL 0 -> ESA $00... park)
+    bne @esa_ok
+    lda #$FF                ; EDL 0: 4-byte buffer parked at $FF00
+@esa_ok:
+    sta tmp2 + 1            ; payload hi = ESA page
+    ldx tmp2
+    lda #CMD_ECHO_CFG
+    jmp apu_send
+
+; --- write FIR preset A (0-7) to the 8 FIR tap registers ------------------------
+apu_fir_preset:
+    and #$07
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl                     ; * 8
+    tax
+    sep #$20
+.ACCU 8
+    stz trig_id             ; tap counter (borrow; safe outside triggers)
+@tap:
+    lda.w fir_presets,x
+    tay
+    lda trig_id
+    asl
+    asl
+    asl
+    asl
+    ora #$0F                ; FIR tap register = v*16 + $0F
+    phx
+    jsr apu_dsp_write
+    plx
+    inx
+    inc trig_id
+    lda trig_id
+    cmp #$08
+    bne @tap
+    rts
+
+; 8 factory FIR curves x 8 taps (signed bytes; tap0-dominant = dry-ish)
+fir_presets:
+    .DB $7F, $00, $00, $00, $00, $00, $00, $00   ; 0 FLAT (pass-through)
+    .DB $58, $30, $12, $08, $00, $00, $00, $00   ; 1 DARK (lowpass hall)
+    .DB $70, $E8, $18, $F4, $00, $00, $00, $00   ; 2 BRIGHT (presence)
+    .DB $40, $00, $00, $40, $00, $00, $00, $00   ; 3 COMB
+    .DB $20, $30, $40, $30, $20, $10, $08, $04   ; 4 SOFT (smeared)
+    .DB $4C, $21, $12, $09, $05, $03, $02, $01   ; 5 DKC HALL (decay tail)
+    .DB $60, $A0, $40, $D0, $20, $E8, $10, $F8   ; 6 METAL (alternating)
+    .DB $7F, $00, $00, $00, $00, $00, $00, $00   ; 7 USER (starts flat)
 
 ; --- T command: set the engine tick rate from a BPM value ---------------------
 ; tick Hz = BPM * 0.4 (groove 6 = 4 rows/beat); Timer-0 target = 20000/BPM.

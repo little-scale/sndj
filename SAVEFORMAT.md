@@ -18,7 +18,7 @@ Offsets are frozen; save/load is a straight copy of this block.
 | $2E00  | $0800 | 32 tables x 64 bytes (reserved until tables land) |
 | $3600  | $0080 | 8 grooves x 16 ticks-per-row entries |
 | $3680  | $0100 | 8 wave banks x 32 samples (reserved until WAVE lands) |
-| $3780  | $0080 | song header: groove, transpose, magic $D7 at +2 |
+| $3780  | $0080 | song header: groove, transpose, magic $D7 at +2, echo block at +3 (EDL, feedback, EVOL L/R, EON mask, FIR preset) |
 
 Instrument record (16 bytes): type, sample, ADSR1 (low 7 bits), ADSR2,
 vol L, vol R, fine-tune, flags, GRP span, GRP offsets x3, reserved x4.

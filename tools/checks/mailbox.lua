@@ -43,8 +43,8 @@ local function onFrame()
     local t = wram(0x0011)
     check(t ~= tick_sample, "APU tick telemetry advancing (" ..
       tick_sample .. " -> " .. t .. ")")
-    -- after audio init: unmuted, echo buffer writes still disabled
-    check(dsp(0x6C) == 0x20, "DSP FLG unmuted with echo writes off ($" ..
+    -- after audio + echo init: unmuted, echo active (EDL 0 buffer at $FF00)
+    check(dsp(0x6C) == 0x00, "DSP FLG unmuted after echo init ($" ..
       string.format("%02X", dsp(0x6C)) .. ")")
   elseif frames == 100 then
     -- heartbeat fires at ROM frame 64 (~lua frame 75): check after it

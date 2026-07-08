@@ -41,6 +41,10 @@
                             ;   port0 = 1..255 (cycling, !=0), ports1-3 = 3 data
                             ;   bytes each round, echoed; port0 = 0 ends bulk
 .DEFINE CMD_TICKRATE  $03   ; port1 = Timer-0 target (engine tick divider)
+.DEFINE CMD_ECHO_CFG  $04   ; port1 = new EDL (0-15), port2 = new ESA page.
+                            ; Runs the erratum-safe sequence: mute + ECEN off,
+                            ; wait out the OLD delay, move ESA/EDL, zero the
+                            ; new buffer, re-enable. (CLAUDE.md invariant #4)
 
 ; --- zero-page state ----------------------------------------------------------
 .ENUM $0010
@@ -48,6 +52,10 @@ last_cmd  db      ; last port-0 byte processed
 tick      db      ; master tick counter (T0-derived)
 dest_lo   db      ; bulk upload write pointer
 dest_hi   db
+cur_edl   db      ; currently configured echo delay
+wait_cnt  db
+new_edl   db      ; latched CMD_ECHO_CFG payload (ports change under us)
+new_esa   db
 .ENDE
 
 .BANK 0 SLOT 0
@@ -71,6 +79,8 @@ entry:
     mov rDSPDATA, #$00
     mov rDSPADDR, #$1C      ; MVOL R
     mov rDSPDATA, #$00
+
+    mov cur_edl, #$00
 
     ; adopt whatever the CPU last wrote (the IPL kick byte) as "processed"
     mov a, rPORT0
@@ -114,6 +124,22 @@ main:
     mov rT0TARGET, a        ; T command: retune the master tick
     bra @ack
 @not_tick:
+    cmp a, #CMD_ECHO_CFG
+    bne @not_echo
+    ; latch the payload NOW — the CPU will reuse ports 1/2 for its next
+    ; command as soon as we ack
+    mov a, rPORT1
+    and a, #$0F
+    mov new_edl, a
+    mov a, rPORT2
+    mov new_esa, a
+    ; ack FIRST: the sequence below can take ~0.5 s (wait + buffer clear)
+    ; and must not stall the CPU's echo-wait past its timeout
+    mov a, last_cmd
+    mov rPORT0, a
+    call !echo_cfg
+    jmp !main
+@not_echo:
     ; unknown commands ack as NOP
 @ack:
     mov a, last_cmd
@@ -152,4 +178,62 @@ main:
     bra @bulk_wait
 @bulk_end:
     mov rPORT0, a           ; echo the 0; both sides now at seq 0
-    bra main
+    jmp !main
+
+; --- safe echo reconfiguration (port1 = EDL, port2 = ESA page) -----------------
+echo_cfg:
+    ; 1. mute + disable echo buffer writes
+    mov rDSPADDR, #$6C
+    mov rDSPDATA, #$60
+    ; 2. wait out the OLD delay: (cur_edl + 1) T0 periods (~16.6 ms each)
+    mov a, cur_edl
+    inc a
+    mov wait_cnt, a
+    mov a, rT0OUT           ; clear the counter
+@wait:
+    mov a, rT0OUT
+    beq @wait
+    dbnz wait_cnt, @wait
+    ; 3. move the buffer (latched payload)
+    mov a, new_esa
+    mov rDSPADDR, #$6D      ; ESA
+    mov rDSPDATA, a
+    mov a, new_edl
+    mov rDSPADDR, #$7D      ; EDL
+    mov rDSPDATA, a
+    mov cur_edl, a
+    ; 4. zero the new buffer region: EDL*2048 bytes (min 4) from ESA<<8
+    mov a, new_esa
+    mov dest_hi, a
+    mov dest_lo, #$00
+    mov a, cur_edl
+    asl a
+    asl a
+    asl a                   ; pages = EDL * 8
+    bne @have_pages
+    mov a, #$01             ; EDL 0 still owns 4 bytes; clear one page
+@have_pages:
+    mov wait_cnt, a
+    mov y, #$00
+    mov a, #$00
+@clear:
+    mov [dest_lo]+y, a
+    inc y
+    bne @clear
+    inc dest_hi
+    dbnz wait_cnt, @clear
+    ; 5. the echo OFFSET counter free-runs even with ECEN off; if the new
+    ; EDL is smaller, an in-flight offset never hits the new wrap point and
+    ; the DSP would write past the buffer (wrapping into low ARAM!) once
+    ; re-enabled. Wait a full max-delay (16 x ~16.6 ms) for the offset to
+    ; wrap around before enabling writes.
+    mov wait_cnt, #17
+    mov a, rT0OUT           ; clear the counter
+@offset_wait:
+    mov a, rT0OUT
+    beq @offset_wait
+    dbnz wait_cnt, @offset_wait
+    ; 6. re-enable: unmute, echo writes on
+    mov rDSPADDR, #$6C
+    mov rDSPDATA, #$00
+    ret

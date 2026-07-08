@@ -1,0 +1,346 @@
+; echoscr.asm — the ECHO screen: the room as a first-class instrument.
+; Edits the song header's echo block; EDL changes run the driver's safe
+; reconfiguration; everything else is a live register write. The ARAM cost
+; of the delay line is shown, not hidden (CLAUDE.md §11). FIR preset taps
+; are displayed; deep tap design belongs to the browser designer.
+
+.ACCU 8
+.INDEX 16
+
+.DEFINE EF_COUNT 6
+
+; field: header offset, max
+ef_fields:
+    .DB SH_EDL, 15
+    .DB SH_EFB, 255
+    .DB SH_EVL, 127
+    .DB SH_EVR, 127
+    .DB SH_EON, 255
+    .DB SH_FIR, 7
+
+ef_labels:
+    .DW ef_l0, ef_l1, ef_l2, ef_l3, ef_l4, ef_l5
+ef_l0: .DB "DELAY", 0
+ef_l1: .DB "FEEDBACK", 0
+ef_l2: .DB "ECHO L", 0
+ef_l3: .DB "ECHO R", 0
+ef_l4: .DB "EON MASK", 0
+ef_l5: .DB "FIR", 0
+
+echo_init:
+    lda #SCREEN_ECHO
+    sta ui_mode
+    stz if_cur              ; reuse the INSTR field cursor
+    jsr text_clear
+    lda #1
+    sta text_x
+    lda #1
+    sta text_y
+    rep #$20
+.ACCU 16
+    lda #ATTR_HILITE
+    sta text_attr
+    sep #$20
+.ACCU 8
+    ldx #str_echo
+    jsr text_puts
+    rts
+
+echo_update:
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_START
+    sep #$20
+.ACCU 8
+    beq @no_start
+    jsr engine_toggle
+@no_start:
+    lda a_down
+    beq @edit_ok
+    jmp echo_draw
+@edit_ok:
+    ; B edges (B+d-pad nudges; no tap action here)
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_B
+    sep #$20
+.ACCU 8
+    beq @no_press
+    lda #$01
+    sta b_down
+    stz b_used
+@no_press:
+    rep #$20
+.ACCU 16
+    lda pad_held
+    and #PAD_B
+    sep #$20
+.ACCU 8
+    bne @b_held
+    stz b_down
+    bra @cursor
+@b_held:
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_DPAD
+    sep #$20
+.ACCU 8
+    beq @draw
+    lda #$01
+    sta b_used
+    jsr ef_nudge
+    bra @draw
+@cursor:
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_UP
+    sep #$20
+.ACCU 8
+    beq @nu
+    lda if_cur
+    dec a
+    bpl @up_ok
+    lda #EF_COUNT - 1
+@up_ok:
+    sta if_cur
+@nu:
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_DOWN
+    sep #$20
+.ACCU 8
+    beq @draw
+    lda if_cur
+    inc a
+    cmp #EF_COUNT
+    bcc @dn_ok
+    lda #$00
+@dn_ok:
+    sta if_cur
+@draw:
+    jmp echo_draw
+
+; header byte address of field A -> X (offset within bank $7E)
+ef_addr:
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.w ef_fields,x       ; header offset
+    rep #$30
+.ACCU 16
+    and #$00FF
+    clc
+    adc #(SB_HEADER + $0000)
+    tax
+    sep #$20
+.ACCU 8
+    rts
+
+ef_nudge:
+    lda #4
+    sta tmp2
+    jsr nudge_delta         ; delta -> tmp1+1
+    lda tmp1 + 1
+    bne @have
+    rts
+@have:
+    sta es0                 ; pending delta
+    lda if_cur
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.w ef_fields + 1,x
+    sta es0 + 1             ; max
+    lda if_cur
+    jsr ef_addr
+    lda.l $7E0000,x
+    clc
+    adc es0
+    ; free byte fields (max 255) wrap; others clamp
+    ldy #$0000
+    cpy #$0000              ; (keep flags sane)
+    pha
+    lda es0 + 1
+    cmp #$FF
+    beq @wrap
+    pla
+    cmp es0 + 1
+    bcc @store
+    beq @store
+    ; out of range: clamp by delta sign
+    lda es0
+    bmi @lo
+    lda es0 + 1
+    bra @store
+@lo:
+    lda #$00
+    bra @store
+@wrap:
+    pla
+@store:
+    sta.l $7E0000,x
+    ; apply: EDL (field 0) walks the safe reconfig; the rest are live writes
+    lda if_cur
+    bne @light
+    jmp apu_echo_apply
+@light:
+    jmp apu_echo_apply_light
+
+echo_draw:
+    stz ui_cnt
+@rows:
+    lda ui_cnt
+    asl
+    clc
+    adc #4
+    sta text_y
+    lda #2
+    sta text_x
+    lda ui_cnt
+    cmp if_cur
+    bne @dim
+    rep #$20
+.ACCU 16
+    lda #ATTR_ACCENT
+    sta text_attr
+    sep #$20
+.ACCU 8
+    bra @label
+@dim:
+    rep #$20
+.ACCU 16
+    lda #ATTR_DIM
+    sta text_attr
+    sep #$20
+.ACCU 8
+@label:
+    lda ui_cnt
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    tax
+    lda.w ef_labels,x
+    tax
+    sep #$20
+.ACCU 8
+    jsr text_puts
+    ; value
+    lda #14
+    sta text_x
+    rep #$20
+.ACCU 16
+    lda #ATTR_TEXT
+    sta text_attr
+    sep #$20
+.ACCU 8
+    lda ui_cnt
+    jsr ef_addr
+    lda.l $7E0000,x
+    jsr text_hex8
+    ; EDL row: show the live ARAM trade (EDL * 2 KB)
+    lda ui_cnt
+    bne @no_cost
+    lda #18
+    sta text_x
+    rep #$20
+.ACCU 16
+    lda #ATTR_DIM
+    sta text_attr
+    sep #$20
+.ACCU 8
+    lda #'-' - 32
+    jsr text_puttile
+    lda ui_cnt
+    jsr ef_addr
+    lda.l $7E0000,x
+    asl                     ; KB = EDL * 2
+    ; two decimal digits
+    ldy #$0000
+@tens:
+    cmp #10
+    bcc @tens_done
+    sbc #10
+    iny
+    bra @tens
+@tens_done:
+    pha
+    tya
+    clc
+    adc #'0' - 32
+    jsr text_puttile
+    pla
+    clc
+    adc #'0' - 32
+    jsr text_puttile
+    lda #'K' - 32
+    jsr text_puttile
+    lda #'B' - 32
+    jsr text_puttile
+@no_cost:
+    inc ui_cnt
+    lda ui_cnt
+    cmp #EF_COUNT
+    beq @taps
+    jmp @rows
+@taps:
+    ; current FIR preset taps, read-only
+    lda #2
+    sta text_x
+    lda #18
+    sta text_y
+    rep #$20
+.ACCU 16
+    lda #ATTR_DIM
+    sta text_attr
+    sep #$20
+.ACCU 8
+    ldx #str_taps
+    jsr text_puts
+    lda.l $7E0000 + SB_HEADER + SH_FIR
+    and #$07
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    stz es1                 ; tap counter
+@tap:
+    lda es1
+    asl
+    clc
+    adc es1
+    adc #2                  ; x = 2 + tap*3
+    sta text_x
+    lda #19
+    sta text_y
+    phx
+    lda.w fir_presets,x
+    jsr text_hex8
+    plx
+    inx
+    inc es1
+    lda es1
+    cmp #$08
+    bne @tap
+    rts
+
+str_echo: .DB "ECHO", 0
+str_taps: .DB "FIR TAPS", 0

@@ -22,6 +22,8 @@
 .DEFINE CMDID_R 18
 .DEFINE CMDID_T 20
 .DEFINE CMDID_V 22
+.DEFINE CMDID_X 24
+.DEFINE CMDID_Y 25
 
 ; --- initialise a NEW song block ----------------------------------------------
 song_init:
@@ -88,6 +90,13 @@ song_init:
     ; header
     lda #$00
     sta.l $7E0000 + SB_HEADER + SH_GROOVE
+    sta.l $7E0000 + SB_HEADER + SH_EDL
+    sta.l $7E0000 + SB_HEADER + SH_EON
+    sta.l $7E0000 + SB_HEADER + SH_FIR
+    lda #$30
+    sta.l $7E0000 + SB_HEADER + SH_EFB
+    sta.l $7E0000 + SB_HEADER + SH_EVL
+    sta.l $7E0000 + SB_HEADER + SH_EVR
     lda #$D7
     sta.l $7E0000 + SB_HEADER + SH_MAGIC
     rts
@@ -600,6 +609,38 @@ row_cmd_pre:
     plx
     rts
 @not_t:
+    cmp #CMDID_X
+    bne @not_x
+    ; X: echo send on/off for this voice (val 0 = off, else on)
+    lda.w trk_cval,x
+    beq @eon_off
+    lda.w bit_for_track,x
+    ora.l $7E0000 + SB_HEADER + SH_EON
+    bra @eon_wr
+@eon_off:
+    lda.w bit_for_track,x
+    eor #$FF
+    and.l $7E0000 + SB_HEADER + SH_EON
+@eon_wr:
+    sta.l $7E0000 + SB_HEADER + SH_EON
+    tay
+    lda #DSP_EON
+    phx
+    jsr apu_dsp_write
+    plx
+    rts
+@not_x:
+    cmp #CMDID_Y
+    bne @not_y
+    ; Y: FIR preset select (global)
+    lda.w trk_cval,x
+    and #$07
+    sta.l $7E0000 + SB_HEADER + SH_FIR
+    phx
+    jsr apu_fir_preset
+    plx
+    rts
+@not_y:
     cmp #CMDID_K
     bne @not_k
     lda.w trk_cval,x
