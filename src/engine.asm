@@ -792,14 +792,14 @@ row_cmd_pre:
     lda.w trk_cval,x
     beq @eon_off
     lda.w bit_for_track,x
-    ora.l $7E0000 + SB_HEADER + SH_EON
+    ora eng_eon
     bra @eon_wr
 @eon_off:
     lda.w bit_for_track,x
     eor #$FF
-    and.l $7E0000 + SB_HEADER + SH_EON
+    and eng_eon
 @eon_wr:
-    sta.l $7E0000 + SB_HEADER + SH_EON
+    sta eng_eon
     tay
     lda #DSP_EON
     phx

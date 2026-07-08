@@ -40,16 +40,18 @@ local script = {
   [70] = { down = true }, [72] = {},
   [74] = { down = true }, [76] = {},
   [78] = { b = true }, [80] = {},
-  -- row 3: insert then Y+B clear
+  -- row 3: insert, then block-select it (Y+B) and cut (Y again)
   [82] = { down = true }, [84] = {},
-  [86] = { b = true }, [88] = {},
-  [90] = { y = true },
-  [92] = { y = true, b = true },
-  [94] = {},
+  [92] = { b = true }, [94] = {},
+  [100] = { y = true },
+  [102] = { y = true, b = true },
+  [104] = {},
+  [108] = { y = true },
+  [110] = {},
   -- play (phrase mode: loops this phrase on track 0)
-  [100] = { start = true }, [102] = {},
+  [120] = { start = true }, [122] = {},
   -- stop
-  [170] = { start = true }, [172] = {},
+  [190] = { start = true }, [192] = {},
 }
 
 emu.addEventCallback(function() emu.setInput(pad, 0) end, emu.eventType.inputPolled)
@@ -74,12 +76,14 @@ emu.addEventCallback(function()
   elseif frames == 81 then
     check(wram(0x000F) == 2, "cursor on row 2")
     check(wram(0x4308) == 50, "B tap inserted last note (C#4) at row 2")
-  elseif frames == 96 then
-    check(wram(0x430C) == 0, "Y+B cleared row 3")
+  elseif frames == 98 then
+    check(wram(0x430C) == 50, "row 3 inserted before the cut")
+  elseif frames == 114 then
+    check(wram(0x430C) == 0, "block cut cleared row 3 (Y+B, Y)")
     check(wram(0x0016) == 0, "not playing yet")
-  elseif frames == 112 then
+  elseif frames == 132 then
     check(wram(0x0016) == 1, "Start began playback")
-  elseif frames == 160 then
+  elseif frames == 180 then
     check(wram(0x0016) == 1, "still playing")
     local row = wram(0x0017)
     -- ~60 frames at 60.15Hz ticks / groove 6 = ~10 rows in
@@ -90,9 +94,9 @@ emu.addEventCallback(function()
       "last engine pitch is C-4/C#4 ($" .. string.format("%04X", p) .. ")")
     local dp = dsp(0x02) + dsp(0x03) * 256
     check(dp == p, "DSP V0 pitch matches engine")
-  elseif frames == 178 then
+  elseif frames == 198 then
     check(wram(0x0016) == 0, "Start stopped playback")
-  elseif frames == 185 then
+  elseif frames == 205 then
     local out = os.getenv("SNESDJ_PHRASE_SHOT")
     if out then
       local png = emu.takeScreenshot()

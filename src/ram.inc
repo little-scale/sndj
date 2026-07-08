@@ -98,6 +98,13 @@ ed_kit       db      ; kit under edit (KIT screen)
 kt_row       db      ; KIT screen cursor slot
 kt_col       db      ; KIT screen cursor column (0=sample 1=tune 2=vol)
 hop_guard    db      ; H-command chain-hop limiter per row tick
+eng_eon      db      ; live per-voice echo-send mask (EON shadow)
+blk_mode     db      ; block select active on the current grid screen
+blk_start    db      ; block anchor row
+clip_kind    db      ; clipboard: 0 none, 1 phrase rows, 2 chain rows, 3 song cells
+clip_len     db      ; clipboard row count
+tap_timer    db      ; frames left to accept a B double-tap (paste)
+ed_track     db      ; track context (set when descending from SONG)
 trk_pending  ds 8    ; LIVE: chain queued to launch at the phrase boundary
 trk_mute     db      ; bit per track: muted
 envx_mirror  ds 8    ; per-voice ENVX from driver telemetry

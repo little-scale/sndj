@@ -78,10 +78,10 @@ emu.addEventCallback(function()
     check(wram(0x16) == 1, "B launched immediately from stopped")
     check(wram(0x20) == 0, "track 0 playing chain 0")
   elseif frames == queued then
-    check(wram(0xE1) == 1, "chain 1 queued on track 0")
+    check(wram(0xE8) == 1, "chain 1 queued on track 0")
     check(wram(0x20) == 0, "still on chain 0 until the boundary")
   elseif frames > queued and frames <= watch_until then
-    if wram(0x0E) ~= nil and envx_seen == false and wram(0xEA) > 0 then
+    if wram(0x0E) ~= nil and envx_seen == false and wram(0xF1) > 0 then
       envx_seen = true
     end
     if switch_frame == nil and wram(0x20) == 1 then
@@ -95,14 +95,14 @@ emu.addEventCallback(function()
         "(prow=" .. switch_prow .. " at switch)")
       check(switch_frame - queued > 30, "launch waited for the boundary (" ..
         (switch_frame - queued) .. " frames)")
-      check(wram(0xE1) == 0xFF, "pending slot cleared")
+      check(wram(0xE8) == 0xFF, "pending slot cleared")
     end
     -- ENVX itself reads as 0 in Mesen (emulator limitation; the same
     -- driver path verifiably round-trips FLG). Hardware-verify item.
     print("info: ENVX meters are a hardware-verify item (Mesen reads 0); " ..
       "seen=" .. tostring(envx_seen))
   elseif frames > muted - 10 and frames < done - 2 then
-    local m = wram(0xE9)
+    local m = wram(0xF0)
     if #mute_seq == 0 or mute_seq[#mute_seq] ~= m then
       mute_seq[#mute_seq + 1] = m
     end

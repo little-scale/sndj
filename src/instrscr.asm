@@ -11,7 +11,7 @@
 .ACCU 8
 .INDEX 16
 
-.DEFINE IF_COUNT 12
+.DEFINE IF_COUNT 13
 
 ; field table: byte offset in record, shift, value mask (post-shift), max
 if_fields:
@@ -27,10 +27,11 @@ if_fields:
     .DB 9,  0, $FF, 24   ; OFS 1
     .DB 10, 0, $FF, 24   ; OFS 2
     .DB 11, 0, $FF, 24   ; OFS 3
+    .DB 7,  0, $01, 1    ; EON (echo send)
 
 if_labels:
     .DW if_l0, if_l1, if_l2, if_l3, if_l4, if_l5
-    .DW if_l6, if_l7, if_l8, if_l9, if_l10, if_l11
+    .DW if_l6, if_l7, if_l8, if_l9, if_l10, if_l11, if_l12
 if_l0:  .DB "TYPE", 0
 if_l1:  .DB "SAMPLE", 0
 if_l2:  .DB "ATTACK", 0
@@ -43,6 +44,7 @@ if_l8:  .DB "GRP", 0
 if_l9:  .DB "OFS 1", 0
 if_l10: .DB "OFS 2", 0
 if_l11: .DB "OFS 3", 0
+if_l12: .DB "ECHO", 0
 
 if_types:
     .DB "SMPKITWAVNSE"     ; 3 chars each

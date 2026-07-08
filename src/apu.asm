@@ -290,6 +290,7 @@ apu_echo_apply_light:
     lda #DSP_EFB
     jsr apu_dsp_write
     lda.l $7E0000 + SB_HEADER + SH_EON
+    sta eng_eon             ; the live shadow starts from the song default
     tay
     lda #DSP_EON
     jsr apu_dsp_write
@@ -535,6 +536,36 @@ apply_instrument:
     lda #DSP_NON
     jsr apu_dsp_write
 @non_same:
+    ; EON bit from the instrument's flags byte (rec[7] bit 0)
+    plx
+    phx
+    lda.l $7E0000 + SB_INSTR + 7,x
+    and #$01
+    pha
+    lda trig_voice
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    pla
+    beq @eon_off
+    lda.w bit_for_track,x
+    ora eng_eon
+    bra @eon_upd
+@eon_off:
+    lda.w bit_for_track,x
+    eor #$FF
+    and eng_eon
+@eon_upd:
+    cmp eng_eon
+    beq @eon_same
+    sta eng_eon
+    tay
+    lda #DSP_EON
+    jsr apu_dsp_write
+@eon_same:
     plx
     ; ADSR1 (ADSR mode always on)
     lda.l $7E0000 + SB_INSTR + 2,x
