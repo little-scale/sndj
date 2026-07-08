@@ -60,6 +60,7 @@ Reset:
     jsr apu_audio_init      ; factory sample + directory + voice 0 config
 +
     jsr song_init           ; fresh song block (NEW)
+    jsr sram_check          ; format SNDJ1 SRAM on first boot
 
     ; editor defaults: first B tap inserts C-4 / instrument 0 / command A
     lda #49

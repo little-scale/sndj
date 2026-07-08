@@ -11,6 +11,14 @@
   IPL protocol; flip-bit mailbox with timeouts everywhere; SCB register
   writes land in the DSP; APU tick telemetry on port 3; a dead APU shows an
   `APU?` warning instead of hanging.
+- **M8 — Save/load.** SNDJ1 SRAM format (SAVEFORMAT.md): 4 journalled slots
+  over 5 regions — a save packs into an always-free region and flips the
+  table entry last, so a power cut can't eat the previous good save.
+  Column-planar RLE (an empty song packs to ~220 bytes), CRC-16 guarded
+  loads, FILES screen (A+Down from SONG). `make test` runs the Python RLE
+  mirror; the emulator check decodes the console-packed SRAM bytes in Lua
+  and requires a byte-identical song block after save -> corrupt -> load
+  -> hardware reset -> load.
 - **M7 — Commands (partial: TABLE screen still to come).** The command
   executor with per-tick effect processing on every track: A arpeggio,
   D delay (within the row), G groove select, H hop, K kill, L slide/legato

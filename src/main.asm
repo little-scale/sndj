@@ -39,6 +39,8 @@
 .INCLUDE "chainscr.asm"
 .INCLUDE "songscr.asm"
 .INCLUDE "instrscr.asm"
+.INCLUDE "save.asm"
+.INCLUDE "filescr.asm"
 .INCLUDE "splash.asm"
 
 ; --- main loop ---------------------------------------------------------------

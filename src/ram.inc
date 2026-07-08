@@ -47,6 +47,22 @@ trk_songrow  ds 8    ; $38  per-track: song grid row
 up_src       dw      ; bulk upload: source (DB-relative)
 up_dest      dw      ;              dest ARAM address
 up_len       dw      ;              byte count (multiple of 3)
+; save/load state (sv_src/sv_dst used with [dp] — must stay below $100)
+sv_src       ds 3    ; 24-bit read pointer
+sv_dst       ds 3    ; 24-bit write pointer
+sv_crc       dw      ; CRC-16/CCITT accumulator
+sv_size      dw      ; packed byte count
+sv_i         dw      ; pack: current image index
+sv_lit       dw      ; pack: pending literal start
+sv_run       db      ; pack: current run length
+sv_b         db      ; pack: current run byte
+sv_chunk     dw      ; pack: literal chunk counter
+sv_ovf       db      ; pack: region overflow flag
+sv_slot      db
+sv_region    db
+fl_slot      db      ; FILES cursor slot
+fl_col       db      ; FILES cursor column (0=load 1=save)
+fl_msg       db      ; FILES status message id
 ; hot scalars (keep below $100 for direct-page speed)
 das_last_fc  db      ; frame_cnt low byte at last DAS update
 text_x       db

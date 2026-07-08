@@ -15,6 +15,7 @@
 .DEFINE SCREEN_CHAIN  2
 .DEFINE SCREEN_SONG   3
 .DEFINE SCREEN_INSTR  4
+.DEFINE SCREEN_FILES  5
 
 ; called every frame from the main loop
 screen_update:
@@ -28,9 +29,13 @@ screen_update:
     beq @chain
     cmp #SCREEN_INSTR
     beq @instr
+    cmp #SCREEN_FILES
+    beq @files
     jmp song_update
 @phrase:
     jmp phrase_update
+@files:
+    jmp files_update
 @chain:
     jmp chain_update
 @instr:
@@ -73,6 +78,40 @@ nav_update:
 @has_dpad:
     lda #$01
     sta a_used
+    ; up/down: SONG <-> FILES (the map's vertical axis grows with screens)
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_DOWN
+    sep #$20
+.ACCU 8
+    beq @not_down
+    lda ui_mode
+    cmp #SCREEN_SONG
+    bne @not_down
+    jsr files_init
+    bra @eat_far
+@not_down:
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_UP
+    sep #$20
+.ACCU 8
+    beq @not_up
+    lda ui_mode
+    cmp #SCREEN_FILES
+    bne @not_up
+    jsr song_init_screen
+@eat_far:
+    rep #$20
+.ACCU 16
+    lda #$0000
+    sta pad_event
+    sep #$20
+.ACCU 8
+    rts
+@not_up:
     ; left/right along the spine
     rep #$20
 .ACCU 16

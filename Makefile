@@ -94,6 +94,7 @@ test:
 	python3 tools/makefont.py /tmp/snesdj-font-test.bin > /dev/null
 	python3 tools/maketables.py /tmp > /dev/null
 	python3 tools/sndj_brr.py --selftest
+	python3 tools/sndj_rle.py --selftest
 	@echo "test: OK"
 
 dist: all
