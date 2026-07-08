@@ -89,6 +89,8 @@ nav_update:
     sep #$20
 .ACCU 8
     beq @no_edge
+    lda b_down
+    bne @no_edge            ; B was held first: A belongs to B's gesture
     lda #$01
     sta a_down
     stz a_used

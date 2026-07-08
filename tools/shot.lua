@@ -1,14 +1,19 @@
 -- shot.lua — headless screenshot for `make shot` / goldens.
--- Waits for the splash to settle, then writes a PNG to the path in the
--- SNESDJ_SHOT env var (default build/shot.png) and exits.
+-- Waits for boot (magic_boot) plus a settle delay deep inside the
+-- PRESS-START blink window, then writes a PNG and exits.
 
 local out = os.getenv("SNESDJ_SHOT") or "build/shot.png"
-local target = tonumber(os.getenv("SNESDJ_SHOT_FRAME") or "76")
+local settle = tonumber(os.getenv("SNESDJ_SHOT_FRAME") or "48")
+local booted = false
 local frames = 0
 
 emu.addEventCallback(function()
+  if not booted then
+    if emu.read(1, emu.memType.snesWorkRam) == 0x5D then booted = true end
+    return
+  end
   frames = frames + 1
-  if frames == target then
+  if frames == settle then
     local png = emu.takeScreenshot()
     local f = io.open(out, "wb")
     f:write(png)

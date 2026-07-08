@@ -165,12 +165,21 @@ song_init:
     rts
 
 ; --- start/stop ----------------------------------------------------------------
+; A+B on SONG: play from the cursor row (genmddj C+B "play from here")
+engine_play_from_cursor:
+    lda song_cy
+    bra engine_play_row
+
 ; Start playback from song row 0: every track loads its first chain.
 engine_play:
+    lda #$00
+engine_play_row:
+    sta es3 + 1
     ldx #$0000
 @track:
-    lda #$00
+    lda es3 + 1
     sta.w trk_songrow,x
+    lda #$00
     sta.w trk_cpos,x
     sta.w trk_tsp,x
     lda #$FF

@@ -32,7 +32,8 @@ live_init:
     rts
 
 live_update:
-    ; Start: play/stop the song
+    ; Start: stop when playing; from stopped, launch every populated track
+    ; on the cursor row (genmddj LIVE Start)
     rep #$20
 .ACCU 16
     lda pad_pressed
@@ -40,8 +41,27 @@ live_update:
     sep #$20
 .ACCU 8
     beq @no_start
-    jsr engine_toggle
+    lda eng_playing
+    beq @launch_row
+    jsr engine_stop
+    bra @no_start
+@launch_row:
+    jsr live_launch_row
 @no_start:
+    ; A held + B: launch/queue the cursor cell (genmddj LIVE C+B)
+    lda a_down
+    beq @no_ab
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_B
+    sep #$20
+.ACCU 8
+    beq @no_ab
+    jsr live_queue_cursor
+    lda #$01
+    sta a_used
+@no_ab:
     lda a_down
     beq @edit_ok
     jmp live_draw
@@ -103,7 +123,7 @@ live_update:
 @x_done:
     jmp live_draw
 @no_x:
-    ; B tap: queue the cursor cell's chain on this track
+    ; B tap also queues (shortcut alias for A+B)
     rep #$20
 .ACCU 16
     lda pad_pressed
@@ -111,23 +131,7 @@ live_update:
     sep #$20
 .ACCU 8
     beq @no_b
-    jsr song_cursor_cell    ; A = chain under cursor ($FF = empty)
-    cmp #$FF
-    beq @no_b
-    pha
-    lda song_cx
-    rep #$30
-.ACCU 16
-    and #$00FF
-    tax
-    sep #$20
-.ACCU 8
-    pla
-    sta.w trk_pending,x
-    ; if stopped, launch immediately as a standalone chain
-    lda eng_playing
-    bne @no_b
-    jsr engine_play_live
+    jsr live_queue_cursor
 @no_b:
     ; plain cursor movement (reuses the SONG cursor + window)
     rep #$20
@@ -140,6 +144,57 @@ live_update:
     jsr song_cursor_move
 @draw:
     jmp live_draw
+
+; queue the cursor cell's chain on its track (launches now if stopped)
+live_queue_cursor:
+    jsr song_cursor_cell    ; A = chain under cursor ($FF = empty)
+    cmp #$FF
+    beq @done
+    pha
+    lda song_cx
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    pla
+    sta.w trk_pending,x
+    lda eng_playing
+    bne @done
+    jsr engine_play_live
+@done:
+    rts
+
+; queue every populated track on the cursor row, then launch
+live_launch_row:
+    ldx #$0000
+@scan:
+    ; cell = SONG[track][song_cy]
+    phx
+    rep #$30
+.ACCU 16
+    txa
+    xba
+    lsr                     ; track * 128
+    sta es0
+    lda song_cy
+    and #$00FF
+    clc
+    adc es0
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_SONG,x
+    plx
+    cmp #$FF
+    beq @next
+    sta.w trk_pending,x
+@next:
+    inx
+    cpx #TRACKS
+    bne @scan
+    jmp engine_play_live
 
 ; key off any newly muted voices so they don't ring
 live_mute_koff:

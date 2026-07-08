@@ -57,6 +57,41 @@ wave_update:
     beq @no_start
     jsr engine_toggle
 @no_start:
+    ; A held + left/right: select the wave bank (genmddj C+left/right on WAVE)
+    lda a_down
+    bne @asel
+    jmp @edit_ok
+@asel:
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_LEFT
+    sep #$20
+.ACCU 8
+    beq @a_r
+    lda ed_wave
+    dec a
+    and #$07
+    sta ed_wave
+    lda #$01
+    sta a_used
+    jsr wave_eat_dpad
+@a_r:
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_RIGHT
+    sep #$20
+.ACCU 8
+    beq @a_done
+    lda ed_wave
+    inc a
+    and #$07
+    sta ed_wave
+    lda #$01
+    sta a_used
+    jsr wave_eat_dpad
+@a_done:
     lda a_down
     beq @edit_ok
     jmp wave_draw
@@ -117,6 +152,19 @@ wave_update:
     stz b_down
     bra @cursor
 @b_held:
+    ; B held + A tap: stamp the next factory shape (genmddj B+C)
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_A
+    sep #$20
+.ACCU 8
+    beq @no_stamp
+    lda #$01
+    sta b_used
+    jsr wave_stamp
+    jmp wave_draw
+@no_stamp:
     rep #$20
 .ACCU 16
     lda pad_event
@@ -155,6 +203,53 @@ wave_update:
     sta wv_x
 @nr:
     jmp wave_draw
+
+wave_eat_dpad:
+    rep #$20
+.ACCU 16
+    lda #$0000
+    sta pad_event
+    sep #$20
+.ACCU 8
+    rts
+
+; B held + A tap: stamp the next factory shape into this bank
+; (sine -> tri -> saw -> square -> 25% -> 12.5% -> organ -> grit)
+wave_stamp:
+    inc wv_stamp
+    lda wv_stamp
+    and #$07
+    sta wv_stamp
+    stz es2                 ; column
+@copy:
+    lda wv_stamp
+    rep #$30
+.ACCU 16
+    and #$00FF
+    xba
+    lsr
+    lsr
+    lsr                     ; * 32
+    sta es1
+    lda es2
+    and #$00FF
+    clc
+    adc es1
+    tax
+    sep #$20
+.ACCU 8
+    lda.w default_waves,x
+    pha
+    lda es2
+    jsr wv_addr
+    pla
+    sta.l $7E0000,x
+    inc es2
+    lda es2
+    cmp #$20
+    bne @copy
+    lda ed_wave
+    jmp wave_compile
 
 ; B held + d-pad: up/down shape, left/right paint-drag
 wave_edit:

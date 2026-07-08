@@ -76,9 +76,68 @@ chain_update:
     beq @no_start
     jsr engine_toggle
 @no_start:
+    ; A held + B: play this chain from the cursor entry (genmddj C+B)
     lda a_down
-    beq @edit_ok
+    beq @no_ab
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_B
+    sep #$20
+.ACCU 8
+    beq @no_ab
+    jsr engine_play_chain
+    lda chain_cy
+    sta trk_cpos
+    ldx #$0000
+    jsr track_load_chain_entry
+    lda #$FF
+    sta trk_prow
+    lda #$01
+    sta a_used
+@no_ab:
+    lda a_down
+    beq @edit_y
     jmp @draw
+@edit_y:
+    ; Y held + up/down: previous / next chain (genmddj A+up/down)
+    rep #$20
+.ACCU 16
+    lda pad_held
+    and #PAD_Y
+    sep #$20
+.ACCU 8
+    beq @edit_ok
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_UP
+    sep #$20
+.ACCU 8
+    beq @y_dn
+    lda ed_chain
+    dec a
+    bpl @y_set
+    lda #(CHAIN_COUNT - 1)
+@y_set:
+    sta ed_chain
+    jmp chain_hdr
+@y_dn:
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_DOWN
+    sep #$20
+.ACCU 8
+    beq @edit_ok
+    lda ed_chain
+    inc a
+    cmp #CHAIN_COUNT
+    bcc @y_set2
+    lda #$00
+@y_set2:
+    sta ed_chain
+    jmp chain_hdr
 @edit_ok:
     ; Y+B cut
     rep #$20
@@ -170,6 +229,21 @@ chain_update:
     beq @draw
     jsr chain_cursor_move
 @draw:
+    jmp chain_draw
+
+chain_hdr:
+    lda #7
+    sta text_x
+    lda #1
+    sta text_y
+    rep #$20
+.ACCU 16
+    lda #ATTR_HILITE
+    sta text_attr
+    sep #$20
+.ACCU 8
+    lda ed_chain
+    jsr text_hex8
     jmp chain_draw
 
 ; signed delta from pad_event -> tmp1+1 (L/R = 1, U/D = 16 or 12)

@@ -81,9 +81,65 @@ song_update:
     beq @no_start
     jsr engine_toggle
 @no_start:
-    ; skip editing while A (nav) is held
+    ; A held + B: play the song from the cursor row (genmddj C+B)
     lda a_down
+    beq @no_ab
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_B
+    sep #$20
+.ACCU 8
+    beq @no_ab
+    jsr engine_play_from_cursor
+    lda #$01
+    sta a_used
+@no_ab:
+    lda a_down
+    beq @edit_y
+    jmp @draw
+@edit_y:
+    ; Y held + up/down: page the 128-row view (genmddj A+up/down)
+    rep #$20
+.ACCU 16
+    lda pad_held
+    and #PAD_Y
+    sep #$20
+.ACCU 8
     beq @edit_ok
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_UP
+    sep #$20
+.ACCU 8
+    beq @pg_dn
+    lda song_cy
+    sec
+    sbc #$10
+    bcs @pg_set
+    lda #$00
+@pg_set:
+    sta song_cy
+    bra @pg_win
+@pg_dn:
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_DOWN
+    sep #$20
+.ACCU 8
+    beq @edit_ok
+    lda song_cy
+    clc
+    adc #$10
+    cmp #SONG_ROWS
+    bcc @pg_set2
+    lda #(SONG_ROWS - 1)
+@pg_set2:
+    sta song_cy
+@pg_win:
+    jsr song_snap_window
     jmp @draw
 @edit_ok:
     ; Y+B: cut
@@ -271,7 +327,8 @@ song_cursor_move:
     bcs @nd
     inc song_cy
 @nd:
-    ; scroll window follows the cursor
+    ; fall through: scroll window follows the cursor
+song_snap_window:
     lda song_cy
     cmp song_top
     bcs @not_above

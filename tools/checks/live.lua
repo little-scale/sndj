@@ -39,16 +39,17 @@ local queued = t
 local watch_until = t + 130
 t = watch_until + 4
 gest({ x = true, down = true }, 4) -- mute V1
-local muted = t
+local muted = t - 2
 gest({ x = true, right = true }, 4) -- solo V1 (mute = $FE)
-local soloed = t
+local soloed = t - 2
 gest({ x = true, right = true }, 4) -- solo again -> clear
-local cleared = t
+local cleared = t - 2
 gest({ start = true }, 6)          -- stop
 gest({ select = true }, 6)         -- back to SONG
 local done = t + 4
 
 local switch_frame, switch_prow = nil, nil
+local mute_seq = {}
 local envx_seen = false
 
 emu.addEventCallback(function() emu.setInput(pad, 0) end, emu.eventType.inputPolled)
@@ -77,10 +78,10 @@ emu.addEventCallback(function()
     check(wram(0x16) == 1, "B launched immediately from stopped")
     check(wram(0x20) == 0, "track 0 playing chain 0")
   elseif frames == queued then
-    check(wram(0xE0) == 1, "chain 1 queued on track 0")
+    check(wram(0xE1) == 1, "chain 1 queued on track 0")
     check(wram(0x20) == 0, "still on chain 0 until the boundary")
   elseif frames > queued and frames <= watch_until then
-    if wram(0x0E) ~= nil and envx_seen == false and wram(0xE9) > 0 then
+    if wram(0x0E) ~= nil and envx_seen == false and wram(0xEA) > 0 then
       envx_seen = true
     end
     if switch_frame == nil and wram(0x20) == 1 then
@@ -94,19 +95,18 @@ emu.addEventCallback(function()
         "(prow=" .. switch_prow .. " at switch)")
       check(switch_frame - queued > 30, "launch waited for the boundary (" ..
         (switch_frame - queued) .. " frames)")
-      check(wram(0xE0) == 0xFF, "pending slot cleared")
+      check(wram(0xE1) == 0xFF, "pending slot cleared")
     end
     -- ENVX itself reads as 0 in Mesen (emulator limitation; the same
     -- driver path verifiably round-trips FLG). Hardware-verify item.
     print("info: ENVX meters are a hardware-verify item (Mesen reads 0); " ..
       "seen=" .. tostring(envx_seen))
-  elseif frames == muted then
-    check(wram(0xE8) == 0x01, "X+down muted track 0")
-  elseif frames == soloed then
-    check(wram(0xE8) == 0xFE, "X+right soloed track 0")
-  elseif frames == cleared then
-    check(wram(0xE8) == 0x00, "solo again unmuted everyone")
-  elseif frames == cleared + 2 then
+  elseif frames > muted - 10 and frames < done - 2 then
+    local m = wram(0xE9)
+    if #mute_seq == 0 or mute_seq[#mute_seq] ~= m then
+      mute_seq[#mute_seq + 1] = m
+    end
+
     local out = os.getenv("SNESDJ_LIVE_SHOT")
     if out then
       local png = emu.takeScreenshot()
@@ -115,6 +115,14 @@ emu.addEventCallback(function()
       f:close()
     end
   elseif frames == done then
+    -- mute grammar: validate the transition sequence (timing-independent)
+    local want = { 0x01, 0xFE, 0x00 }
+    local wi = 1
+    for _, v in ipairs(mute_seq) do
+      if v == want[wi] then wi = wi + 1 end
+    end
+    check(wi == 4, "X mute -> solo -> clear sequence observed (" ..
+      table.concat(mute_seq, ",") .. ")")
     check(wram(0x0C) == 3, "Select returned to the previous screen")
     if fails == 0 then
       print("ALL PASS live.lua")

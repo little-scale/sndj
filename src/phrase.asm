@@ -31,6 +31,19 @@ phrase_init:
     jsr text_puts
     lda ed_phrase
     jsr text_hex8
+    ; column titles
+    lda #4
+    sta text_x
+    lda #3
+    sta text_y
+    rep #$20
+.ACCU 16
+    lda #ATTR_DIM
+    sta text_attr
+    sep #$20
+.ACCU 8
+    ldx #str_cols
+    jsr text_puts
     rts
 
 ; ---------------------------------------------------------------------------
@@ -47,9 +60,66 @@ phrase_update:
     beq @no_start
     jsr engine_toggle
 @no_start:
+    ; A held + B tap: play this phrase from the cursor row (genmddj C+B)
     lda a_down
-    beq @edit_ok
+    beq @no_ab
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_B
+    sep #$20
+.ACCU 8
+    beq @no_ab
+    jsr engine_play_phrase
+    lda cur_y
+    dec a
+    and #$0F
+    sta trk_prow            ; next tick advances INTO the cursor row
+    lda #$01
+    sta a_used
+@no_ab:
+    lda a_down
+    beq @edit_y
     jmp phrase_draw
+@edit_y:
+    ; Y held + up/down: previous / next phrase (genmddj A+up/down)
+    rep #$20
+.ACCU 16
+    lda pad_held
+    and #PAD_Y
+    sep #$20
+.ACCU 8
+    beq @edit_ok
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_UP
+    sep #$20
+.ACCU 8
+    beq @y_dn
+    lda ed_phrase
+    dec a
+    bpl @y_set
+    lda #(PHRASE_COUNT - 1)
+@y_set:
+    sta ed_phrase
+    jmp phrase_draw_hdr
+@y_dn:
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_DOWN
+    sep #$20
+.ACCU 8
+    beq @edit_ok
+    lda ed_phrase
+    inc a
+    cmp #PHRASE_COUNT
+    bcc @y_set2
+    lda #$00
+@y_set2:
+    sta ed_phrase
+    jmp phrase_draw_hdr
 @edit_ok:
 
     ; Y held + B pressed: clear cell
@@ -102,6 +172,19 @@ phrase_update:
     bra @dpad_cursor
 
 @b_is_down:
+    ; B held + Y tap: copy the cell to the insert buffer (genmddj B+A)
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_Y
+    sep #$20
+.ACCU 8
+    beq @no_copy
+    lda #$01
+    sta b_used
+    jsr cell_copy
+    bra @draw
+@no_copy:
     ; B held + d-pad = nudge
     rep #$20
 .ACCU 16
@@ -125,6 +208,21 @@ phrase_update:
     beq @draw
     jsr cursor_move
 @draw:
+    jmp phrase_draw
+
+phrase_draw_hdr:
+    lda #8
+    sta text_x
+    lda #1
+    sta text_y
+    rep #$20
+.ACCU 16
+    lda #ATTR_HILITE
+    sta text_attr
+    sep #$20
+.ACCU 8
+    lda ed_phrase
+    jsr text_hex8
     jmp phrase_draw
 
 ; --- cursor movement (d-pad events in pad_event) -------------------------------
@@ -240,6 +338,38 @@ cell_tap:
 @val:
     lda ed_lastval
     sta.l $7E0000 + SB_PHRASES,x
+    rts
+
+; --- B held + Y: copy cell into the per-column insert buffer -------------------
+cell_copy:
+    jsr cell_addr
+    lda.l $7E0000 + SB_PHRASES,x
+    sta es3
+    lda ed_col
+    bne @not_note
+    lda es3
+    beq @done
+    sta ed_lastnote
+@done:
+    rts
+@not_note:
+    cmp #$01
+    bne @not_instr
+    lda es3
+    cmp #INSTR_NONE
+    beq @done
+    sta ed_lastinstr
+    rts
+@not_instr:
+    cmp #$02
+    bne @is_val
+    lda es3
+    beq @done
+    sta ed_lastcmd
+    rts
+@is_val:
+    lda es3
+    sta ed_lastval
     rts
 
 ; --- Y+B: cut (deleted value becomes the next B-tap insert) --------------------
@@ -509,9 +639,9 @@ phrase_draw:
     jsr text_puttile
 @c_done:
 
-    ; VAL cell
+    ; VAL cell (contiguous with the command letter)
     inc tmp0
-    lda #13
+    lda #12
     sta text_x
     jsr cell_attr
     lda str_buf + 34        ; empty cmd draws val dimmed as --
@@ -630,3 +760,4 @@ note_name1: .DB "CCDDEFFGGAAB"
 note_name2: .DB "-#-#--#-#-#-"
 
 str_phrase: .DB "PHRASE ", 0
+str_cols:   .DB "NOTE IN  CMD", 0

@@ -85,6 +85,7 @@ ed_instr     db      ; instrument id under edit (INSTR screen)
 if_cur       db      ; INSTR screen field cursor
 ed_wave      db      ; wave bank under edit (WAVE screen)
 wv_x         db      ; WAVE screen cursor column (0-31)
+wv_stamp     db      ; WAVE preset-stamp cycle position
 trig_type    db      ; instrument type at trigger time
 pool_count   db      ; samples in the ROM pool (set at boot)
 pool_map     ds 64   ; pool index -> resident SRCN (0 = silent stub)
