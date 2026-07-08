@@ -121,6 +121,78 @@ song_init:
     inx
     cpx #$0008
     bne @finstr
+    ; auto-populate 8-63 so every slot is playable out of the box:
+    ; 8-47 SMP on pool samples 0-39, 48-55 WAV banks 0-7,
+    ; 56-57 the two kits, 58 NSE, 59-63 SMP melodics 0-4 again
+@autoinstr:
+    txa
+    sec
+    sbc #$08
+    sta es0 + 1             ; default: SMP, sample = slot - 8
+    lda #$00
+    sta es0
+    txa
+    cmp #$30
+    bcc @ai_have            ; 8-47: SMP
+    cmp #$38
+    bcs @ai_not_wav
+    sec
+    sbc #$30
+    sta es0 + 1
+    lda #$02                ; 48-55: WAV bank 0-7
+    sta es0
+    bra @ai_have
+@ai_not_wav:
+    cmp #$3A
+    bcs @ai_not_kit
+    sec
+    sbc #$38
+    sta es0 + 1
+    lda #$01                ; 56-57: KIT 0/1
+    sta es0
+    bra @ai_have
+@ai_not_kit:
+    bne @ai_tail
+    lda #$03                ; 58: NSE
+    sta es0
+    lda #$00
+    sta es0 + 1
+    bra @ai_have
+@ai_tail:
+    sec
+    sbc #$3B                ; 59-63: melodics 0-4
+    sta es0 + 1
+    lda #$00
+    sta es0
+@ai_have:
+    phx
+    rep #$30
+.ACCU 16
+    txa
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda es0
+    sta.l $7E0000 + SB_INSTR,x      ; type
+    lda es0 + 1
+    sta.l $7E0000 + SB_INSTR + 1,x  ; sample / bank / kit
+    lda #$2F
+    sta.l $7E0000 + SB_INSTR + 2,x
+    lda #$CA
+    sta.l $7E0000 + SB_INSTR + 3,x
+    lda #$50
+    sta.l $7E0000 + SB_INSTR + 4,x
+    sta.l $7E0000 + SB_INSTR + 5,x
+    plx
+    inx
+    cpx #INSTR_COUNT
+    beq @ai_done
+    jmp @autoinstr
+@ai_done:
     ; factory kits: kit 0 = 808 (pool 8-23), kit 1 = 909 (pool 24-39)
     ldx #$0000
 @fkits:
@@ -142,8 +214,8 @@ song_init:
     sep #$20
 .ACCU 8
     sta.l $7E0000 + SB_KITS,x       ; sample
-    lda #$00
-    sta.l $7E0000 + SB_KITS + 1,x   ; tune
+    lda #$F4
+    sta.l $7E0000 + SB_KITS + 1,x   ; tune -12: factory drums are 16 kHz
     lda #$50
     sta.l $7E0000 + SB_KITS + 2,x   ; vol
     plx

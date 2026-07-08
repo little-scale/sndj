@@ -75,8 +75,9 @@ def trim_tail(samples, floor=300):
 
 
 def prep_oneshot(samples, rate, max_ms):
-    s = resample(trim_tail(samples), rate)
-    s = s[:int(32 * max_ms)]
+    # drums live at 16 kHz (factory kit slots are tuned -12): half the ARAM
+    s = resample(trim_tail(samples), rate, 16000)
+    s = s[:int(16 * max_ms)]
     # short fade-out so the END block doesn't click
     fade = min(256, len(s))
     for i in range(fade):
@@ -117,7 +118,7 @@ def sf2_samples(path):
 
 # ---------------------------------------------------------------- factory set
 DRUM_KITS = [('01 808', '808'), ('02 909', '909')]
-DRUM_MS = {'BD': 220, 'SD': 180, 'CP': 180, 'CY': 260, 'HO': 200}  # else 130
+DRUM_MS = {'BD': 200, 'SD': 170, 'CP': 170, 'CY': 195, 'HO': 160}  # else 112
 SF2_PICKS = 8               # first N loopable melodic samples by size
 
 
@@ -140,7 +141,11 @@ def build_factory():
             pcm = resample(s['pcm'], s['rate'])
             scale = 32000 / s['rate']
             loop_start = int(s['loop'][0] * scale)
+            loop_end = int(s['loop'][1] * scale)
             loop_block = (loop_start // 16 * 16) // 16
+            # looped playback never reads past the loop end: truncate there
+            # (rounded up to a BRR block) to keep the resident set small
+            pcm = pcm[:min(len(pcm), (loop_end + 15) // 16 * 16)]
             pcm = pcm[:len(pcm) // 16 * 16]
             if loop_block * 16 >= len(pcm):
                 loop_block = 0
@@ -156,7 +161,7 @@ def build_factory():
             seen[code] = seen.get(code, 0) + 1
             name = f'{tag} {code}' if seen[code] == 1 else f'{tag} {code}{seen[code]}'
             pcm, rate = read_wav(os.path.join(d, f))
-            ms = DRUM_MS.get(code, 180)
+            ms = DRUM_MS.get(code, 112)
             pcm = prep_oneshot(pcm, rate, ms)
             if len(pcm) < 16:
                 pcm = [0] * 16
