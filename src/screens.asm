@@ -17,6 +17,7 @@
 .DEFINE SCREEN_INSTR  4
 .DEFINE SCREEN_FILES  5
 .DEFINE SCREEN_ECHO   6
+.DEFINE SCREEN_WAVE   7
 
 ; called every frame from the main loop
 screen_update:
@@ -34,6 +35,8 @@ screen_update:
     beq @files
     cmp #SCREEN_ECHO
     beq @echo
+    cmp #SCREEN_WAVE
+    beq @wave
     jmp song_update
 @phrase:
     jmp phrase_update
@@ -41,6 +44,8 @@ screen_update:
     jmp files_update
 @echo:
     jmp echo_update
+@wave:
+    jmp wave_update
 @chain:
     jmp chain_update
 @instr:
@@ -98,8 +103,13 @@ nav_update:
     bra @eat_far
 @down_not_song:
     cmp #SCREEN_INSTR
-    bne @not_down
+    bne @down_not_instr
     jsr echo_init
+    bra @eat_far
+@down_not_instr:
+    cmp #SCREEN_WAVE
+    bne @not_down
+    jsr instr_init
     bra @eat_far
 @not_down:
     rep #$20
@@ -116,8 +126,13 @@ nav_update:
     bra @eat_far
 @up_not_files:
     cmp #SCREEN_ECHO
-    bne @not_up
+    bne @up_not_echo
     jsr instr_init
+    bra @eat_far
+@up_not_echo:
+    cmp #SCREEN_INSTR
+    bne @not_up
+    jsr wave_init
 @eat_far:
     rep #$20
 .ACCU 16

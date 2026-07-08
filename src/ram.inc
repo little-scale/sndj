@@ -64,6 +64,7 @@ fl_slot      db      ; FILES cursor slot
 fl_col       db      ; FILES cursor column (0=load 1=save)
 fl_msg       db      ; FILES status message id
 ; hot scalars (keep below $100 for direct-page speed)
+apu_tmo      db      ; apu_wait_p0 outer timeout counter
 das_last_fc  db      ; frame_cnt low byte at last DAS update
 text_x       db
 text_y       db      ; must follow text_x
@@ -82,6 +83,11 @@ grp_span     db
 grp_m        db
 ed_instr     db      ; instrument id under edit (INSTR screen)
 if_cur       db      ; INSTR screen field cursor
+ed_wave      db      ; wave bank under edit (WAVE screen)
+wv_x         db      ; WAVE screen cursor column (0-31)
+trig_type    db      ; instrument type at trigger time
+eng_noise    db      ; global noise clock (FLG bits 0-4)
+eng_non      db      ; NON mask shadow
 ; --- per-track command/effect state (M7) — grows past the direct page; all
 ; access is indexed absolute, which WLA emits automatically ---
 eng_groove   db      ; active groove id

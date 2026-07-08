@@ -617,6 +617,7 @@ load_slot:
     sta sv_src + 2
     jsr rle_unpack
     jsr stage_in
-    jsr apu_echo_apply      ; the loaded song's room comes back with it
+    jsr wave_sync_all       ; the loaded song's waves come back with it
+    jsr apu_echo_apply      ; ...and its room (long sequence last)
     lda #SV_OK
     rts

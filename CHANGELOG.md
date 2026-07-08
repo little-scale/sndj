@@ -11,6 +11,13 @@
   IPL protocol; flip-bit mailbox with timeouts everywhere; SCB register
   writes land in the DSP; APU tick telemetry on port 3; a dead APU shows an
   `APU?` warning instead of hanging.
+- **M10 — Wavetables & noise (KIT waits for the M11 sample pool).** WAVE
+  screen: draw 32-sample single-cycle waves with the pad (B+up/down shapes,
+  B+left/right drags, Y+left/right pages banks); every edit compiles the
+  bank to a tiny looped BRR and re-uploads it live. 8 factory waves seeded
+  by NEW; waves save with the song. WAV instrument type plays the drawn
+  banks; the B command wave-sequences banks per row; NSE type drives the
+  DSP noise generator with the note as the global noise clock.
 - **M9 — Echo & FIR.** The ECHO screen: delay (with its ARAM cost shown
   live), feedback, echo volume L/R, per-voice send mask, FIR preset with
   tap display; 8 factory FIR curves; X (echo send on/off) and Y (FIR

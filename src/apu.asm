@@ -40,15 +40,21 @@
 .DEFINE ARAM_DIR     $1000
 .DEFINE ARAM_SAMPLES $1200
 
-; --- wait until $2140 == A; carry set on timeout ------------------------------
+; --- wait until $2140 == A; carry set on timeout (~1.3 s) ----------------------
+; Long enough to ride out the driver's echo reconfiguration (~0.3-0.6 s of
+; busy time) with margin; a genuinely dead APU still surfaces as APU?.
 apu_wait_p0:
     sta tmp0
+    lda #$04
+    sta apu_tmo
     ldy #$0000
 @wait:
     lda APUIO0
     cmp tmp0
     beq @ok
     dey
+    bne @wait
+    dec apu_tmo
     bne @wait
     sec
     rts
@@ -227,6 +233,12 @@ apu_audio_init:
     jsr apu_dsp_write
     lda #DSP_KOF
     ldy #$00                ; release the boot-time all-voices key-off latch
+    jsr apu_dsp_write
+    lda #DSP_NON
+    ldy #$00                ; power-on DSP state is garbage: park the
+    jsr apu_dsp_write       ; modulation/noise routing explicitly
+    lda #DSP_PMON
+    ldy #$00
     jsr apu_dsp_write
     lda #DSP_FLG
     ldy #$20                ; unmute; echo buffer writes stay disabled
@@ -460,7 +472,26 @@ apply_instrument:
 .ACCU 8
     lda.w trk_instr_active,x
     cmp trig_id
-    beq @skip
+    bne @load
+    ; already loaded: still report the type for trigger routing
+    rep #$30
+.ACCU 16
+    lda trig_id
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR,x
+    and #$03
+    sta trig_type
+    plx
+    lda trig_id
+    rts
+@load:
     lda trig_id
     sta.w trk_instr_active,x
     rep #$30
@@ -474,8 +505,19 @@ apply_instrument:
     tax                     ; record offset
     sep #$20
 .ACCU 8
-    ; SRCN
+    ; type decides sample routing and the NON bit
+    lda.l $7E0000 + SB_INSTR,x
+    and #$03
+    sta trig_type
+    cmp #$02                ; WAV: SRCN = 32 + bank
+    bne @not_wav
     lda.l $7E0000 + SB_INSTR + 1,x
+    and #$07
+    ora #$20
+    bra @srcn
+@not_wav:
+    lda.l $7E0000 + SB_INSTR + 1,x
+@srcn:
     tay
     lda trig_voice
     asl
@@ -485,6 +527,34 @@ apply_instrument:
     ora #DSP_V0SRCN
     phx
     jsr apu_dsp_write
+    plx
+    ; NON bit: on for NSE, off otherwise
+    phx
+    lda trig_voice
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda trig_type
+    cmp #$03
+    beq @nse
+    lda.w bit_for_track,x
+    eor #$FF
+    and eng_non
+    bra @non_wr
+@nse:
+    lda.w bit_for_track,x
+    ora eng_non
+@non_wr:
+    cmp eng_non
+    beq @non_same
+    sta eng_non
+    tay
+    lda #DSP_NON
+    jsr apu_dsp_write
+@non_same:
     plx
     ; ADSR1 (ADSR mode always on)
     lda.l $7E0000 + SB_INSTR + 2,x

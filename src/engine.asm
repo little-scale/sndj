@@ -13,6 +13,7 @@
 
 ; command letter ids (1 = A ... 26 = Z)
 .DEFINE CMDID_A 1
+.DEFINE CMDID_B 2
 .DEFINE CMDID_D 4
 .DEFINE CMDID_G 7
 .DEFINE CMDID_H 8
@@ -68,6 +69,7 @@ song_init:
     inx
     cpx #(TRACKS * SONG_ROWS)
     bcc @song_none
+    jsr waves_seed          ; factory single-cycle waves into the song block
     ; grooves: groove 0 = 6 ticks/row on all 16 steps
     ldx #$0000
     lda #6
@@ -517,6 +519,7 @@ track_row:
 ; --- trigger raw note byte A on track X (transpose, instrument, pitch, KON) ----
 track_trigger_note:
     sta.w str_buf + 26
+    stz trig_type           ; instrument-less triggers keep plain pitch
     txa
     sta trig_voice
     lda.w trk_instr,x
@@ -536,9 +539,41 @@ track_trigger_note:
 @in_range:
     sta trig_note
     sta.w trk_note,x
+    ; type-aware pitch: NSE sets the global noise clock instead; WAV plays
+    ; a 32-sample loop, two octaves above the sampler's reference
+    lda trig_type
+    cmp #$03
+    bne @not_nse
+    lda trig_note
+    and #$1F
+    sta eng_noise
+    tay
+    lda #DSP_FLG
+    phx
+    jsr apu_dsp_write
+    plx
+    bra @pitched
+@not_nse:
+    cmp #$02
+    bne @plain_pitch
+    lda trig_note
+    phx
+    jsr note_pitch_calc_only
+    rep #$20
+.ACCU 16
+    lsr last_pitch
+    lsr last_pitch          ; -2 octaves for the short loop
+    sep #$20
+.ACCU 8
+    jsr voice_pitch_write
+    plx
+    bra @pitched
+@plain_pitch:
+    lda trig_note
     phx
     jsr note_pitch
     plx
+@pitched:
     lda last_pitch
     sta.w trk_pitch_lo,x
     lda last_pitch + 1
@@ -601,6 +636,27 @@ row_cmd_pre:
     sta eng_groove
     rts
 @not_g:
+    cmp #CMDID_B
+    bne @not_b
+    ; B: wave bank select for this voice (SRCN = 32 + bank)
+    lda.w trk_cval,x
+    and #$07
+    ora #$20
+    tay
+    txa
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0SRCN
+    phx
+    jsr apu_dsp_write
+    plx
+    ; the voice now plays a different source than its instrument claims
+    lda #$FF
+    sta.w trk_instr_active,x
+    rts
+@not_b:
     cmp #CMDID_T
     bne @not_t
     lda.w trk_cval,x

@@ -72,6 +72,7 @@ check: all
 	  SNESDJ_PHRASE_SHOT=$(abspath $(BUILD)/shot-phrase.png) \
 	  SNESDJ_SONG_SHOT=$(abspath $(BUILD)/shot-song.png) \
 	  SNESDJ_INSTR_SHOT=$(abspath $(BUILD)/shot-instr.png) \
+	  SNESDJ_WAVE_SHOT=$(abspath $(BUILD)/shot-wave.png) \
 	  "$(MESEN)" --testrunner $(abspath $(ROM)) $(abspath $$c) || exit 1; \
 	done
 
@@ -83,7 +84,7 @@ shot: all
 # splash comparison masks pixel rows 88-96 (the git-stamp text line)
 shot-diff: shot
 	@python3 tools/shotdiff.py $(BUILD)/shot.png tools/goldens/splash.png 88 96
-	@for g in phrase song instr; do \
+	@for g in phrase song instr wave; do \
 	  if [ -f $(BUILD)/shot-$$g.png ]; then \
 	    python3 tools/shotdiff.py $(BUILD)/shot-$$g.png tools/goldens/$$g.png; \
 	  fi; \

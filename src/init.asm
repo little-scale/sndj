@@ -63,6 +63,7 @@ Reset:
     jsr sram_check          ; format SNDJ1 SRAM on first boot
     lda apu_status
     bne +
+    jsr wave_sync_all       ; compile + upload the 8 wave banks
     jsr apu_echo_apply      ; song echo defaults -> DSP (safe reconfig)
 +
 
