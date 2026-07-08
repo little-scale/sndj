@@ -2,7 +2,10 @@
 """sndj_pool.py — build the self-describing ROM sample pool (CLAUDE.md §14.4).
 
 Pool image layout v2 (little endian; offsets/sizes in 9-byte BRR blocks so
-16-bit fields address up to 576 KB):
+16-bit fields address up to 576 KB). Entry +14/+15 are the default tune:
+signed semitones and signed fine (1/256 semitone) applied by the engine
+when the sample is triggered (factory entries bake their SF2 root into
+the resample, so they carry 0/0).
   +0   8   magic "SNDJPOOL"
   +8   1   format version (2)
   +9   1   entry count N (max 56)
@@ -109,10 +112,13 @@ def sf2_samples(path):
         r = shdr[0] + i * 46
         name = data[r:r + 20].split(b'\0')[0].decode('latin1')
         start, end, ls, le, rate = struct.unpack('<IIIII', data[r + 20:r + 40])
+        root = data[r + 40]
+        corr = struct.unpack('<b', data[r + 41:r + 42])[0]   # cents
         pcm = struct.unpack('<%dh' % (end - start),
                             data[smpl + start * 2:smpl + end * 2])
         loop = (ls - start, le - start) if le > ls >= start else None
-        out.append({'name': name, 'pcm': list(pcm), 'rate': rate, 'loop': loop})
+        out.append({'name': name, 'pcm': list(pcm), 'rate': rate, 'loop': loop,
+                    'root': root, 'corr': corr})
     return out
 
 
@@ -134,12 +140,20 @@ def build_factory():
                 break
     if sf2_path:
         cands = [s for s in sf2_samples(sf2_path)
-                 if s['loop'] and 1000 <= len(s['pcm']) <= 14000]
+                 if s['loop'] and 1000 <= len(s['pcm']) <= 12000]
         cands.sort(key=lambda s: len(s['pcm']))
         step = max(1, len(cands) // SF2_PICKS)
         for k, s in enumerate(cands[::step][:SF2_PICKS]):
-            pcm = resample(s['pcm'], s['rate'])
-            scale = 32000 / s['rate']
+            # bake the SF2 root key/correction into the resample: after
+            # this, playing DSP pitch $1000 sounds engine note 61, so the
+            # tracker keyboard is in tune with no runtime tune fields
+            root_eff = (s.get('root', 60) or 60) - s.get('corr', 0) / 100.0
+            if not 24 <= root_eff <= 108:
+                root_eff = 60
+            shift = 61 - root_eff            # semitones the data must move
+            dst = 32000 * 2 ** (-shift / 12)
+            pcm = resample(s['pcm'], s['rate'], dst)
+            scale = dst / s['rate']
             loop_start = int(s['loop'][0] * scale)
             loop_end = int(s['loop'][1] * scale)
             loop_block = (loop_start // 16 * 16) // 16
@@ -188,9 +202,11 @@ def bank_pad(offset, size):
 def build_pool(entries):
     assert len(entries) <= MAX_ENTRIES, f'{len(entries)} entries (max {MAX_ENTRIES})'
     blobs = []
-    for name, pcm, loop in entries:
+    for entry in entries:
+        name, pcm, loop = entry[:3]
+        semis, fine = (entry[3], entry[4]) if len(entry) > 3 else (0, 0)
         brr = sndj_brr.encode(pcm, loop_block=loop)
-        blobs.append((name, brr, loop))
+        blobs.append((name, brr, loop, semis, fine))
     table = b''
     data = b''
     base = 16 + 16 * len(blobs)
@@ -199,7 +215,7 @@ def build_pool(entries):
     data_start = (base + 8) // 9 * 9
     off = data_start
     chunks = []
-    for name, brr, loop in blobs:
+    for name, brr, loop, semis, fine in blobs:
         pad = bank_pad(off, len(brr))
         if pad:
             pad = (pad + 8) // 9 * 9      # keep block alignment
@@ -208,7 +224,7 @@ def build_pool(entries):
         assert off % 9 == 0
         loop_blk = 0xFFFF if loop is None else loop
         table += name.ljust(8)[:8].encode() + struct.pack(
-            '<HHH', off // 9, len(brr) // 9, loop_blk) + bytes(2)
+            '<HHHbb', off // 9, len(brr) // 9, loop_blk, semis, fine)
         chunks.append(brr)
         off += len(brr)
     header = b'SNDJPOOL' + bytes([2, len(blobs)]) + bytes(6)

@@ -11,7 +11,7 @@
 .ACCU 8
 .INDEX 16
 
-.DEFINE IF_COUNT 13
+.DEFINE IF_COUNT 14
 
 ; field table: byte offset in record, shift, value mask (post-shift), max
 if_fields:
@@ -28,10 +28,11 @@ if_fields:
     .DB 10, 0, $FF, 24   ; OFS 2
     .DB 11, 0, $FF, 24   ; OFS 3
     .DB 7,  0, $01, 1    ; EON (echo send)
+    .DB 6,  0, $FF, 255  ; FINE (signed 1/256 semitone; max 255 = free wrap)
 
 if_labels:
     .DW if_l0, if_l1, if_l2, if_l3, if_l4, if_l5
-    .DW if_l6, if_l7, if_l8, if_l9, if_l10, if_l11, if_l12
+    .DW if_l6, if_l7, if_l8, if_l9, if_l10, if_l11, if_l12, if_l13
 if_l0:  .DB "TYPE", 0
 if_l1:  .DB "SAMPLE", 0
 if_l2:  .DB "ATTACK", 0
@@ -45,6 +46,7 @@ if_l9:  .DB "OFS 1", 0
 if_l10: .DB "OFS 2", 0
 if_l11: .DB "OFS 3", 0
 if_l12: .DB "ECHO", 0
+if_l13: .DB "FINE", 0
 
 if_types:
     .DB "SMPKITWAVNSE"     ; 3 chars each
@@ -260,6 +262,15 @@ if_nudge:
     jsr if_get_x
     clc
     adc str_buf + 35
+    ; max 255 marks a signed byte field: wrap freely, no clamp
+    pha
+    lda str_buf + 37
+    cmp #$FF
+    bne @clamped
+    pla
+    bra @store
+@clamped:
+    pla
     bpl @not_neg
     lda #$00
 @not_neg:

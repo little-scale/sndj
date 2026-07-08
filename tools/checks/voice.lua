@@ -71,9 +71,12 @@ local function onFrame()
     check(aram(0x1000) == 0x00 and aram(0x1001) == 0x12 and
           aram(0x1002) == 0x00 and aram(0x1003) == 0x12,
           "sample directory uploaded to ARAM $1000")
-    -- resident sample 1 (SF2 00, 92 blocks at $1209): END+LOOP on the last
-    check((aram(0x1209 + 91 * 9) & 0x03) == 0x03,
-          "BRR sample in ARAM with END+LOOP flags")
+    -- resident sample 1 (SF2 00 at $1209): END+LOOP on its last block
+    -- (block count read from the ROM pool table so retunes don't break this)
+    local rom = function(a) return emu.read(a, emu.memType.snesPrgRom) end
+    local blocks = rom(0x8006 + 16 + 10) + rom(0x8006 + 16 + 11) * 256
+    check((aram(0x1209 + (blocks - 1) * 9) & 0x03) == 0x03,
+          "BRR sample in ARAM with END+LOOP flags (" .. blocks .. " blocks)")
     check(wram(0x0015) == 0, "no KONs yet")
   elseif frames == 68 then
     check(wram(0x000C) == 1, "navigated SONG -> CHAIN -> PHRASE")

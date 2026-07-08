@@ -217,6 +217,12 @@ kit_audition:
     lda.l $7E0002,x         ; vol
     beq @silent
     pha
+    lda.l $7E0000,x         ; sample: pool default tune applies
+    and #$3F
+    phx
+    stz np_fine
+    jsr trig_tune_pool
+    plx
     lda.l $7E0000,x         ; sample -> SRCN
     and #$3F
     phx

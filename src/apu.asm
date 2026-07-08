@@ -376,9 +376,113 @@ apu_set_tempo:
 ; note_pitch_calc_only computes last_pitch without touching the DSP.
 note_pitch:
     jsr note_pitch_calc_only
-    bra voice_pitch_write
+    jmp voice_pitch_write
 
+; tuned pitch: apply trig_semis + trig_fine (set by apply_instrument /
+; kit paths) with linear interpolation between adjacent table entries.
+; The fine byte is signed: a negative value borrows a semitone and keeps
+; its bit pattern as the unsigned fraction from the lower note.
 note_pitch_calc_only:
+    sta np_note
+    lda trig_semis
+    ora trig_fine
+    bne @tuned
+    lda np_note
+    jmp note_pitch_raw
+@tuned:
+    lda np_note
+    clc
+    adc trig_semis
+    bpl +
+    lda #$00
++
+    cmp #96
+    bcc +
+    lda #95
++
+    sta np_note
+    lda trig_fine
+    sta np_fine
+    bpl @fine_set
+    lda np_note
+    bne @borrow
+    stz np_fine             ; bottom of the table: drop the fraction
+    bra @fine_set
+@borrow:
+    dec np_note
+@fine_set:
+    lda np_fine
+    bne @interp
+    lda np_note
+    jmp note_pitch_raw
+@interp:
+    lda np_note
+    jsr note_pitch_raw
+    rep #$20
+.ACCU 16
+    lda last_pitch
+    sta np_base
+    sep #$20
+.ACCU 8
+    lda np_note
+    inc a
+    cmp #96
+    bcs @top                ; no next entry: play the base
+    jsr note_pitch_raw
+    rep #$30
+.ACCU 16
+    lda last_pitch
+    sec
+    sbc np_base
+    sta np_delta
+    sep #$20
+.ACCU 8
+    ; frac = (delta * fine) >> 8 via the 5A22 multiplier (main loop only)
+    lda np_delta
+    sta.w WRMPYA
+    lda np_fine
+    sta.w WRMPYB
+    nop
+    nop
+    nop
+    nop
+    rep #$20
+.ACCU 16
+    lda.w RDMPYL
+    xba
+    and #$00FF              ; (delta_lo * fine) >> 8
+    sta np_frac
+    sep #$20
+.ACCU 8
+    lda np_delta + 1
+    sta.w WRMPYA
+    lda np_fine
+    sta.w WRMPYB
+    nop
+    nop
+    nop
+    nop
+    rep #$30
+.ACCU 16
+    lda.w RDMPYL            ; delta_hi * fine
+    clc
+    adc np_frac
+    clc
+    adc np_base
+    sta last_pitch
+    sep #$20
+.ACCU 8
+    rts
+@top:
+    rep #$20
+.ACCU 16
+    lda np_base
+    sta last_pitch
+    sep #$20
+.ACCU 8
+    rts
+
+note_pitch_raw:
     rep #$20
 .ACCU 16
     and #$00FF
@@ -426,12 +530,111 @@ voice_pitch_write:
     ora #DSP_V0PITCHH
     jmp apu_dsp_write
 
+; --- tune context loaders -------------------------------------------------------
+; trig_tune_pool: A = pool sample index, np_fine = extra fine (signed,
+; e.g. the instrument record's FINE byte). Sums the pool entry's default
+; tune with the extra fine, folding overflow into whole semitones.
+trig_tune_pool:
+    phx
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.l POOL_TABLE + 14,x ; default semitones (signed)
+    sta trig_semis
+    lda.l POOL_TABLE + 15,x ; default fine (signed)
+    sta np_base
+    stz np_base + 1
+    bpl +
+    lda #$FF
+    sta np_base + 1
++
+    lda np_fine
+    sta np_delta
+    stz np_delta + 1
+    bpl +
+    lda #$FF
+    sta np_delta + 1
++
+    rep #$30
+.ACCU 16
+    lda np_base
+    clc
+    adc np_delta            ; S in [-256, 254]
+    bmi @neg
+    cmp #$0080
+    bcc @store16
+    sec
+    sbc #$0100
+    sep #$20
+.ACCU 8
+    inc trig_semis
+    bra @store8
+@neg:
+.ACCU 16
+    cmp #$FF80
+    bcs @store16
+    clc
+    adc #$0100
+    sep #$20
+.ACCU 8
+    dec trig_semis
+    bra @store8
+@store16:
+.ACCU 16
+    sep #$20
+.ACCU 8
+@store8:
+    sta trig_fine
+    plx
+    rts
+
+; trig_tune_load: tune context for instrument trig_id (record FINE byte
+; plus, for SMP/NSE, the pool entry default of its sample). Clobbers np_*.
+trig_tune_load:
+    phx
+    rep #$30
+.ACCU 16
+    lda trig_id
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR + 6,x  ; FINE (signed)
+    sta np_fine
+    lda.l $7E0000 + SB_INSTR,x
+    and #$03
+    beq @pool               ; SMP
+    cmp #$03
+    beq @pool               ; NSE
+    stz trig_semis          ; WAV/KIT: record fine only
+    lda np_fine
+    sta trig_fine
+    plx
+    rts
+@pool:
+    lda.l $7E0000 + SB_INSTR + 1,x
+    and #$3F
+    plx
+    jmp trig_tune_pool
+
 ; --- load instrument A's registers onto voice trig_voice (if not active) ------
 ; SRCN, ADSR (bit7 forced on), VOL L/R from the record at SB_INSTR + id*16.
 ; Preserves X; returns A = id.
 apply_instrument:
     sta trig_id
     phx
+    jsr trig_tune_load      ; pitch tune context, needed on both paths
     lda trig_voice
     rep #$30
 .ACCU 16

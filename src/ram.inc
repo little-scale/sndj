@@ -156,6 +156,13 @@ pad_prev     dw
 pad_das_dir  dw      ; d-pad bits DAS is tracking
 das_cnt      db
 str_buf      ds 40   ; scratch line buffer for formatted text
+trig_semis   db      ; pitch-calc tune context: whole semitones (signed)
+trig_fine    db      ; and 1/256-semitone fraction (signed)
+np_note      db      ; note_pitch_calc_only scratch
+np_fine      db
+np_base      dw
+np_delta     dw
+np_frac      dw
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

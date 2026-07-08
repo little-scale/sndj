@@ -940,6 +940,11 @@ row_cmd_pre:
     lda #NOTE_MAX - 1
 @l_ok:
     sta.w trk_sl_note,x
+    pha
+    phx
+    jsr track_tune_load
+    plx
+    pla
     phx
     jsr note_pitch_calc_only
     plx
@@ -1053,6 +1058,20 @@ bit_for_track:
 ; sample + tune (signed semitones around native) + vol. Returns carry SET
 ; when a note was played, CLEAR for an empty (vol 0) slot. Uses trig_id /
 ; trig_note / trig_voice; clobbers X.
+; tune context for track X's active instrument — fx paths (slide, arp)
+; recompute pitch without a fresh apply_instrument, and trig_semis/fine
+; are global, so another track's trigger may have replaced them.
+track_tune_load:
+    lda.w trk_instr,x
+    cmp #$FF
+    beq @none
+    sta trig_id
+    jmp trig_tune_load
+@none:
+    stz trig_semis
+    stz trig_fine
+    rts
+
 kit_trigger:
     ; kit id from the instrument record
     lda trig_id
@@ -1098,6 +1117,12 @@ kit_trigger:
     sta es1                 ; vol
     lda.l $7E0000 + SB_KITS + 1,x   ; tune (signed semitones)
     sta es1 + 1
+    lda.l $7E0000 + SB_KITS,x       ; sample: pool default tune applies
+    and #$3F
+    pha
+    stz np_fine
+    jsr trig_tune_pool
+    pla
     lda.l $7E0000 + SB_KITS,x       ; sample -> resident SRCN
     and #$3F
     rep #$30
@@ -1320,6 +1345,11 @@ fx_arp:
     bcc @n_ok
     lda #NOTE_MAX - 1
 @n_ok:
+    pha
+    phx
+    jsr track_tune_load
+    plx
+    pla
     phx
     jsr note_pitch          ; calc + write (base pitch untouched)
     plx

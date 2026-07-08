@@ -141,9 +141,12 @@ function poolParse(bytes) {
     const off = (bytes[e + 8] | (bytes[e + 9] << 8)) * 9;
     const size = (bytes[e + 10] | (bytes[e + 11] << 8)) * 9;
     const loop = bytes[e + 12] | (bytes[e + 13] << 8);
+    const s8 = v => (v > 127 ? v - 256 : v);
     entries.push({
       name,
       loopBlock: loop === 0xFFFF ? null : loop,
+      tuneSemis: s8(bytes[e + 14]),
+      tuneFine: s8(bytes[e + 15]),
       brr: bytes.slice(off, off + size),
     });
   }
@@ -172,7 +175,8 @@ function poolBuild(entries) {
     const offB = off / 9, sizeB = e.brr.length / 9;
     table.push(...[...name].map(c => c.charCodeAt(0)),
       offB & 0xFF, offB >> 8, sizeB & 0xFF, sizeB >> 8,
-      loop & 0xFF, loop >> 8, 0, 0);
+      loop & 0xFF, loop >> 8,
+      (e.tuneSemis || 0) & 0xFF, (e.tuneFine || 0) & 0xFF);
     chunks.push(e.brr);
     off += e.brr.length;
   }
@@ -340,12 +344,14 @@ function selftest() {
   assert(snr > 26, 'BRR SNR ' + snr.toFixed(1));
   // pool round-trip
   const pool = poolBuild([
-    { name: 'PAD', loopBlock: 0, brr },
+    { name: 'PAD', loopBlock: 0, tuneSemis: -3, tuneFine: 64, brr },
     { name: 'HIT', loopBlock: null, brr: brr.slice(0, 18) },
   ]);
   const back = poolParse(pool);
   assert(back.length === 2 && back[0].name === 'PAD', 'pool names');
   assert(back[0].brr.length === 72 && back[1].loopBlock === null, 'pool fields');
+  assert(back[0].tuneSemis === -3 && back[0].tuneFine === 64 &&
+    back[1].tuneSemis === 0, 'pool tune fields');
   // RLE + CRC + image
   const blk = new Uint8Array(BLOCK_SZ);
   for (let i = PHRASES_OFF + 1; i < PHRASES_OFF + PHRASES_LEN; i += 4) blk[i] = 0xFF;

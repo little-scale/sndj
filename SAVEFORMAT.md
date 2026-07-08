@@ -23,7 +23,9 @@ phrase growth moves nothing else. Save/load is a straight copy.
 | $2300  | $3000 | 192 phrases x 16 rows x 4 bytes (note, instr, cmd, val) |
 
 Instrument record (16 bytes): type, sample, ADSR1 (low 7 bits), ADSR2,
-vol L, vol R, fine-tune, flags, GRP span, GRP offsets x3, reserved x4.
+vol L, vol R, fine-tune (signed 1/256 semitone, interpolated between
+pitch-table entries), flags (bit 0 = EON echo send), GRP span,
+GRP offsets x3, reserved x4.
 
 Cell conventions: note 0 = empty, 1-96 = C-0..B-7, 97 = OFF; instrument
 $FF = none; command 0 = none, 1-26 = A-Z.
@@ -49,7 +51,13 @@ Slot table entry (16 bytes):
 | 2      | 2    | packed size (little endian) |
 | 4      | 2    | CRC-16/CCITT of the packed bytes ($FFFF seed) |
 | 6      | 8    | name (ASCII, space padded) |
-| 14     | 2    | reserved |
+| 14     | 1    | default tune: signed whole semitones |
+| 15     | 1    | default tune: signed fine, 1/256 semitone |
+
+The engine sums the entry's default tune with the instrument's fine-tune
+byte at trigger time (kit slots add the entry default to their own
+semitone tune). Factory melodics bake their SF2 root key into the
+resample and carry 0/0 here.
 
 **Journalling:** 4 logical slots share 5 physical regions; at least one
 region is always unreferenced. A save packs into that free region first
