@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>snesdj FIR designer</title>
+<script src="sndj.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: ui-monospace, Menlo, monospace; background: #101228;
+         color: #dee2e8; max-width: 780px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { color: #ffb020; font-size: 1.3rem; }
+  h1 small { color: #606888; font-weight: normal; }
+  .drop { border: 2px dashed #606888; border-radius: 8px; padding: 1.2rem;
+          text-align: center; color: #606888; margin: 1rem 0; }
+  .drop.armed { border-color: #40d0c8; color: #40d0c8; }
+  canvas { width: 100%; background: #0a0c1e; border: 1px solid #2a2e48;
+           border-radius: 6px; }
+  .taps { display: grid; grid-template-columns: repeat(8, 1fr); gap: .5rem;
+          margin: 1rem 0; }
+  .tap { text-align: center; }
+  .tap input[type=range] { writing-mode: vertical-lr; direction: rtl;
+        height: 110px; width: 100%; }
+  .tap input[type=text] { width: 100%; background: #2a2e48; color: #dee2e8;
+        border: 1px solid #606888; border-radius: 4px; text-align: center;
+        font: inherit; box-sizing: border-box; }
+  .tap label { color: #606888; font-size: .85em; }
+  select, button { background: #2a2e48; color: #dee2e8;
+           border: 1px solid #606888; border-radius: 4px;
+           padding: .3rem .8rem; cursor: pointer; font: inherit; }
+  button:hover { border-color: #ffb020; color: #ffb020; }
+  button.primary { border-color: #40d0c8; color: #40d0c8; }
+  #status { color: #40d0c8; min-height: 1.4em; margin: .6rem 0; }
+  .warn { color: #ff6060; }
+  .row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center;
+         margin: .6rem 0; }
+  .row label { color: #606888; }
+  #sum { color: #606888; }
+  #sum.hot { color: #ff6060; }
+</style>
+</head>
+<body>
+<h1>snesdj FIR designer <small>— the room's tone control</small></h1>
+<p>Design the 8-tap FIR in the S-DSP echo feedback path. Audition it through
+the full echo model (delay, feedback, FIR), then patch a preset slot in your
+<code>snesdj.sfc</code> — the ROM's FIR screen recalls what you design here.</p>
+
+<canvas id="plot" width="760" height="220"></canvas>
+
+<div class="taps" id="taps"></div>
+<div class="row">
+  <span id="sum">Σ taps = 127</span>
+  <label>preset</label>
+  <select id="preset"></select>
+  <button id="loadp">load</button>
+</div>
+<div class="row">
+  <label>EDL</label>
+  <select id="edl"></select>
+  <label>feedback</label>
+  <input type="range" id="efb" min="-128" max="127" value="72" style="width:140px">
+  <span id="efbv">72</span>
+  <button id="play">audition noise</button>
+  <button id="click">audition clicks</button>
+  <button id="stop">stop</button>
+</div>
+
+<div class="drop" id="drop">drop snesdj.sfc here to patch its presets (or click)</div>
+<input type="file" id="file" hidden accept=".sfc,.smc">
+<div class="row" id="romrow" hidden>
+  <label>write into slot</label>
+  <select id="slot"></select>
+  <button class="primary" id="export">export patched ROM</button>
+</div>
+<div id="status"></div>
+
+<script>
+'use strict';
+const S = window.SNDJ;
+const $ = id => document.getElementById(id);
+const status = (msg, warn) => {
+  $('status').textContent = msg;
+  $('status').className = warn ? 'warn' : '';
+};
+
+const FACTORY = [
+  ['FLAT',     [0x7F,0,0,0,0,0,0,0]],
+  ['DARK',     [0x58,0x30,0x12,0x08,0,0,0,0]],
+  ['BRIGHT',   [0x70,0xE8,0x18,0xF4,0,0,0,0]],
+  ['COMB',     [0x40,0,0,0x40,0,0,0,0]],
+  ['SOFT',     [0x20,0x30,0x40,0x30,0x20,0x10,0x08,0x04]],
+  ['DKC HALL', [0x4C,0x21,0x12,0x09,0x05,0x03,0x02,0x01]],
+  ['METAL',    [0x60,0xA0,0x40,0xD0,0x20,0xE8,0x10,0xF8]],
+  ['USER',     [0x7F,0,0,0,0,0,0,0]],
+];
+const s8 = v => (v > 127 ? v - 256 : v);
+let taps = FACTORY[5][1].map(s8);
+let rom = null, romName = 'snesdj.sfc', firOff = null;
+
+// ------------------------------------------------------------------ tap UI
+for (let i = 0; i < 8; i++) {
+  const d = document.createElement('div');
+  d.className = 'tap';
+  d.innerHTML = '<input type="range" min="-128" max="127" value="0" data-i="' + i +
+    '"><input type="text" data-h="' + i + '"><label>t' + i + '</label>';
+  $('taps').appendChild(d);
+}
+FACTORY.forEach((p, i) => {
+  const o = document.createElement('option');
+  o.value = i; o.textContent = i + ' ' + p[0];
+  $('preset').appendChild(o);
+});
+$('preset').value = 5;
+for (let e = 0; e <= 15; e++) {
+  const o = document.createElement('option');
+  o.value = e;
+  o.textContent = e + ' (' + e * 16 + ' ms, ' + (e * 2 || 0.5) + ' KB)';
+  $('edl').appendChild(o);
+}
+$('edl').value = 6;
+
+function syncUI() {
+  document.querySelectorAll('[data-i]').forEach(r => { r.value = taps[+r.dataset.i]; });
+  document.querySelectorAll('[data-h]').forEach(t => {
+    t.value = (taps[+t.dataset.h] & 0xFF).toString(16).toUpperCase().padStart(2, '0');
+  });
+  const sum = taps.reduce((a, b) => a + b, 0);
+  $('sum').textContent = 'Σ taps = ' + sum;
+  $('sum').className = Math.abs(sum) > 127 ? 'hot' : '';
+  drawPlot();
+}
+
+$('taps').oninput = e => {
+  if (e.target.dataset.i !== undefined) {
+    taps[+e.target.dataset.i] = +e.target.value;
+  } else if (e.target.dataset.h !== undefined) {
+    const v = parseInt(e.target.value, 16);
+    if (!isNaN(v)) taps[+e.target.dataset.h] = s8(v & 0xFF);
+  }
+  syncUI();
+};
+$('loadp').onclick = () => {
+  const i = +$('preset').value;
+  const src = (rom && firOff >= 0)
+    ? Array.from(rom.slice(firOff + i * 8, firOff + i * 8 + 8)).map(s8)
+    : FACTORY[i][1].map(s8);
+  taps = src;
+  syncUI();
+  status('loaded preset ' + i + (firOff !== null ? ' from the ROM' : ''));
+};
+
+// ------------------------------------------------------------------- plot
+function drawPlot() {
+  const c = $('plot'), g = c.getContext('2d');
+  g.clearRect(0, 0, c.width, c.height);
+  g.strokeStyle = '#2a2e48';
+  for (let db = 12; db >= -36; db -= 12) {
+    const y = dbY(db);
+    g.beginPath(); g.moveTo(0, y); g.lineTo(c.width, y); g.stroke();
+    g.fillStyle = '#606888';
+    g.fillText(db + ' dB', 4, y - 3);
+  }
+  g.fillStyle = '#606888';
+  [2, 4, 8, 16].forEach(k => {
+    const x = (k * 1000 / 16000) * c.width;
+    g.fillText(k + 'k', x - 14, c.height - 4);
+  });
+  g.strokeStyle = '#40d0c8';
+  g.lineWidth = 2;
+  g.beginPath();
+  for (let px = 0; px < c.width; px++) {
+    const f = (px / c.width) * Math.PI;      // 0..fs/2
+    let re = 0, im = 0;
+    for (let k = 0; k < 8; k++) {
+      re += taps[k] * Math.cos(-f * k);
+      im += taps[k] * Math.sin(-f * k);
+    }
+    const mag = Math.hypot(re, im) / 128;
+    const db = 20 * Math.log10(Math.max(mag, 1e-4));
+    px ? g.lineTo(px, dbY(db)) : g.moveTo(px, dbY(db));
+  }
+  g.stroke();
+  g.lineWidth = 1;
+  function dbY(db) { return ((12 - db) / 48) * c.height; }
+}
+
+// -------------------------------------------------------------- audition
+// echo model at 32 kHz: buf[n] = send[n] + efb*FIR(buf[n-D]);
+// out = dry + evol * FIR(buf[n-D])   (the S-DSP loop shape)
+let ctx = null, node = null;
+function audition(kind) {
+  stop();
+  ctx = ctx || new AudioContext({ sampleRate: 32000 });
+  const D = Math.max(1, +$('edl').value * 512);
+  const buf = new Float32Array(D);
+  const hist = new Float32Array(8);
+  let w = 0, n = 0;
+  const efb = +$('efb').value / 128;
+  node = ctx.createScriptProcessor(1024, 0, 1);
+  node.onaudioprocess = ev => {
+    const out = ev.outputBuffer.getChannelData(0);
+    for (let i = 0; i < out.length; i++, n++) {
+      let x = 0;
+      if (kind === 'noise') x = (Math.random() * 2 - 1) * (n < 8000 ? 0.5 : 0);
+      else if (n % 16000 < 40) x = ((n & 4) ? 1 : -1) * 0.6;
+      // FIR over the delayed buffer output
+      for (let k = 7; k > 0; k--) hist[k] = hist[k - 1];
+      hist[0] = buf[w];
+      let fir = 0;
+      for (let k = 0; k < 8; k++) fir += hist[k] * taps[k];
+      fir /= 128;
+      buf[w] = Math.max(-1, Math.min(1, x + fir * efb));
+      w = (w + 1) % D;
+      out[i] = Math.max(-1, Math.min(1, x * 0.7 + fir * 0.8));
+    }
+  };
+  node.connect(ctx.destination);
+  status('auditioning ' + kind + ' through EDL ' + $('edl').value +
+    ', feedback ' + $('efb').value);
+}
+function stop() { if (node) { node.disconnect(); node = null; } }
+$('play').onclick = () => audition('noise');
+$('click').onclick = () => audition('click');
+$('stop').onclick = stop;
+$('efb').oninput = () => { $('efbv').textContent = $('efb').value; };
+
+// ------------------------------------------------------------------- ROM
+for (let i = 0; i < 8; i++) {
+  const o = document.createElement('option');
+  o.value = i; o.textContent = i + ' ' + FACTORY[i][0];
+  $('slot').appendChild(o);
+}
+$('slot').value = 7;
+
+$('drop').onclick = () => $('file').click();
+$('file').onchange = e => { if (e.target.files[0]) loadRom(e.target.files[0]); };
+document.body.ondragover = e => { e.preventDefault(); $('drop').classList.add('armed'); };
+document.body.ondragleave = () => $('drop').classList.remove('armed');
+document.body.ondrop = e => {
+  e.preventDefault();
+  $('drop').classList.remove('armed');
+  if (e.dataTransfer.files[0]) loadRom(e.dataTransfer.files[0]);
+};
+
+function loadRom(f) {
+  romName = f.name;
+  f.arrayBuffer().then(b => {
+    rom = new Uint8Array(b);
+    firOff = S.findMarker(rom, 'SNFIR0');
+    if (firOff < 0) {
+      status(f.name + ': no SNFIR0 marker — not a snesdj ROM?', true);
+      rom = null;
+      $('romrow').hidden = true;
+      return;
+    }
+    $('romrow').hidden = false;
+    status(f.name + ' loaded — presets at $' + firOff.toString(16).toUpperCase());
+  });
+}
+
+$('export').onclick = () => {
+  if (!rom) return;
+  const i = +$('slot').value;
+  for (let k = 0; k < 8; k++) rom[firOff + i * 8 + k] = taps[k] & 0xFF;
+  S.fixChecksum(rom);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([rom]));
+  a.download = romName.replace(/\.(sfc|smc)$/i, '') + '-fir.sfc';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  status('preset ' + i + ' patched — reload the ROM and pick FIR ' + i +
+    ' on the ECHO screen');
+};
+
+syncUI();
+</script>
+</body>
+</html>

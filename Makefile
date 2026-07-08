@@ -98,6 +98,7 @@ test:
 	python3 tools/sndj_brr.py --selftest
 	python3 tools/sndj_rle.py --selftest
 	node tools/sndj.js --selftest
+	node -e "for (const f of ['tools/patcher.html','tools/savetool.html','tools/firdesign.html']) { const s = require('fs').readFileSync(f, 'utf8'); const m = s.match(/<script>([^]*?)<\/script>/); new Function(m[1]); } console.log('html tools: parse OK')"
 	@echo "test: OK"
 
 dist: all

@@ -291,6 +291,116 @@ function fromImage(img) {
 }
 
 // ---------------------------------------------------------------- tuning/rom
+// ------------------------------------------------------------- SRAM (.srm)
+const SRM_SIZE = 0x8000;
+const SRM_REGIONS = 5;
+const SRM_REGION_SZ = 0x1880;
+const SRM_SLOTS = 4;
+
+function srmNew() {
+  const srm = new Uint8Array(SRM_SIZE);
+  srm.set([...'SNDJ1'].map(c => c.charCodeAt(0)), 0);
+  srm[5] = 1;
+  for (let s = 0; s < SRM_SLOTS; s++) srm[0x10 + s * 16] = 0xFF;
+  return srm;
+}
+
+function srmParse(srm) {
+  const magic = String.fromCharCode(...srm.slice(0, 5));
+  const valid = magic === 'SNDJ1' && srm[5] === 1;
+  const slots = [];
+  for (let s = 0; s < SRM_SLOTS; s++) {
+    const e = 0x10 + s * 16;
+    const status = srm[e];
+    if (status !== 0xA5) {
+      slots.push({ index: s, empty: true });
+      continue;
+    }
+    const region = srm[e + 1];
+    const size = srm[e + 2] | (srm[e + 3] << 8);
+    const crc = srm[e + 4] | (srm[e + 5] << 8);
+    const name = String.fromCharCode(...srm.slice(e + 6, e + 14)).trimEnd();
+    const data = srm.slice(0x100 + region * SRM_REGION_SZ,
+                           0x100 + region * SRM_REGION_SZ + size);
+    slots.push({
+      index: s, empty: false, region, size, crc, name,
+      ok: region < SRM_REGIONS && size <= SRM_REGION_SZ && crc16(data) === crc,
+      packed: data,
+    });
+  }
+  return { valid, slots };
+}
+
+function srmFreeRegion(srm) {
+  const used = new Set();
+  for (let s = 0; s < SRM_SLOTS; s++) {
+    const e = 0x10 + s * 16;
+    if (srm[e] === 0xA5) used.add(srm[e + 1]);
+  }
+  for (let r = 0; r < SRM_REGIONS; r++) if (!used.has(r)) return r;
+  return null;
+}
+
+// .sndj song file: "SNDJ1" ver name[8] packedSize crc16 packedBytes
+function sndjFileBuild(name, packed) {
+  const out = new Uint8Array(18 + packed.length);
+  out.set([...'SNDJ1'].map(c => c.charCodeAt(0)), 0);
+  out[5] = 1;
+  out.set([...(name || '').padEnd(8).slice(0, 8)].map(c => c.charCodeAt(0)), 6);
+  out[14] = packed.length & 0xFF;
+  out[15] = packed.length >> 8;
+  const crc = crc16(packed);
+  out[16] = crc & 0xFF;
+  out[17] = crc >> 8;
+  out.set(packed, 18);
+  return out;
+}
+
+function sndjFileParse(bytes) {
+  if (String.fromCharCode(...bytes.slice(0, 5)) !== 'SNDJ1' || bytes[5] !== 1) {
+    throw new Error('not a .sndj file');
+  }
+  const name = String.fromCharCode(...bytes.slice(6, 14)).trimEnd();
+  const size = bytes[14] | (bytes[15] << 8);
+  const crc = bytes[16] | (bytes[17] << 8);
+  const packed = bytes.slice(18, 18 + size);
+  if (crc16(packed) !== crc) throw new Error('.sndj CRC mismatch');
+  return { name, packed };
+}
+
+function srmExtract(srm, slotIdx) {
+  const { slots } = srmParse(srm);
+  const s = slots[slotIdx];
+  if (!s || s.empty) throw new Error('slot ' + slotIdx + ' is empty');
+  return sndjFileBuild(s.name, s.packed);
+}
+
+function srmInsert(srm, slotIdx, sndjBytes) {
+  const { name, packed } = sndjFileParse(sndjBytes);
+  if (packed.length > SRM_REGION_SZ) throw new Error('song too big for a slot');
+  const out = new Uint8Array(srm);
+  const e = 0x10 + slotIdx * 16;
+  out[e] = 0;                       // release this slot's region first
+  const region = srmFreeRegion(out);
+  if (region === null) throw new Error('no free region');
+  out.set(packed, 0x100 + region * SRM_REGION_SZ);
+  out[e + 1] = region;
+  out[e + 2] = packed.length & 0xFF;
+  out[e + 3] = packed.length >> 8;
+  const crc = crc16(packed);
+  out[e + 4] = crc & 0xFF;
+  out[e + 5] = crc >> 8;
+  out.set([...(name || '').padEnd(8).slice(0, 8)].map(c => c.charCodeAt(0)), e + 6);
+  out[e] = 0xA5;                    // status byte last (journal order)
+  return out;
+}
+
+function srmErase(srm, slotIdx) {
+  const out = new Uint8Array(srm);
+  out[0x10 + slotIdx * 16] = 0xFF;
+  return out;
+}
+
 function pitchForNote(note) {  // note 0-95 (C-0..B-7)
   const base = Math.round(0x4000 * 2 ** ((note % 12) / 12));
   return base >> (7 - Math.floor(note / 12));
@@ -352,6 +462,19 @@ function selftest() {
   assert(back[0].brr.length === 72 && back[1].loopBlock === null, 'pool fields');
   assert(back[0].tuneSemis === -3 && back[0].tuneFine === 64 &&
     back[1].tuneSemis === 0, 'pool tune fields');
+
+  // srm + .sndj round trip
+  const blk2 = new Uint8Array(BLOCK_SZ);
+  blk2[0] = 7; blk2[0x2300] = 49;
+  const packed2 = rlePack(toImage(blk2));
+  let srm = srmNew();
+  srm = srmInsert(srm, 2, sndjFileBuild('SELFTEST', packed2));
+  const parsed = srmParse(srm);
+  assert(parsed.valid && parsed.slots[2].ok &&
+    parsed.slots[2].name === 'SELFTEST', 'srm insert/parse');
+  const rt = fromImage(rleUnpack(sndjFileParse(srmExtract(srm, 2)).packed, BLOCK_SZ));
+  assert(rt[0] === 7 && rt[0x2300] === 49, 'srm song round trip');
+  assert(srmParse(srmErase(srm, 2)).slots[2].empty, 'srm erase');
   // RLE + CRC + image
   const blk = new Uint8Array(BLOCK_SZ);
   for (let i = PHRASES_OFF + 1; i < PHRASES_OFF + PHRASES_LEN; i += 4) blk[i] = 0xFF;
@@ -373,6 +496,9 @@ function selftest() {
 }
 
 const SNDJ = {
+  SRM_SIZE, SRM_REGION_SZ, SRM_SLOTS,
+  srmNew, srmParse, srmExtract, srmInsert, srmErase, srmFreeRegion,
+  sndjFileBuild, sndjFileParse,
   brrEncode, brrDecode, poolParse, poolBuild,
   rlePack, rleUnpack, crc16, toImage, fromImage,
   pitchForNote, findMarker, fixChecksum, selftest,

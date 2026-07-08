@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>snesdj savetool</title>
+<script src="sndj.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: ui-monospace, Menlo, monospace; background: #101228;
+         color: #dee2e8; max-width: 780px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { color: #ffb020; font-size: 1.3rem; }
+  h1 small { color: #606888; font-weight: normal; }
+  .drop { border: 2px dashed #606888; border-radius: 8px; padding: 2rem;
+          text-align: center; color: #606888; margin: 1rem 0; }
+  .drop.armed { border-color: #40d0c8; color: #40d0c8; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  td, th { padding: .4rem .6rem; text-align: left;
+           border-bottom: 1px solid #2a2e48; }
+  th { color: #606888; font-weight: normal; }
+  button { background: #2a2e48; color: #dee2e8; border: 1px solid #606888;
+           border-radius: 4px; padding: .3rem .8rem; cursor: pointer;
+           font: inherit; }
+  button:hover { border-color: #ffb020; color: #ffb020; }
+  button.primary { border-color: #40d0c8; color: #40d0c8; }
+  #status { color: #40d0c8; min-height: 1.4em; margin: .6rem 0; }
+  .warn { color: #ff6060; }
+  .ok { color: #40d0c8; }
+  .dim { color: #606888; }
+</style>
+</head>
+<body>
+<h1>snesdj savetool <small>— songs &amp; saves</small></h1>
+<p>Drop a <code>.srm</code> cart save (FXPak / Mesen / ares / snes9x are all
+raw) to view its song slots, extract them as <code>.sndj</code> files, or
+assemble a new cart image from <code>.sndj</code> files. Everything runs
+locally.</p>
+<div class="drop" id="drop">drop a .srm or .sndj here (or click)</div>
+<input type="file" id="file" hidden multiple>
+<div id="status"></div>
+<div id="view" hidden>
+  <table>
+    <thead><tr><th>slot</th><th>name</th><th>packed</th><th>crc</th>
+      <th></th><th></th></tr></thead>
+    <tbody id="slots"></tbody>
+  </table>
+  <button class="primary" id="download">download .srm</button>
+  <button id="fresh">new empty cart image</button>
+</div>
+
+<script>
+'use strict';
+const S = window.SNDJ;
+let srm = S.srmNew();
+const $ = id => document.getElementById(id);
+const status = (msg, warn) => {
+  $('status').textContent = msg;
+  $('status').className = warn ? 'warn' : '';
+};
+
+function hex(v, w) { return '$' + v.toString(16).toUpperCase().padStart(w || 4, '0'); }
+
+function songStats(packed) {
+  // unpack and count used phrases/chains for the slot line
+  try {
+    const blk = S.fromImage(S.rleUnpack(packed, 0x5300));
+    let phrases = 0, chains = 0;
+    for (let p = 0; p < 192; p++) {
+      for (let r = 0; r < 16; r++) {
+        if (blk[0x2300 + p * 64 + r * 4] !== 0) { phrases++; break; }
+      }
+    }
+    for (let c = 0; c < 96; c++) {
+      for (let r = 0; r < 16; r++) {
+        if (blk[0x1700 + c * 32 + r * 2] !== 0xFF) { chains++; break; }
+      }
+    }
+    return phrases + ' phrases, ' + chains + ' chains';
+  } catch (e) {
+    return '';
+  }
+}
+
+function render() {
+  const parsed = S.srmParse(srm);
+  if (!parsed.valid) {
+    status('not an SNDJ1 save — use "new empty cart image" to start one', true);
+  }
+  const tb = $('slots');
+  tb.innerHTML = '';
+  parsed.slots.forEach(s => {
+    const tr = document.createElement('tr');
+    if (s.empty) {
+      tr.innerHTML = '<td>' + s.index + '</td><td class="dim">— empty —</td>' +
+        '<td></td><td></td><td></td><td></td>';
+    } else {
+      const crc = s.ok ? '<span class="ok">ok</span>'
+                       : '<span class="warn">BAD</span>';
+      tr.innerHTML = '<td>' + s.index + '</td><td>' + s.name +
+        ' <span class="dim">' + songStats(s.packed) + '</span></td>' +
+        '<td>' + s.size + ' B</td><td>' + crc + ' ' + hex(s.crc) + '</td>' +
+        '<td><button data-x="' + s.index + '">extract</button></td>' +
+        '<td><button data-e="' + s.index + '">erase</button></td>';
+    }
+    tb.appendChild(tr);
+  });
+  $('view').hidden = false;
+}
+
+function save(bytes, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([bytes]));
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function ingest(name, bytes) {
+  const lower = name.toLowerCase();
+  if (lower.endsWith('.sndj')) {
+    const parsed = S.srmParse(srm);
+    const free = parsed.slots.find(s => s.empty);
+    if (!free) { status('all 4 slots are full — erase one first', true); return; }
+    try {
+      srm = S.srmInsert(srm, free.index, bytes);
+      status(name + ' -> slot ' + free.index);
+    } catch (e) {
+      status(name + ': ' + e.message, true);
+    }
+    render();
+    return;
+  }
+  // treat anything else as a cart save (trim/pad to 32 KB)
+  const img = new Uint8Array(S.SRM_SIZE);
+  img.set(bytes.slice(0, S.SRM_SIZE));
+  srm = img;
+  status(name + ' loaded (' + bytes.length + ' bytes)');
+  render();
+}
+
+$('drop').onclick = () => $('file').click();
+$('file').onchange = e => {
+  for (const f of e.target.files) {
+    f.arrayBuffer().then(b => ingest(f.name, new Uint8Array(b)));
+  }
+};
+document.body.ondragover = e => { e.preventDefault(); $('drop').classList.add('armed'); };
+document.body.ondragleave = () => $('drop').classList.remove('armed');
+document.body.ondrop = e => {
+  e.preventDefault();
+  $('drop').classList.remove('armed');
+  for (const f of e.dataTransfer.files) {
+    f.arrayBuffer().then(b => ingest(f.name, new Uint8Array(b)));
+  }
+};
+
+$('slots').onclick = e => {
+  const x = e.target.dataset.x, er = e.target.dataset.e;
+  if (x !== undefined) {
+    const bytes = S.srmExtract(srm, +x);
+    const name = S.sndjFileParse(bytes).name.trim() || 'slot' + x;
+    save(bytes, name.replace(/\s+/g, '_') + '.sndj');
+    status('extracted slot ' + x);
+  } else if (er !== undefined) {
+    srm = S.srmErase(srm, +er);
+    status('erased slot ' + er);
+    render();
+  }
+};
+
+$('download').onclick = () => { save(srm, 'snesdj.srm'); };
+$('fresh').onclick = () => { srm = S.srmNew(); status('new cart image'); render(); };
+
+render();
+</script>
+</body>
+</html>
