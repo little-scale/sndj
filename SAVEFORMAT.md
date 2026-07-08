@@ -6,19 +6,21 @@ invariant #12).
 
 ## The WRAM song block (what gets saved)
 
-One contiguous block at `$7E:2000..$7E:57FF` (`SB..SB_END`, $3800 bytes).
-Offsets are frozen; save/load is a straight copy of this block.
+One contiguous block at `$7E:2000..$7E:72FF` (`SB..SB_END`, $5300 bytes),
+**layout v2**: fixed-size sections first, growable pools last, so future
+phrase growth moves nothing else. Save/load is a straight copy.
 
 | offset | size  | contents |
 |--------|-------|----------|
-| $0000  | $2000 | 128 phrases x 16 rows x 4 bytes (note, instr, cmd, val) |
-| $2000  | $0800 | 64 chains x 16 entries x 2 bytes (phrase, transpose) |
-| $2800  | $0400 | song grid: 8 tracks x 128 rows (chain id, $FF empty) |
-| $2C00  | $0200 | 32 instruments x 16 bytes (see below) |
-| $2E00  | $0800 | 32 tables x 64 bytes (reserved until tables land) |
-| $3600  | $0080 | 8 grooves x 16 ticks-per-row entries |
-| $3680  | $0100 | 8 wave banks x 32 samples (reserved until WAVE lands) |
-| $3780  | $0080 | song header: groove, transpose, magic $D7 at +2, echo block at +3 (EDL, feedback, EVOL L/R, EON mask, FIR preset) |
+| $0000  | $0400 | song grid: 8 tracks x 128 rows (chain id, $FF empty) |
+| $0400  | $0400 | 64 instruments x 16 bytes (see below) |
+| $0800  | $0800 | 32 tables x 64 bytes (reserved until tables land) |
+| $1000  | $0100 | 16 grooves x 16 ticks-per-row entries |
+| $1100  | $0100 | 8 wave banks x 32 samples |
+| $1200  | $0400 | 16 kits x 16 slots x 4 bytes (sample, tune, vol, flags; a slot with vol 0 is empty) |
+| $1600  | $0100 | song header: groove, transpose, magic $D7 at +2, echo block at +3 (EDL, feedback, EVOL L/R, EON mask, FIR preset) |
+| $1700  | $0C00 | 96 chains x 16 entries x 2 bytes (phrase, transpose) |
+| $2300  | $3000 | 192 phrases x 16 rows x 4 bytes (note, instr, cmd, val) |
 
 Instrument record (16 bytes): type, sample, ADSR1 (low 7 bits), ADSR2,
 vol L, vol R, fine-tune, flags, GRP span, GRP offsets x3, reserved x4.
@@ -61,24 +63,27 @@ A save that packs larger than a region ($1880) is refused — the UI shows
 
 ## Save image (what actually gets packed)
 
-The phrase pool interleaves `note,instr,cmd,val` per row, which defeats
-run-length coding (empty rows are `00 FF 00 00`). The save image therefore
-stores the phrase pool **column-planar**:
+The phrase pool interleaves `note,instr,cmd,val` per row and chains
+interleave `phrase,transpose`, which defeats run-length coding (empty
+rows are `00 FF ...`). The save image therefore stores both pools
+**column-planar**:
 
 ```
-image[$0000..$07FF] = all note bytes   (block offset 0, 4, 8, ...)
-image[$0800..$0FFF] = all instr bytes  (offset 1, 5, 9, ...)
-image[$1000..$17FF] = all cmd bytes
-image[$1800..$1FFF] = all val bytes
-image[$2000..$37FF] = the rest of the block, linear
+image[$0000..$0BFF] = all note bytes   (phrase pool, stride 4)
+image[$0C00..$17FF] = all instr bytes
+image[$1800..$23FF] = all cmd bytes
+image[$2400..$2FFF] = all val bytes
+image[$3000..$35FF] = all chain phrase ids  (chain pool, stride 2)
+image[$3600..$3BFF] = all chain transposes
+image[$3C00..$52FF] = the rest of the block ($0000-$16FF), linear
 ```
 
-An empty song packs to well under 300 bytes this way. Both packers stage
-the image in WRAM at `$7E:6000` before/after the RLE pass.
+An empty song packs to ~330 bytes this way. Both packers stage the image
+in WRAM at `$7E:8000` before/after the RLE pass.
 
 ## RLE codec
 
-Byte stream; unpacking stops after exactly $3800 output bytes.
+Byte stream; unpacking stops after exactly $5300 output bytes.
 
 - control `$00-$7F`: copy the next `c+1` bytes literally (1-128)
 - control `$80-$FF`: repeat the next byte `c-$80+3` times (3-130)

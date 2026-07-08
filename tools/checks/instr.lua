@@ -83,8 +83,8 @@ emu.addEventCallback(function()
 
   if frames == at_instr then
     check(wram(0x000C) == 4, "A+Right opened INSTR from the phrase row")
-    check(wram(0x2001) == 0, "phrase row 0 instrument = 00")
-    check(wram(0x4C02) == 0x2F and wram(0x4C03) == 0xCA,
+    check(wram(0x4301) == 0, "phrase row 0 instrument = 00")
+    check(wram(0x2402) == 0x2F and wram(0x2403) == 0xCA,
       "factory instrument ADSR present")
   elseif frames == shot_at then
     local out = os.getenv("SNESDJ_INSTR_SHOT")
@@ -96,9 +96,9 @@ emu.addEventCallback(function()
       print("info: instr screenshot -> " .. out)
     end
   elseif frames == after_edit then
-    check(wram(0x4C08) == 2, "GRP span = 2")
-    check(wram(0x4C09) == 4, "OFS1 = 4 semitones")
-    check(wram(0x4C0A) == 7, "OFS2 = 7 semitones")
+    check(wram(0x2408) == 2, "GRP span = 2")
+    check(wram(0x2409) == 4, "OFS1 = 4 semitones")
+    check(wram(0x240A) == 7, "OFS2 = 7 semitones")
   elseif frames == at_phrase + 2 then
     check(wram(0x000C) == 1, "back on PHRASE")
   elseif frames == playing then

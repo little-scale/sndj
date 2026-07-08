@@ -1,46 +1,52 @@
-; song.inc — the contiguous WRAM song block (CLAUDE.md §3.5).
+; song.inc — the contiguous WRAM song block (CLAUDE.md §3.5, SAVEFORMAT.md).
 ;
 ; Lives in bank $7E above the $0000-$1FFF mirror, so ALL access uses long
 ; addressing (lda.l/sta.l $7E0000,x with X = block-relative offset + SB).
-; Layout freezes in M8 when SAVEFORMAT.md is written; keep additions at the
-; end. Save/load is a straight copy of [SB, SB_END).
+; Layout v2: fixed-size sections first, growable pools last, so future
+; phrase-count growth doesn't move anything else. Save/load is a straight
+; copy of [SB, SB_END).
 ;
-; Pool sizes (v1, SMDJ4-derived, SRAM 4-slot target — CLAUDE.md §15):
-;   128 phrases, 64 chains, 8x128 song grid, 32 instruments, 32 tables,
-;   8 grooves, 8 wave banks.
+; Pool sizes (v2 "option B"): 192 phrases, 96 chains, 64 instruments,
+; 16 kits x 16 slots, 16 grooves — sized against the 4-slot SRAM target.
 
 .DEFINE SB            $2000            ; song block base (bank $7E)
 
-.DEFINE PHRASE_COUNT  128
+.DEFINE PHRASE_COUNT  192
 .DEFINE PHRASE_ROWS   16
 .DEFINE PHRASE_ROW_SZ 4                ; note, instr, cmd, val
 .DEFINE PHRASE_SZ     64               ; 16 rows * 4
 
-.DEFINE CHAIN_COUNT   64
+.DEFINE CHAIN_COUNT   96
 .DEFINE CHAIN_ROWS    16
 .DEFINE CHAIN_SZ      32               ; 16 * (phrase id, transpose)
 
 .DEFINE SONG_ROWS     128
 .DEFINE TRACKS        8
 
-.DEFINE INSTR_COUNT   32
+.DEFINE INSTR_COUNT   64
 .DEFINE INSTR_SZ      16
 
 .DEFINE TABLE_COUNT   32
 .DEFINE TABLE_SZ      64               ; 16 rows * (cmd,val)*2 columns
 
-.DEFINE GROOVE_COUNT  8
+.DEFINE GROOVE_COUNT  16
 .DEFINE GROOVE_SZ     16
 
-.DEFINE SB_PHRASES    (SB + $0000)     ; $2000 bytes
-.DEFINE SB_CHAINS     (SB + $2000)     ; $0800
-.DEFINE SB_SONG       (SB + $2800)     ; $0400 (8 tracks * 128 rows)
-.DEFINE SB_INSTR      (SB + $2C00)     ; $0200
-.DEFINE SB_TABLES     (SB + $2E00)     ; $0800
-.DEFINE SB_GROOVES    (SB + $3600)     ; $0080
-.DEFINE SB_WAVES      (SB + $3680)     ; $0100 (8 banks * 32 samples)
-.DEFINE SB_HEADER     (SB + $3780)     ; $0080 (song-level settings)
-.DEFINE SB_END        (SB + $3800)
+.DEFINE KIT_COUNT     16
+.DEFINE KIT_SLOTS     16
+.DEFINE KIT_SLOT_SZ   4                ; sample, tune(signed), vol, flags
+.DEFINE KIT_SZ        64               ; 16 slots * 4
+
+.DEFINE SB_SONG       (SB + $0000)     ; $0400 (8 tracks * 128 rows)
+.DEFINE SB_INSTR      (SB + $0400)     ; $0400 (64 * 16)
+.DEFINE SB_TABLES     (SB + $0800)     ; $0800 (reserved until tables land)
+.DEFINE SB_GROOVES    (SB + $1000)     ; $0100 (16 * 16)
+.DEFINE SB_WAVES      (SB + $1100)     ; $0100 (8 banks * 32 samples)
+.DEFINE SB_KITS       (SB + $1200)     ; $0400 (16 kits * 64)
+.DEFINE SB_HEADER     (SB + $1600)     ; $0100 (song-level settings)
+.DEFINE SB_CHAINS     (SB + $1700)     ; $0C00 (96 * 32)
+.DEFINE SB_PHRASES    (SB + $2300)     ; $3000 (192 * 64)
+.DEFINE SB_END        (SB + $5300)
 
 ; song header fields (offsets into SB_HEADER)
 .DEFINE SH_GROOVE     0                ; default groove id
@@ -60,5 +66,7 @@
 .DEFINE INSTR_NONE    $FF
 .DEFINE CMD_NONE      0
 
-; ROM pool reservation (patcher.html may grow the pool up to this)
-.DEFINE POOL_RESERVED $4000
+; ROM pool reservation (patcher.html may grow the pool up to this; the
+; pool spans ROM banks — entry offsets/sizes are in 9-byte BRR blocks)
+.DEFINE POOL_RESERVED $17FFA           ; banks 1-3 minus the SNPOOL marker
+.DEFINE POOL_BANKS    3

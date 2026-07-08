@@ -64,18 +64,18 @@ emu.addEventCallback(function()
 
   if frames == 54 then
     check(wram(0x000C) == 1, "navigated to the PHRASE screen")
-    check(wram(0x5782) == 0xD7, "song block initialised (magic)")
+    check(wram(0x3602) == 0xD7, "song block initialised (magic)")
   elseif frames == 60 then
-    check(wram(0x2000) == 49, "B tap inserted C-4 (note 49) at row 0")
+    check(wram(0x4300) == 49, "B tap inserted C-4 (note 49) at row 0")
     check(wram(0x0015) == 1, "insert auditioned (1 KON)")
   elseif frames == 69 then
-    check(wram(0x2000) == 50, "B+Right nudged row 0 to C#4 (50)")
+    check(wram(0x4300) == 50, "B+Right nudged row 0 to C#4 (50)")
     check(wram(0x0015) == 2, "nudge auditioned (2 KONs)")
   elseif frames == 81 then
     check(wram(0x000F) == 2, "cursor on row 2")
-    check(wram(0x2008) == 50, "B tap inserted last note (C#4) at row 2")
+    check(wram(0x4308) == 50, "B tap inserted last note (C#4) at row 2")
   elseif frames == 96 then
-    check(wram(0x200C) == 0, "Y+B cleared row 3")
+    check(wram(0x430C) == 0, "Y+B cleared row 3")
     check(wram(0x0016) == 0, "not playing yet")
   elseif frames == 112 then
     check(wram(0x0016) == 1, "Start began playback")

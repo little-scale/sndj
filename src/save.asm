@@ -14,8 +14,8 @@
 .DEFINE REGION_SZ    $1880
 .DEFINE SLOT_COUNT   4
 .DEFINE REGION_COUNT 5
-.DEFINE IMAGE        $6000       ; staging buffer in bank $7E
-.DEFINE IMAGE_SZ     $3800
+.DEFINE IMAGE        $8000       ; staging buffer in bank $7E (block ends $7300)
+.DEFINE IMAGE_SZ     $5300
 
 .DEFINE SV_OK        0
 .DEFINE SV_FULL      1
@@ -56,19 +56,76 @@ sram_check:
     bne @slots
     rts
 
-; --- song block <-> planar image at $7E:6000 ------------------------------------
+; --- song block <-> planar image at IMAGE -----------------------------------
+; image = [4 phrase planes $C00][2 chain planes $600][rest of block $1700]
+; (SAVEFORMAT.md v2). Table-driven: each pass de/interleaves one column.
+
+stage_tab:  ; src offset (bank $7E), stride, image offset, plane length
+    .DW SB_PHRASES + 0
+    .DB 4
+    .DW $0000, $0C00
+    .DW SB_PHRASES + 1
+    .DB 4
+    .DW $0C00, $0C00
+    .DW SB_PHRASES + 2
+    .DB 4
+    .DW $1800, $0C00
+    .DW SB_PHRASES + 3
+    .DB 4
+    .DW $2400, $0C00
+    .DW SB_CHAINS + 0
+    .DB 2
+    .DW $3000, $0600
+    .DW SB_CHAINS + 1
+    .DB 2
+    .DW $3600, $0600
+
+; pass sv_i (0-5) -> sv_src pointer, X = image offset, Y = length,
+; sv_b = stride
+stage_setup:
+    lda sv_i
+    rep #$30
+.ACCU 16
+    and #$00FF
+    ; * 7 (table entry size)
+    sta sv_chunk
+    asl
+    asl
+    asl                     ; *8
+    sec
+    sbc sv_chunk            ; *7
+    tax
+    sep #$20
+.ACCU 8
+    lda.w stage_tab + 2,x
+    sta sv_b                ; stride
+    rep #$30
+.ACCU 16
+    lda.w stage_tab,x
+    sta sv_src
+    lda.w stage_tab + 5,x
+    tay                     ; length
+    lda.w stage_tab + 3,x
+    tax                     ; image offset
+    sep #$20
+.ACCU 8
+    lda #$7E
+    sta sv_src + 2
+    rts
+
 stage_out:
-    stz sv_i                ; column counter in sv_i low byte
-@col:
+    stz sv_i
+@pass:
     jsr stage_setup
 @plane:
     lda [sv_src]
     sta.l $7E0000 + IMAGE,x
     rep #$20
 .ACCU 16
-    lda sv_src
+    lda sv_b
+    and #$00FF
     clc
-    adc #$0004
+    adc sv_src
     sta sv_src
     sep #$20
 .ACCU 8
@@ -77,29 +134,30 @@ stage_out:
     bne @plane
     inc sv_i
     lda sv_i
-    cmp #$04
-    bne @col
+    cmp #$06
+    bne @pass
     ldx #$0000
 @rest:
-    lda.l $7E0000 + SB + $2000,x
-    sta.l $7E0000 + IMAGE + $2000,x
+    lda.l $7E0000 + SB,x
+    sta.l $7E0000 + IMAGE + $3C00,x
     inx
-    cpx #(IMAGE_SZ - $2000)
+    cpx #(SB_CHAINS - SB)
     bne @rest
     rts
 
 stage_in:
     stz sv_i
-@col:
+@pass:
     jsr stage_setup
 @plane:
     lda.l $7E0000 + IMAGE,x
     sta [sv_src]
     rep #$20
 .ACCU 16
-    lda sv_src
+    lda sv_b
+    and #$00FF
     clc
-    adc #$0004
+    adc sv_src
     sta sv_src
     sep #$20
 .ACCU 8
@@ -108,42 +166,15 @@ stage_in:
     bne @plane
     inc sv_i
     lda sv_i
-    cmp #$04
-    bne @col
+    cmp #$06
+    bne @pass
     ldx #$0000
 @rest:
-    lda.l $7E0000 + IMAGE + $2000,x
-    sta.l $7E0000 + SB + $2000,x
+    lda.l $7E0000 + IMAGE + $3C00,x
+    sta.l $7E0000 + SB,x
     inx
-    cpx #(IMAGE_SZ - $2000)
+    cpx #(SB_CHAINS - SB)
     bne @rest
-    rts
-
-; shared per-column setup: sv_src = $7E:(SB+col), X = col*$800, Y = $800
-stage_setup:
-    lda sv_i
-    rep #$30
-.ACCU 16
-    and #$00FF
-    clc
-    adc #SB
-    sta sv_src
-    sep #$20
-.ACCU 8
-    lda #$7E
-    sta sv_src + 2
-    lda sv_i
-    rep #$30
-.ACCU 16
-    and #$00FF
-    xba
-    asl
-    asl
-    asl                     ; * $800
-    tax
-    sep #$20
-.ACCU 8
-    ldy #$0800
     rts
 
 ; --- CRC-16/CCITT: update sv_crc with byte A ------------------------------------

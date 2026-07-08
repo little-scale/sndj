@@ -58,26 +58,40 @@ def unpack(data, size):
     return bytes(out)
 
 
-PHRASE_POOL = 0x2000  # bytes of interleaved phrase data at the block start
+BLOCK_SZ = 0x5300     # SAVEFORMAT.md v2
+PHRASES_OFF = 0x2300  # interleaved phrase pool at the END of the block
+PHRASES_LEN = 0x3000
+
+
+CHAINS_OFF = 0x1700
+CHAINS_LEN = 0x0C00
 
 
 def to_image(block):
-    """Reorder the song block into the column-planar save image."""
-    assert len(block) == 0x3800
+    """Reorder the song block into the column-planar save image:
+    [4 phrase planes][2 chain planes][the rest of the block, linear]."""
+    assert len(block) == BLOCK_SZ
     img = bytearray()
     for col in range(4):
-        img.extend(block[col:PHRASE_POOL:4])
-    img.extend(block[PHRASE_POOL:])
+        img.extend(block[PHRASES_OFF + col:PHRASES_OFF + PHRASES_LEN:4])
+    for col in range(2):
+        img.extend(block[CHAINS_OFF + col:CHAINS_OFF + CHAINS_LEN:2])
+    img.extend(block[:CHAINS_OFF])
     return bytes(img)
 
 
 def from_image(img):
-    assert len(img) == 0x3800
-    block = bytearray(0x3800)
-    n = PHRASE_POOL // 4
+    assert len(img) == BLOCK_SZ
+    block = bytearray(BLOCK_SZ)
+    n = PHRASES_LEN // 4
     for col in range(4):
-        block[col:PHRASE_POOL:4] = img[col * n:(col + 1) * n]
-    block[PHRASE_POOL:] = img[PHRASE_POOL:]
+        block[PHRASES_OFF + col:PHRASES_OFF + PHRASES_LEN:4] = \
+            img[col * n:(col + 1) * n]
+    m = CHAINS_LEN // 2
+    for col in range(2):
+        block[CHAINS_OFF + col:CHAINS_OFF + CHAINS_LEN:2] = \
+            img[PHRASES_LEN + col * m:PHRASES_LEN + (col + 1) * m]
+    block[:CHAINS_OFF] = img[PHRASES_LEN + CHAINS_LEN:]
     return bytes(block)
 
 
@@ -94,24 +108,28 @@ def selftest():
     import random
     rnd = random.Random(1)
     cases = [
-        bytes(0x3800),                                    # all zero
-        bytes([0xFF]) * 0x3800,                           # all $FF
-        bytes(rnd.randrange(256) for _ in range(0x3800)),  # noise
-        (b"\x00" * 100 + b"ABC" + b"\x55" * 300) * 20 + bytes(0x3800),
+        bytes(BLOCK_SZ),                                    # all zero
+        bytes([0xFF]) * BLOCK_SZ,                           # all $FF
+        bytes(rnd.randrange(256) for _ in range(BLOCK_SZ)),  # noise
+        (b"\x00" * 100 + b"ABC" + b"\x55" * 300) * 40 + bytes(BLOCK_SZ),
     ]
-    for i, src in enumerate(c[:0x3800] for c in cases):
+    for i, src in enumerate(c[:BLOCK_SZ] for c in cases):
         p = pack(src)
         u = unpack(p, len(src))
         assert u == src, f"case {i} round-trip failed"
     assert crc16(b"123456789") == 0x29B1, "CRC-16/CCITT check value"
     # image reorder round-trip + empty-song packing size
-    empty = bytearray(0x3800)
-    for i in range(1, PHRASE_POOL, 4):
+    empty = bytearray(BLOCK_SZ)
+    for i in range(PHRASES_OFF + 1, PHRASES_OFF + PHRASES_LEN, 4):
         empty[i] = 0xFF          # instr column = none
+    for i in range(CHAINS_OFF, CHAINS_OFF + CHAINS_LEN, 2):
+        empty[i] = 0xFF          # chain phrase entries = empty
+    for i in range(0x0000, 0x0400):
+        empty[i] = 0xFF          # song grid = empty
     empty = bytes(empty)
     assert from_image(to_image(empty)) == empty
     packed = pack(to_image(empty))
-    assert len(packed) < 512, f"empty song image packs to {len(packed)}"
+    assert len(packed) < 768, f"empty song image packs to {len(packed)}"
     print(f"sndj_rle selftest: OK (empty song image packs to "
           f"{len(packed)} bytes)")
 

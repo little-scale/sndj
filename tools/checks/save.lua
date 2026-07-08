@@ -22,7 +22,7 @@ local function check(cond, msg)
   end
 end
 
-local SB, SBEND = 0x2000, 0x5800
+local SB, SBEND = 0x2000, 0x7300
 local snapshot = nil
 
 local function snap()
@@ -38,12 +38,15 @@ local function block_equal(t)
   return true
 end
 
--- Lua mirror: unpack region bytes, un-planar, compare to snapshot
+-- Lua mirror: unpack region bytes, un-planar (image v2: 4 phrase planes,
+-- 2 chain planes, then the rest), compare to snapshot
+local BLOCK, PH_OFF, PH_LEN = 0x5300, 0x2300, 0x3000
+local CH_OFF, CH_LEN = 0x1700, 0x0C00
 local function verify_packed(region, size, t)
   local base = 0x100 + region * 0x1880
   local img = {}
   local i = base
-  while #img < 0x3800 do
+  while #img < BLOCK do
     local c = sram(i)
     i = i + 1
     if c < 0x80 then
@@ -60,18 +63,28 @@ local function verify_packed(region, size, t)
   if i - base ~= size then
     return false, "stream length " .. (i - base) .. " != " .. size
   end
-  -- un-planar the phrase pool
-  local n = 0x2000 / 4
+  local n = PH_LEN / 4
   for col = 0, 3 do
     for k = 0, n - 1 do
-      local blk_off = col + k * 4
+      local blk_off = PH_OFF + col + k * 4
       if img[col * n + k + 1] ~= t[blk_off + 1] then
         return false, "phrase byte " .. blk_off
       end
     end
   end
-  for off = 0x2000, 0x37FF do
-    if img[off + 1] ~= t[off + 1] then return false, "byte " .. off end
+  local m = CH_LEN / 2
+  for col = 0, 1 do
+    for k = 0, m - 1 do
+      local blk_off = CH_OFF + col + k * 2
+      if img[PH_LEN + col * m + k + 1] ~= t[blk_off + 1] then
+        return false, "chain byte " .. blk_off
+      end
+    end
+  end
+  for off = 0, CH_OFF - 1 do
+    if img[PH_LEN + CH_LEN + off + 1] ~= t[off + 1] then
+      return false, "byte " .. off
+    end
   end
   return true
 end
@@ -95,17 +108,17 @@ emu.addEventCallback(function()
   elseif stage == "to_song" and frames == t0 then
     pad = {}
     -- author a song directly (pad grammar covered elsewhere)
-    poke(0x4800, 0)            -- V1 r0 = chain 0
-    poke(0x4000, 0)            -- chain0 e0 = phrase 0
-    poke(0x4001, 5)            -- transpose 5
+    poke(0x2000, 0)            -- V1 r0 = chain 0
+    poke(0x3700, 0)            -- chain0 e0 = phrase 0
+    poke(0x3701, 5)            -- transpose 5
     for r = 0, 15, 2 do
-      poke(SB + r * 4, 49 + r) -- notes
-      poke(SB + r * 4 + 1, 0)  -- instrument 0
-      poke(SB + r * 4 + 2, 22) -- V
-      poke(SB + r * 4 + 3, 0x48)
+      poke(0x4300 + r * 4, 49 + r) -- notes
+      poke(0x4300 + r * 4 + 1, 0)  -- instrument 0
+      poke(0x4300 + r * 4 + 2, 22) -- V
+      poke(0x4300 + r * 4 + 3, 0x48)
     end
-    poke(0x4C08, 2)            -- GRP 2
-    poke(0x5600, 3)            -- groove tweak
+    poke(0x2408, 2)            -- GRP 2
+    poke(0x3000, 3)            -- groove tweak
     stage = "snapshot"
     t0 = frames + 4
   elseif stage == "snapshot" and frames == t0 then
@@ -151,7 +164,7 @@ emu.addEventCallback(function()
       (ok and "" or (" [" .. tostring(why) .. "]")))
     -- corrupt the live song
     for a = SB, SB + 0x200 do poke(a, 0x11) end
-    poke(0x5600, 9)
+    poke(0x3000, 9)
     check(not block_equal(snapshot), "song block corrupted for the test")
     pad = { left = true }      -- LOAD column
     stage = "col2"

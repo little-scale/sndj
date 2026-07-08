@@ -114,17 +114,17 @@ emu.addEventCallback(function()
   if frames == play + 2 then pad = {} end
 
   if frames == 26 then
-    poke(0x4800, 0)          -- V1r0 = chain 0
-    poke(0x4000, 0)          -- chain0 e0 = phrase 0
+    poke(0x2000, 0)          -- V1r0 = chain 0
+    poke(0x3700, 0)          -- chain0 e0 = phrase 0
     -- phrase 0: row0 = note + Y03 (FIR comb), row4 = note + X00 (EON off)
-    poke(0x2000, 49)
-    poke(0x2001, 0)
-    poke(0x2002, 25)         -- Y
-    poke(0x2003, 3)
-    poke(0x2010, 49)
-    poke(0x2011, 0xFF)
-    poke(0x2012, 24)         -- X
-    poke(0x2013, 0)
+    poke(0x4300, 49)
+    poke(0x4301, 0)
+    poke(0x4302, 25)         -- Y
+    poke(0x4303, 3)
+    poke(0x4310, 49)
+    poke(0x4311, 0xFF)
+    poke(0x4312, 24)         -- X
+    poke(0x4313, 0)
     aram_snap = snap_aram()
   elseif frames == at_echo then
     check(wram(0x0C) == 6, "navigated to the ECHO screen")

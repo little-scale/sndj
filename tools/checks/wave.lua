@@ -69,31 +69,31 @@ emu.addEventCallback(function()
     check(aram(0x1084) == 0x12 and aram(0x1085) == 0x11,
           "directory entry 33 -> wave slot 1 ($1112)")
     -- author the test song: WAV instrument 1 (bank 1), NSE instrument 2
-    poke(0x4800, 0)
-    poke(0x4000, 0)
-    poke(0x4C10, 2)          -- instr 1: type WAV
-    poke(0x4C11, 1)          -- bank 1 (triangle)
-    poke(0x4C12, 0x2F)
-    poke(0x4C13, 0xCA)
-    poke(0x4C14, 0x50)
-    poke(0x4C15, 0x50)
-    poke(0x4C20, 3)          -- instr 2: type NSE
-    poke(0x4C21, 0)
-    poke(0x4C22, 0x2F)
-    poke(0x4C23, 0xCA)
-    poke(0x4C24, 0x50)
-    poke(0x4C25, 0x50)
+    poke(0x2000, 0)
+    poke(0x3700, 0)
+    poke(0x2410, 2)          -- instr 1: type WAV
+    poke(0x2411, 1)          -- bank 1 (triangle)
+    poke(0x2412, 0x2F)
+    poke(0x2413, 0xCA)
+    poke(0x2414, 0x50)
+    poke(0x2415, 0x50)
+    poke(0x2420, 3)          -- instr 2: type NSE
+    poke(0x2421, 0)
+    poke(0x2422, 0x2F)
+    poke(0x2423, 0xCA)
+    poke(0x2424, 0x50)
+    poke(0x2425, 0x50)
     -- phrase 0: r0 C-4 wav1 | r4 B02 | r8 G-4 nse2 | r12 C-4 wav1
-    poke(0x2000, 49)
-    poke(0x2001, 1)
-    poke(0x2010, 0)
-    poke(0x2011, 0xFF)
-    poke(0x2012, 2)          -- B
-    poke(0x2013, 2)          -- bank 2 (saw)
-    poke(0x2020, 56)         -- G-4 (idx 55 -> clock 23)
-    poke(0x2021, 2)
-    poke(0x2030, 49)
-    poke(0x2031, 1)
+    poke(0x4300, 49)
+    poke(0x4301, 1)
+    poke(0x4310, 0)
+    poke(0x4311, 0xFF)
+    poke(0x4312, 2)          -- B
+    poke(0x4313, 2)          -- bank 2 (saw)
+    poke(0x4320, 56)         -- G-4 (idx 55 -> clock 23)
+    poke(0x4321, 2)
+    poke(0x4330, 49)
+    poke(0x4331, 1)
   elseif frames == play + 8 then
     check(dsp(0x04) == 33, "WAV instrument routes SRCN to wave slot 33")
     check(dsp(0x02) + dsp(0x03) * 256 == 0x0200,
@@ -115,7 +115,7 @@ emu.addEventCallback(function()
     end
   elseif frames == edited then
     -- sine col 0: 8 -> 7 => first data byte: (7-8)&15 <<4 | (9-8)&15 = $F1
-    check(wram(0x5680) == 7, "edit stored in the song block")
+    check(wram(0x3100) == 7, "edit stored in the song block")
     check(aram(0x1101) == 0xF1, "edit recompiled + re-uploaded to ARAM ($" ..
       string.format("%02X", aram(0x1101)) .. ")")
     if fails == 0 then

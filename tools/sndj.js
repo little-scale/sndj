@@ -217,25 +217,43 @@ function crc16(data) {
   return crc;
 }
 
-const PHRASE_POOL = 0x2000;
+const BLOCK_SZ = 0x5300;     // SAVEFORMAT.md v2
+const PHRASES_OFF = 0x2300;  // interleaved phrase pool at the block end
+const PHRASES_LEN = 0x3000;
+const CHAINS_OFF = 0x1700;
+const CHAINS_LEN = 0x0C00;
 
 function toImage(block) {
-  const img = new Uint8Array(0x3800);
+  const img = new Uint8Array(BLOCK_SZ);
   let p = 0;
   for (let col = 0; col < 4; col++) {
-    for (let k = col; k < PHRASE_POOL; k += 4) img[p++] = block[k];
+    for (let k = PHRASES_OFF + col; k < PHRASES_OFF + PHRASES_LEN; k += 4) {
+      img[p++] = block[k];
+    }
   }
-  img.set(block.slice(PHRASE_POOL, 0x3800), PHRASE_POOL);
+  for (let col = 0; col < 2; col++) {
+    for (let k = CHAINS_OFF + col; k < CHAINS_OFF + CHAINS_LEN; k += 2) {
+      img[p++] = block[k];
+    }
+  }
+  img.set(block.slice(0, CHAINS_OFF), p);
   return img;
 }
 
 function fromImage(img) {
-  const block = new Uint8Array(0x3800);
+  const block = new Uint8Array(BLOCK_SZ);
   let p = 0;
   for (let col = 0; col < 4; col++) {
-    for (let k = col; k < PHRASE_POOL; k += 4) block[k] = img[p++];
+    for (let k = PHRASES_OFF + col; k < PHRASES_OFF + PHRASES_LEN; k += 4) {
+      block[k] = img[p++];
+    }
   }
-  block.set(img.slice(PHRASE_POOL, 0x3800), PHRASE_POOL);
+  for (let col = 0; col < 2; col++) {
+    for (let k = CHAINS_OFF + col; k < CHAINS_OFF + CHAINS_LEN; k += 2) {
+      block[k] = img[p++];
+    }
+  }
+  block.set(img.slice(p, BLOCK_SZ), 0);
   return block;
 }
 
@@ -300,14 +318,16 @@ function selftest() {
   assert(back.length === 2 && back[0].name === 'PAD', 'pool names');
   assert(back[0].brr.length === 72 && back[1].loopBlock === null, 'pool fields');
   // RLE + CRC + image
-  const blk = new Uint8Array(0x3800);
-  for (let i = 1; i < PHRASE_POOL; i += 4) blk[i] = 0xFF;
-  blk[0x2100] = 0x42;
+  const blk = new Uint8Array(BLOCK_SZ);
+  for (let i = PHRASES_OFF + 1; i < PHRASES_OFF + PHRASES_LEN; i += 4) blk[i] = 0xFF;
+  for (let i = CHAINS_OFF; i < CHAINS_OFF + CHAINS_LEN; i += 2) blk[i] = 0xFF;
+  for (let i = 0; i < 0x0400; i++) blk[i] = 0xFF;
+  blk[0x1000] = 0x42;
   const img = toImage(blk);
   const packed = rlePack(img);
-  assert(packed.length < 512, 'empty-song pack size ' + packed.length);
-  const un = fromImage(rleUnpack(packed, 0x3800));
-  for (let i = 0; i < 0x3800; i++) assert(un[i] === blk[i], 'rle byte ' + i);
+  assert(packed.length < 768, 'empty-song pack size ' + packed.length);
+  const un = fromImage(rleUnpack(packed, BLOCK_SZ));
+  for (let i = 0; i < BLOCK_SZ; i++) assert(un[i] === blk[i], 'rle byte ' + i);
   assert(crc16([...'123456789'].map(c => c.charCodeAt(0))) === 0x29B1, 'crc');
   // tuning matches the ROM tables
   assert(pitchForNote(48) === 0x0800, 'C-4 pitch');

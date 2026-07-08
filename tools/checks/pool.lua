@@ -28,7 +28,7 @@ end
 local function find_pool()
   local sig = { 0x53, 0x4E, 0x50, 0x4F, 0x4F, 0x4C,          -- "SNPOOL"
                 0x53, 0x4E, 0x44, 0x4A, 0x50, 0x4F, 0x4F, 0x4C } -- "SNDJPOOL"
-  for base = 0, 0x20000, 0x8000 do
+  for base = 0, 0x43000, 0x8000 do
     local hit = true
     for i, b in ipairs(sig) do
       if rom(base + i - 1) ~= b then hit = false break end
@@ -102,17 +102,17 @@ emu.addEventCallback(function()
     check(cursor < 0xD000, "pool fits under the echo region (top at $" ..
       string.format("%04X", cursor) .. ")")
     -- author a KIT test: instrument 1 = KIT; notes pick pool slots
-    poke(0x4800, 0)
-    poke(0x4000, 0)
-    poke(0x4C10, 1)          -- type KIT
-    poke(0x4C12, 0x2F)
-    poke(0x4C13, 0xCA)
-    poke(0x4C14, 0x50)
-    poke(0x4C15, 0x50)
-    poke(0x2000, 49)         -- C-4 -> idx 48 -> slot 0 (PAD)
-    poke(0x2001, 1)
-    poke(0x2010, 52)         -- D#4 -> idx 51 -> slot 3 (KICK)
-    poke(0x2011, 0xFF)
+    poke(0x2000, 0)
+    poke(0x3700, 0)
+    poke(0x2410, 1)          -- type KIT
+    poke(0x2412, 0x2F)
+    poke(0x2413, 0xCA)
+    poke(0x2414, 0x50)
+    poke(0x2415, 0x50)
+    poke(0x4300, 49)         -- C-4 -> idx 48 -> slot 0 (PAD)
+    poke(0x4301, 1)
+    poke(0x4310, 52)         -- D#4 -> idx 51 -> slot 3 (KICK)
+    poke(0x4311, 0xFF)
   elseif frames == 80 then
     pad = { start = true }
   elseif frames == 82 then

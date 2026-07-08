@@ -144,6 +144,9 @@ def main(out_path):
         data = build_pool()
         print(f"sndj_pool: synthesized factory pool "
               f"({data[9]} samples, {len(data)} bytes)")
+    RESERVED = 0x17FFA
+    assert len(data) <= RESERVED, f"pool {len(data)} exceeds {RESERVED}"
+    data = data + b"\xFF" * (RESERVED - len(data))
     open(out_path, "wb").write(data)
 
 

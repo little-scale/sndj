@@ -27,7 +27,7 @@ end
 local CA, CD, CG, CH, CK, CL, CP, CR, CT, CV = 1, 4, 7, 8, 11, 12, 16, 18, 20, 22
 
 local function clear_phrase(p)
-  local base = 0x2000 + p * 64
+  local base = 0x4300 + p * 64
   for r = 0, 15 do
     poke(base + r * 4, 0)
     poke(base + r * 4 + 1, 0xFF)
@@ -37,7 +37,7 @@ local function clear_phrase(p)
 end
 
 local function row(p, r, note, instr, cmd, val)
-  local base = 0x2000 + p * 64 + r * 4
+  local base = 0x4300 + p * 64 + r * 4
   poke(base, note)
   poke(base + 1, instr)
   poke(base + 2, cmd)
@@ -91,7 +91,7 @@ end, {
 
 -- 4. G: groove select (groove 1 = 2 ticks/row)
 T("G", function()
-  for i = 0, 15 do poke(0x5610 + i, 2) end
+  for i = 0, 15 do poke(0x3010 + i, 2) end
   clear_phrase(0)
   row(0, 0, 49, 0, CG, 1)
 end, {
@@ -109,16 +109,16 @@ T("H", function()
   clear_phrase(1)
   row(0, 0, 49, 0, CH, 0)
   row(1, 0, 61, 0xFF, 0, 0)
-  poke(0x4002, 1)              -- chain 0 entry 1 = phrase 1
-  poke(0x4003, 0)
+  poke(0x3702, 1)              -- chain 0 entry 1 = phrase 1
+  poke(0x3703, 0)
 end, {
   [20] = function()
     check(wram(0x28) == 1, "H hopped to the next chain entry (phrase 1)")
     check(pitch0() == 0x1000, "H: phrase 1's C-5 playing")
   end,
 }, 32, function()
-  poke(0x4002, 0xFF)           -- restore chain 0
-  poke(0x4003, 0)
+  poke(0x3702, 0xFF)           -- restore chain 0
+  poke(0x3703, 0)
 end)
 
 -- 6. A: arpeggio 0/4/7
@@ -208,9 +208,9 @@ emu.addEventCallback(function()
   if frames == 22 then pad = {} end
   if frames == 26 then
     -- song scaffolding: V1 row0 = chain 0 -> phrase 0
-    poke(0x4800, 0)
-    poke(0x4000, 0)
-    poke(0x4001, 0)
+    poke(0x2000, 0)
+    poke(0x3700, 0)
+    poke(0x3701, 0)
     cur = 1
     phase = "setup"
   end
@@ -278,7 +278,7 @@ emu.addEventCallback(function()
   elseif phase == "gap" then
     if frames >= t0 then
       if tests[cur].name == "H" then
-        poke(0x4002, 0xFF)     -- undo the H test's second chain entry
+        poke(0x3702, 0xFF)     -- undo the H test's second chain entry
       end
       cur = cur + 1
       phase = "setup"

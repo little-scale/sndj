@@ -124,16 +124,20 @@ driver_blob_end:
 
 
 
-; --- bank 1: the self-describing sample pool (tools/sndj_pool.py) ------------
-; marker-wrapped and padded to a fixed reserved size so patcher.html can
-; grow it in place
+; --- banks 1-3: the self-describing sample pool (tools/sndj_pool.py) ---------
+; marker-wrapped and padded to POOL_RESERVED so patcher.html can grow it in
+; place; pool.bin is emitted pre-padded and split across the banks here
 .BANK 1 SLOT 0
 .ORG $0000
     .DB "SNPOOL"
 pool_data:
-    .INCBIN "pool.bin"
-pool_data_end:
-    .DSB (POOL_RESERVED - (pool_data_end - pool_data)), $FF
+    .INCBIN "pool.bin" READ $7FFA
+.BANK 2 SLOT 0
+.ORG $0000
+    .INCBIN "pool.bin" SKIP $7FFA READ $8000
+.BANK 3 SLOT 0
+.ORG $0000
+    .INCBIN "pool.bin" SKIP $FFFA READ $8000
 
 .BANK 0 SLOT 0
 ; --- internal header (hand-rolled; checksum fixed by tools/fixsum.py) --------

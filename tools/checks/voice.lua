@@ -85,7 +85,7 @@ local function onFrame()
     check(dsp(0x02) == 0x00 and dsp(0x03) == 0x08, "DSP V0 pitch = C-4")
     check(dsp(0x4C) == 0x01, "KON hit voice 0")
   elseif frames == 95 then
-    check(wram(0x2000) == 53, "four nudges wrote E-4 (note 53) to row 0")
+    check(wram(0x4300) == 53, "four nudges wrote E-4 (note 53) to row 0")
     check(wram(0x0015) == 5, "each nudge auditioned (5 KONs)")
     -- E-4: round(16384 * 2^(4/12)) >> 3 = 20643 >> 3 = 2580 = $0A14
     check(wram(0x0013) == 0x14 and wram(0x0014) == 0x0A,

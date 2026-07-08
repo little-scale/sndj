@@ -63,14 +63,14 @@ emu.addEventCallback(function()
 
   if frames == 20 then
     -- song data: chain0 -> phrase0 (C-4s), chain1 -> phrase1 (C-5s)
-    poke(0x4800, 0)          -- grid row 0 = chain 0
-    poke(0x4801, 1)          -- grid row 1 = chain 1
-    poke(0x4000, 0)
-    poke(0x4020, 1)
-    poke(0x2000, 49)         -- phrase0 r0
-    poke(0x2001, 0)
-    poke(0x2040, 61)         -- phrase1 r0
-    poke(0x2041, 0)
+    poke(0x2000, 0)          -- grid row 0 = chain 0
+    poke(0x2001, 1)          -- grid row 1 = chain 1
+    poke(0x3700, 0)
+    poke(0x3720, 1)
+    poke(0x4300, 49)         -- phrase0 r0
+    poke(0x4301, 0)
+    poke(0x4340, 61)         -- phrase1 r0
+    poke(0x4341, 0)
   elseif frames == at_live then
     check(wram(0x0C) == 8, "Select opened LIVE")
   elseif frames == launched then
