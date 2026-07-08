@@ -253,6 +253,7 @@ engine_go:
     sta.w trk_instr_active,x
     sta.w trk_dly_cnt,x
     sta.w trk_kill_cnt,x
+    sta.w trk_pending,x
     lda #$00
     sta.w trk_cmd,x
     sta.w trk_ret_per,x
@@ -415,7 +416,20 @@ track_row:
     and #$0F
     sta.w trk_prow,x
     bne @trigger
-    ; wrapped: standalone phrase mode just loops
+    ; wrapped: a LIVE-queued chain launches exactly here (quantised)
+    lda.w trk_pending,x
+    cmp #$FF
+    beq @no_launch
+    sta.w trk_chain,x
+    lda #$FF
+    sta.w trk_pending,x
+    sta.w trk_songrow,x     ; behave as a standalone (looping) chain
+    lda #$00
+    sta.w trk_cpos,x
+    jsr track_load_chain_entry
+    jmp @check
+@no_launch:
+    ; standalone phrase mode just loops
     lda.w trk_chain,x
     cmp #$FE
     beq @trigger
@@ -445,6 +459,12 @@ track_row:
     bne @trigger
     rts
 @trigger:
+    ; muted tracks advance but stay silent
+    lda.w bit_for_track,x
+    and trk_mute
+    beq @not_muted
+    rts
+@not_muted:
     ; read the phrase cell (4 bytes): SB_PHRASES + phrase*64 + prow*4
     phx
     rep #$30

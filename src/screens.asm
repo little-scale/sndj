@@ -18,11 +18,28 @@
 .DEFINE SCREEN_FILES  5
 .DEFINE SCREEN_ECHO   6
 .DEFINE SCREEN_WAVE   7
+.DEFINE SCREEN_LIVE   8
 
 ; called every frame from the main loop
 screen_update:
     lda ui_mode
     beq @splash
+    ; Select: jump to LIVE; in LIVE, jump back where you came from
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_SELECT
+    sep #$20
+.ACCU 8
+    beq @no_select
+    lda ui_mode
+    cmp #SCREEN_LIVE
+    beq @leave_live
+    jsr live_init
+    bra @no_select
+@leave_live:
+    jsr screen_reopen
+@no_select:
     jsr nav_update
     lda ui_mode
     cmp #SCREEN_PHRASE
@@ -37,6 +54,8 @@ screen_update:
     beq @echo
     cmp #SCREEN_WAVE
     beq @wave
+    cmp #SCREEN_LIVE
+    beq @live
     jmp song_update
 @phrase:
     jmp phrase_update
@@ -46,6 +65,8 @@ screen_update:
     jmp echo_update
 @wave:
     jmp wave_update
+@live:
+    jmp live_update
 @chain:
     jmp chain_update
 @instr:
@@ -248,3 +269,32 @@ nav_update:
 ; true (A returned non-FF) helpers implemented by the screens:
 ;   song_cursor_cell   -> A = chain id under SONG cursor
 ;   chain_cursor_phrase-> A = phrase id under CHAIN cursor
+
+; reopen the screen we were on before LIVE
+screen_reopen:
+    lda live_prev
+    cmp #SCREEN_PHRASE
+    bne +
+    jmp phrase_init
++
+    cmp #SCREEN_CHAIN
+    bne +
+    jmp chain_init
++
+    cmp #SCREEN_INSTR
+    bne +
+    jmp instr_init
++
+    cmp #SCREEN_FILES
+    bne +
+    jmp files_init
++
+    cmp #SCREEN_ECHO
+    bne +
+    jmp echo_init
++
+    cmp #SCREEN_WAVE
+    bne +
+    jmp wave_init
++
+    jmp song_init_screen

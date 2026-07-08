@@ -617,6 +617,19 @@ audition_note:
 apu_update:
     lda APUIO3
     sta apu_tick
+    ; ENVX telemetry: ports 1/2 hold the (tick&3) voice pair
+    and #$03
+    asl
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda APUIO1
+    sta.w envx_mirror,x
+    lda APUIO2
+    sta.w envx_mirror + 1,x
     lda apu_status
     bne @done               ; don't hammer a dead mailbox every heartbeat
     rep #$20

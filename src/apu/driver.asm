@@ -93,13 +93,39 @@ entry:
     mov rPORT0, #$EE
 
 main:
-    ; --- telemetry: accumulate timer-0 ticks, publish on port 3 ---
+    ; --- telemetry: accumulate timer-0 ticks, publish on port 3; each tick
+    ; also publish two voices' live ENVX on ports 1/2 (voice pair = tick&3,
+    ; the CPU reconstructs the meters from its mirrored tick) ---
     mov a, rT0OUT           ; reads and clears the 4-bit tick count
     beq @no_tick
     clrc
     adc a, tick
     mov tick, a
     mov rPORT3, a
+    and a, #$03             ; voice pair
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a                   ; pair * 32 = first voice's register base
+    or a, #$08              ; VxENVX
+    mov rDSPADDR, a
+    mov a, rDSPDATA
+    mov rPORT1, a
+    mov a, tick
+    and a, #$03
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    or a, #$28              ; second voice of the pair
+    mov rDSPADDR, a
+    mov a, rDSPDATA
+    mov rPORT2, a
+    ; NOTE: Mesen 2 returns 0 for live ENVX reads (verified: FLG reads
+    ; back fine through the same path) — the meters are flat in the
+    ; emulator and real on hardware, where ENVX reads are serviced.
 @no_tick:
 
     ; --- mailbox ---

@@ -87,6 +87,10 @@ ed_wave      db      ; wave bank under edit (WAVE screen)
 wv_x         db      ; WAVE screen cursor column (0-31)
 trig_type    db      ; instrument type at trigger time
 pool_count   db      ; samples in the ROM pool (set at boot)
+trk_pending  ds 8    ; LIVE: chain queued to launch at the phrase boundary
+trk_mute     db      ; bit per track: muted
+envx_mirror  ds 8    ; per-voice ENVX from driver telemetry
+live_prev    db      ; screen to return to when Select leaves LIVE
 eng_noise    db      ; global noise clock (FLG bits 0-4)
 eng_non      db      ; NON mask shadow
 ; --- per-track command/effect state (M7) — grows past the direct page; all

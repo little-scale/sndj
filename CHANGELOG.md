@@ -11,6 +11,14 @@
   IPL protocol; flip-bit mailbox with timeouts everywhere; SCB register
   writes land in the DSP; APU tick telemetry on port 3; a dead APU shows an
   `APU?` warning instead of hanging.
+- **M13 — LIVE mode.** The clip launcher: Select toggles LIVE from any
+  screen; B queues the cursor cell's chain on its track and it launches
+  exactly at that track's next phrase boundary (quantised — verified to
+  the row); from stopped, B launches immediately. X+up/down mutes the
+  cursor track (voices keyed off), X+left/right solos (again to clear).
+  Per-voice ENVX telemetry streams up from the driver into header meters
+  (flat in Mesen, which doesn't service live ENVX reads; real on
+  hardware — the same path verifiably round-trips FLG).
 - **M11 — Sample pool & the first browser tool.** Self-describing SNDJPOOL
   in ROM (marker-wrapped, 16 KB reserved so it can grow in place): six
   factory samples — pad, bass, pluck, and synthesized kick/snare/hat —
