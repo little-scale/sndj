@@ -11,6 +11,17 @@
   IPL protocol; flip-bit mailbox with timeouts everywhere; SCB register
   writes land in the DSP; APU tick telemetry on port 3; a dead APU shows an
   `APU?` warning instead of hanging.
+- **M11 — Sample pool & the first browser tool.** Self-describing SNDJPOOL
+  in ROM (marker-wrapped, 16 KB reserved so it can grow in place): six
+  factory samples — pad, bass, pluck, and synthesized kick/snare/hat —
+  uploaded at boot with an auto-built ARAM directory. KIT instruments (v1)
+  map notes chromatically onto pool samples at native rate. `tools/sndj.js`
+  lands: the shared JS library (BRR codec byte-matching the Python
+  reference, pool format, RLE, CRC, tuning), node self-tested.
+  `tools/patcher.html`: drop a ROM, replace pool samples with WAVs
+  (resampled + BRR-encoded locally), audition the decoded BRR, export a
+  checksum-fixed patched ROM — verified end-to-end by booting a
+  node-patched ROM through checks/pool.lua.
 - **M10 — Wavetables & noise (KIT waits for the M11 sample pool).** WAVE
   screen: draw 32-sample single-cycle waves with the pad (B+up/down shapes,
   B+left/right drags, Y+left/right pages banks); every edit compiles the

@@ -542,6 +542,47 @@ track_trigger_note:
     ; type-aware pitch: NSE sets the global noise clock instead; WAV plays
     ; a 32-sample loop, two octaves above the sampler's reference
     lda trig_type
+    cmp #$01
+    bne @not_kit
+    ; KIT (v1): the note picks a pool sample chromatically (mod 12),
+    ; played at native rate; full kit tables arrive with the kit editor
+    lda trig_note
+@kit_mod:
+    cmp #$0C
+    bcc @kit_slot
+    sec
+    sbc #$0C
+    bra @kit_mod
+@kit_slot:
+    cmp pool_count
+    bcc @kit_ok
+    lda pool_count
+    dec a
+@kit_ok:
+    tay
+    txa
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0SRCN
+    phx
+    jsr apu_dsp_write
+    plx
+    ; kit voices' SRCN no longer matches the instrument record
+    lda #$FF
+    sta.w trk_instr_active,x
+    rep #$20
+.ACCU 16
+    lda #$1000
+    sta last_pitch
+    sep #$20
+.ACCU 8
+    phx
+    jsr voice_pitch_write
+    plx
+    bra @pitched
+@not_kit:
     cmp #$03
     bne @not_nse
     lda trig_note

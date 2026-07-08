@@ -59,3 +59,6 @@
 .DEFINE NOTE_MAX      96
 .DEFINE INSTR_NONE    $FF
 .DEFINE CMD_NONE      0
+
+; ROM pool reservation (patcher.html may grow the pool up to this)
+.DEFINE POOL_RESERVED $4000

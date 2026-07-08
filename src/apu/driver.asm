@@ -53,6 +53,7 @@ tick      db      ; master tick counter (T0-derived)
 dest_lo   db      ; bulk upload write pointer
 dest_hi   db
 cur_edl   db      ; currently configured echo delay
+cur_esa   db
 wait_cnt  db
 new_edl   db      ; latched CMD_ECHO_CFG payload (ports change under us)
 new_esa   db
@@ -81,6 +82,7 @@ entry:
     mov rDSPDATA, #$00
 
     mov cur_edl, #$00
+    mov cur_esa, #$FF       ; matches the CPU's boot parking value
 
     ; adopt whatever the CPU last wrote (the IPL kick byte) as "processed"
     mov a, rPORT0
@@ -182,6 +184,15 @@ main:
 
 ; --- safe echo reconfiguration (port1 = EDL, port2 = ESA page) -----------------
 echo_cfg:
+    ; fast path: nothing changes, nothing to do (keeps boot + reloads quick)
+    mov a, new_edl
+    cmp a, cur_edl
+    bne @do_cfg
+    mov a, new_esa
+    cmp a, cur_esa
+    bne @do_cfg
+    ret
+@do_cfg:
     ; 1. mute + disable echo buffer writes
     mov rDSPADDR, #$6C
     mov rDSPDATA, #$60
@@ -202,6 +213,8 @@ echo_cfg:
     mov rDSPADDR, #$7D      ; EDL
     mov rDSPDATA, a
     mov cur_edl, a
+    mov a, new_esa
+    mov cur_esa, a
     ; 4. zero the new buffer region: EDL*2048 bytes (min 4) from ESA<<8
     mov a, new_esa
     mov dest_hi, a

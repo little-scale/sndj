@@ -3,7 +3,7 @@
 -- SNESDJ_SHOT env var (default build/shot.png) and exits.
 
 local out = os.getenv("SNESDJ_SHOT") or "build/shot.png"
-local target = tonumber(os.getenv("SNESDJ_SHOT_FRAME") or "60")
+local target = tonumber(os.getenv("SNESDJ_SHOT_FRAME") or "76")
 local frames = 0
 
 emu.addEventCallback(function()

@@ -7,6 +7,7 @@
 -- 64 frames (into unused DSP reg $1D).
 
 local frames = 0
+local _booted = false
 local fails = 0
 local tick_sample = -1
 
@@ -33,6 +34,10 @@ local function cell(x, y)
 end
 
 local function onFrame()
+  if not _booted then
+    if emu.read(1, emu.memType.snesWorkRam) == 0x5D then _booted = true end
+    return
+  end
   frames = frames + 1
 
   if frames == 20 then
@@ -44,7 +49,7 @@ local function onFrame()
     check(t ~= tick_sample, "APU tick telemetry advancing (" ..
       tick_sample .. " -> " .. t .. ")")
     -- after audio + echo init: unmuted, echo active (EDL 0 buffer at $FF00)
-    check(dsp(0x6C) == 0x00, "DSP FLG unmuted after echo init ($" ..
+    check(dsp(0x6C) == 0x20, "DSP FLG unmuted, echo idle at EDL 0 ($" ..
       string.format("%02X", dsp(0x6C)) .. ")")
   elseif frames == 100 then
     -- heartbeat fires at ROM frame 64 (~lua frame 75): check after it

@@ -4,6 +4,7 @@
 -- clock, and WAVE-screen edits land in ARAM immediately.
 
 local frames = 0
+local _booted = false
 local fails = 0
 local pad = {}
 local W = emu.memType.snesWorkRam
@@ -49,6 +50,10 @@ local edited = t + 10
 emu.addEventCallback(function() emu.setInput(pad, 0) end, emu.eventType.inputPolled)
 
 emu.addEventCallback(function()
+  if not _booted then
+    if emu.read(1, emu.memType.snesWorkRam) == 0x5D then _booted = true end
+    return
+  end
   frames = frames + 1
   if script[frames] then pad = script[frames] end
   if frames == play then pad = { start = true } end

@@ -5,6 +5,7 @@
 -- WRAM addresses here are the FROZEN block from src/ram.inc.
 
 local frames = 0
+local _booted = false
 local fails = 0
 local fc_sample = -1
 local pad = {}   -- table of buttons to hold, applied at every input poll
@@ -42,6 +43,10 @@ local function onPoll()
 end
 
 local function onFrame()
+  if not _booted then
+    if emu.read(1, emu.memType.snesWorkRam) == 0x5D then _booted = true end
+    return
+  end
   frames = frames + 1
 
   if frames == 20 then

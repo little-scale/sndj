@@ -109,6 +109,8 @@ wave_compile:
 .ACCU 8
     ldx #str_buf
     stx up_src
+    lda #$7E
+    sta up_src + 2
     ldx #WAVE_SLOT_SZ
     stx up_len
     jmp apu_upload_block
@@ -166,6 +168,8 @@ wave_sync_all:
     sta.w str_buf + 32      ; pad to a multiple of 3 (33 bytes)
     ldx #str_buf
     stx up_src
+    lda #$7E
+    sta up_src + 2
     ldx #WAVE_DIR
     stx up_dest
     ldx #33

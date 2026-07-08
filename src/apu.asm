@@ -154,13 +154,13 @@ apu_upload_block:
     stz tmp1                ; round counter (1..255, cycling, never 0)
     ldy #$0000
 @round:
-    lda (up_src),y
+    lda [up_src],y
     sta APUIO1
     iny
-    lda (up_src),y
+    lda [up_src],y
     sta APUIO2
     iny
-    lda (up_src),y
+    lda [up_src],y
     sta APUIO3
     iny
     lda tmp1
@@ -191,27 +191,10 @@ apu_upload_block:
     rts
 
 ; --- one-time audio setup after driver upload ---------------------------------
-; Uploads the factory sample + directory, configures the DSP for voice 0.
+; Parses the ROM pool, uploads every sample to ARAM, builds the directory,
+; then configures the DSP and all 8 voices.
 apu_audio_init:
-    ; sample 0 -> ARAM_SAMPLES
-    ldx #sample0_brr
-    stx up_src
-    ldx #ARAM_SAMPLES
-    stx up_dest
-    ldx #(sample0_brr_end - sample0_brr)
-    stx up_len
-    jsr apu_upload_block
-    bcc +
-    jmp @fail
-+
-    ; directory (entry 0: start/loop = ARAM_SAMPLES) -> ARAM_DIR
-    ldx #dir0_data
-    stx up_src
-    ldx #ARAM_DIR
-    stx up_dest
-    ldx #(dir0_data_end - dir0_data)
-    stx up_len
-    jsr apu_upload_block
+    jsr pool_upload
     bcc +
     jmp @fail
 +

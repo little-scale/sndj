@@ -5,6 +5,7 @@
 -- GRP=2, OFS1=4, OFS2=7 -> play phrase -> voices 0/1/2 = C-4/E-4/G-4.
 
 local frames = 0
+local _booted = false
 local fails = 0
 local pad = {}
 
@@ -60,6 +61,7 @@ chord({ up = true })                      -- +4
 chord({ right = true })                   -- +1
 chord({ right = true })                   -- +1
 chord({ right = true })                   -- +1 -> 7
+local shot_at = t - 2
 local after_edit = t + 4
 gest({ a = true, left = true })           -- back to PHRASE
 local at_phrase = t + 2
@@ -72,6 +74,10 @@ local done = t + 6
 emu.addEventCallback(function() emu.setInput(pad, 0) end, emu.eventType.inputPolled)
 
 emu.addEventCallback(function()
+  if not _booted then
+    if emu.read(1, emu.memType.snesWorkRam) == 0x5D then _booted = true end
+    return
+  end
   frames = frames + 1
   if script[frames] then pad = script[frames] end
 
@@ -80,7 +86,7 @@ emu.addEventCallback(function()
     check(wram(0x2001) == 0, "phrase row 0 instrument = 00")
     check(wram(0x4C02) == 0x2F and wram(0x4C03) == 0xCA,
       "factory instrument ADSR present")
-  elseif frames == after_edit then
+  elseif frames == shot_at then
     local out = os.getenv("SNESDJ_INSTR_SHOT")
     if out then
       local png = emu.takeScreenshot()
@@ -89,6 +95,7 @@ emu.addEventCallback(function()
       f:close()
       print("info: instr screenshot -> " .. out)
     end
+  elseif frames == after_edit then
     check(wram(0x4C08) == 2, "GRP span = 2")
     check(wram(0x4C09) == 4, "OFS1 = 4 semitones")
     check(wram(0x4C0A) == 7, "OFS2 = 7 semitones")

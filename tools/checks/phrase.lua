@@ -7,6 +7,7 @@
 -- $0E..: cur handled via $0F? cursor row = cur_y ($0F), ed_col ($19).
 
 local frames = 0
+local _booted = false
 local fails = 0
 local pad = {}
 
@@ -54,6 +55,10 @@ local script = {
 emu.addEventCallback(function() emu.setInput(pad, 0) end, emu.eventType.inputPolled)
 
 emu.addEventCallback(function()
+  if not _booted then
+    if emu.read(1, emu.memType.snesWorkRam) == 0x5D then _booted = true end
+    return
+  end
   frames = frames + 1
   if script[frames] then pad = script[frames] end
 

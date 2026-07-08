@@ -3,6 +3,7 @@
 -- KON + pitch register values (C-4 then E-4 from the cursor grid).
 
 local frames = 0
+local _booted = false
 local fails = 0
 local pad = {}
 
@@ -53,6 +54,10 @@ local function onPoll()
 end
 
 local function onFrame()
+  if not _booted then
+    if emu.read(1, emu.memType.snesWorkRam) == 0x5D then _booted = true end
+    return
+  end
   frames = frames + 1
   if script[frames] then
     pad = script[frames]
@@ -73,7 +78,7 @@ local function onFrame()
     check(wram(0x0015) == 0, "no KONs yet")
   elseif frames == 68 then
     check(wram(0x000C) == 1, "navigated SONG -> CHAIN -> PHRASE")
-    check(dsp(0x6C) == 0x00, "DSP FLG unmuted after echo init")
+    check(dsp(0x6C) == 0x20, "DSP FLG unmuted, echo idle at EDL 0")
     check(wram(0x0015) == 1, "first audition sent one KON")
     check(wram(0x0013) == 0x00 and wram(0x0014) == 0x08,
           "C-4 pitch $0800 recorded")

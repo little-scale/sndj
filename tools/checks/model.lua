@@ -8,6 +8,7 @@
 --   V2 row0 = chain 01 -> phrase 01 (tsp 12) -> C-4 -> voice 1 pitch $1000
 
 local frames = 0
+local _booted = false
 local fails = 0
 local pad = {}
 
@@ -64,6 +65,10 @@ local script = {
 emu.addEventCallback(function() emu.setInput(pad, 0) end, emu.eventType.inputPolled)
 
 emu.addEventCallback(function()
+  if not _booted then
+    if emu.read(1, emu.memType.snesWorkRam) == 0x5D then _booted = true end
+    return
+  end
   frames = frames + 1
   if script[frames] then pad = script[frames] end
 

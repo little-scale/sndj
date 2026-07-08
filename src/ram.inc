@@ -44,7 +44,7 @@ trk_prow     ds 8    ; $30  per-track: phrase row
 trk_songrow  ds 8    ; $38  per-track: song grid row
 ; --- end pinned blocks ---
 ; DP-required (used with (dp),y indirect addressing — must stay below $100)
-up_src       dw      ; bulk upload: source (DB-relative)
+up_src       ds 3    ; bulk upload: 24-bit source pointer
 up_dest      dw      ;              dest ARAM address
 up_len       dw      ;              byte count (multiple of 3)
 ; save/load state (sv_src/sv_dst used with [dp] — must stay below $100)
@@ -86,6 +86,7 @@ if_cur       db      ; INSTR screen field cursor
 ed_wave      db      ; wave bank under edit (WAVE screen)
 wv_x         db      ; WAVE screen cursor column (0-31)
 trig_type    db      ; instrument type at trigger time
+pool_count   db      ; samples in the ROM pool (set at boot)
 eng_noise    db      ; global noise clock (FLG bits 0-4)
 eng_non      db      ; NON mask shadow
 ; --- per-track command/effect state (M7) — grows past the direct page; all

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>snesdj patcher</title>
+<script src="sndj.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: ui-monospace, Menlo, monospace; background: #101228;
+         color: #dee2e8; max-width: 780px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { color: #ffb020; font-size: 1.3rem; }
+  h1 small { color: #606888; font-weight: normal; }
+  .drop { border: 2px dashed #606888; border-radius: 8px; padding: 2rem;
+          text-align: center; color: #606888; margin: 1rem 0; }
+  .drop.armed { border-color: #40d0c8; color: #40d0c8; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  td, th { padding: .4rem .6rem; text-align: left;
+           border-bottom: 1px solid #2a2e48; }
+  th { color: #606888; font-weight: normal; }
+  button { background: #2a2e48; color: #dee2e8; border: 1px solid #606888;
+           border-radius: 4px; padding: .3rem .8rem; cursor: pointer;
+           font: inherit; }
+  button:hover { border-color: #ffb020; color: #ffb020; }
+  button.primary { border-color: #40d0c8; color: #40d0c8; }
+  #status { color: #40d0c8; min-height: 1.4em; margin: .6rem 0; }
+  .warn { color: #ff6060; }
+  .bar { height: 8px; background: #2a2e48; border-radius: 4px; overflow: hidden; }
+  .bar div { height: 100%; background: #40d0c8; }
+  .bar div.over { background: #ff6060; }
+</style>
+</head>
+<body>
+<h1>snesdj patcher <small>— sample pool</small></h1>
+<p>Drop a built <code>snesdj.sfc</code>, replace pool samples with your own
+WAVs (auto-resampled to 32 kHz, BRR-encoded with the reference codec),
+audition the decoded BRR, and export a patched ROM. Everything runs locally.</p>
+<div class="drop" id="drop">drop snesdj.sfc here (or click)</div>
+<input type="file" id="file" hidden>
+<div id="status"></div>
+<div id="poolview" hidden>
+  <div class="bar"><div id="budget" style="width:0"></div></div>
+  <p id="budgettext"></p>
+  <table id="pool"></table>
+  <button class="primary" id="export">export patched ROM</button>
+</div>
+<input type="file" id="wavfile" hidden accept=".wav">
+
+<script>
+'use strict';
+const S = window.SNDJ;
+const RESERVED = 0x4000;
+let rom = null, poolOff = -1, entries = [], replacing = -1, romName = 'snesdj.sfc';
+
+const $ = id => document.getElementById(id);
+const status = (msg, warn) => {
+  $('status').textContent = msg;
+  $('status').className = warn ? 'warn' : '';
+};
+
+$('drop').onclick = () => $('file').click();
+$('drop').ondragover = e => { e.preventDefault(); $('drop').classList.add('armed'); };
+$('drop').ondragleave = () => $('drop').classList.remove('armed');
+$('drop').ondrop = e => {
+  e.preventDefault();
+  $('drop').classList.remove('armed');
+  loadRom(e.dataTransfer.files[0]);
+};
+$('file').onchange = e => loadRom(e.target.files[0]);
+
+async function loadRom(f) {
+  if (!f) return;
+  romName = f.name;
+  rom = new Uint8Array(await f.arrayBuffer());
+  poolOff = S.findMarker(rom, 'SNPOOL');
+  if (poolOff < 0) { status('no SNPOOL marker found — is this a snesdj ROM?', 1); return; }
+  try {
+    entries = S.poolParse(rom.subarray(poolOff));
+  } catch (err) { status('pool parse failed: ' + err.message, 1); return; }
+  status(`loaded ${f.name}: ${entries.length} samples in the pool`);
+  render();
+}
+
+function poolSize() {
+  return 16 + entries.length * 16 + entries.reduce((a, e) => a + e.brr.length, 0);
+}
+
+function render() {
+  const t = $('pool');
+  t.innerHTML = '<tr><th>#</th><th>name</th><th>BRR bytes</th><th>loop</th>' +
+    '<th></th><th></th></tr>';
+  entries.forEach((e, i) => {
+    const row = t.insertRow();
+    row.innerHTML =
+      `<td>${i}</td><td>${e.name}</td><td>${e.brr.length}</td>` +
+      `<td>${e.loopBlock === null ? 'one-shot' : 'block ' + e.loopBlock}</td>`;
+    const play = document.createElement('button');
+    play.textContent = 'play';
+    play.onclick = () => audition(e);
+    const rep = document.createElement('button');
+    rep.textContent = 'replace…';
+    rep.onclick = () => { replacing = i; $('wavfile').click(); };
+    row.insertCell().appendChild(play);
+    row.insertCell().appendChild(rep);
+  });
+  const used = poolSize();
+  const pct = Math.min(100, used * 100 / RESERVED);
+  $('budget').style.width = pct + '%';
+  $('budget').className = used > RESERVED ? 'over' : '';
+  $('budgettext').textContent =
+    `pool ${used} / ${RESERVED} bytes ROM budget` +
+    (used > RESERVED ? ' — TOO BIG, replace with smaller samples' : '');
+  $('poolview').hidden = false;
+}
+
+$('wavfile').onchange = async e => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f || replacing < 0) return;
+  try {
+    const samples = await wavTo32k(f);
+    const trimmed = samples.slice(0, Math.floor(samples.length / 16) * 16);
+    if (!trimmed.length) throw new Error('WAV too short');
+    const brr = S.brrEncode(trimmed, null);
+    const name = f.name.replace(/\.wav$/i, '').toUpperCase().slice(0, 8) || 'SAMPLE';
+    entries[replacing] = { name, loopBlock: null, brr };
+    status(`replaced #${replacing} with ${name} ` +
+      `(${trimmed.length} samples, ${brr.length} bytes BRR)`);
+    render();
+  } catch (err) {
+    status('replace failed: ' + err.message, 1);
+  }
+  replacing = -1;
+};
+
+async function wavTo32k(f) {
+  const buf = await f.arrayBuffer();
+  const ctx = new OfflineAudioContext(1, 1, 32000);
+  const decoded = await ctx.decodeAudioData(buf);
+  const src = decoded.getChannelData(0);
+  const ratio = decoded.sampleRate / 32000;
+  const n = Math.floor(src.length / ratio);
+  const out = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const p = i * ratio, i0 = Math.floor(p), fr = p - i0;
+    const a = src[i0] || 0, b = src[i0 + 1] ?? a;
+    out[i] = Math.max(-32768, Math.min(32767,
+      Math.round((a + (b - a) * fr) * 30000)));
+  }
+  return out;
+}
+
+let actx = null;
+function audition(e) {
+  const pcm = S.brrDecode(e.brr);
+  actx = actx || new AudioContext({ sampleRate: 32000 });
+  const loops = e.loopBlock !== null ? 8 : 1;
+  const loopStart = e.loopBlock !== null ? e.loopBlock * 16 : 0;
+  const total = pcm.length + (loops - 1) * (pcm.length - loopStart);
+  const buf = actx.createBuffer(1, total, 32000);
+  const ch = buf.getChannelData(0);
+  let p = 0;
+  for (let i = 0; i < pcm.length; i++) ch[p++] = pcm[i] / 32768;
+  for (let l = 1; l < loops; l++) {
+    for (let i = loopStart; i < pcm.length; i++) ch[p++] = pcm[i] / 32768;
+  }
+  const node = actx.createBufferSource();
+  node.buffer = buf;
+  node.connect(actx.destination);
+  node.start();
+}
+
+$('export').onclick = () => {
+  const img = S.poolBuild(entries);
+  if (img.length > RESERVED) { status('pool exceeds the ROM budget', 1); return; }
+  const out = rom.slice();
+  out.fill(0xFF, poolOff, poolOff + RESERVED);
+  out.set(img, poolOff);
+  S.fixChecksum(out);
+  const blob = new Blob([out], { type: 'application/octet-stream' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = romName.replace(/\.sfc$/i, '') + '-patched.sfc';
+  a.click();
+  status('exported ' + a.download);
+};
+</script>
+</body>
+</html>
