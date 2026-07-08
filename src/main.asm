@@ -64,6 +64,7 @@ main_loop:
     jsr apu_update
     jsr engine_update
     jsr draw_apu_status
+    jsr draw_minimap
 
     jsr screen_update
     jmp main_loop
@@ -95,6 +96,111 @@ draw_apu_status:
 
 str_apu_ok:  .DB "APU ", 0
 str_apu_bad: .DB "APU?", 0
+
+; the mini map (sibling chrome): the 3x5 screen layout, bottom-right,
+; current screen accented, built screens bright, future screens dim
+;   [O][P][M][W][K]
+;   [S][C][H][I][T]
+;   [F][G][L][E][R]
+minimap_chars: .DB "OPMWKSCHITFGLER"
+minimap_impl:  .DB 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0
+; ui_mode -> minimap cell index ($FF = no highlight, e.g. splash)
+minimap_pos:   .DB $FF, 7, 6, 5, 8, 10, 13, 3, 12, 4
+
+draw_minimap:
+    lda ui_mode
+    bne @go                 ; not on the splash
+    rts
+@go:
+    stz ui_cnt              ; cell 0-14
+@cell:
+    ; x = 27 + cell%5, y = 25 + cell/5
+    lda ui_cnt
+@mod5:
+    cmp #$05
+    bcc @m_done
+    sec
+    sbc #$05
+    bra @mod5
+@m_done:
+    clc
+    adc #27
+    sta text_x
+    lda ui_cnt
+    ldy #$0000
+@div5:
+    cmp #$05
+    bcc @d_done
+    sec
+    sbc #$05
+    iny
+    bra @div5
+@d_done:
+    tya
+    clc
+    adc #25
+    sta text_y
+    ; attr: accent if current, text if built, dim otherwise
+    lda ui_mode
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w minimap_pos,x
+    cmp ui_cnt
+    bne @not_here
+    rep #$20
+.ACCU 16
+    lda #ATTR_ACCENT
+    sta text_attr
+    sep #$20
+.ACCU 8
+    bra @put
+@not_here:
+    lda ui_cnt
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w minimap_impl,x
+    bne @built
+    rep #$20
+.ACCU 16
+    lda #ATTR_DIM
+    sta text_attr
+    sep #$20
+.ACCU 8
+    bra @put
+@built:
+    rep #$20
+.ACCU 16
+    lda #ATTR_TEXT
+    sta text_attr
+    sep #$20
+.ACCU 8
+@put:
+    lda ui_cnt
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w minimap_chars,x
+    sec
+    sbc #32
+    jsr text_puttile
+    inc ui_cnt
+    lda ui_cnt
+    cmp #$0F
+    beq @done
+    jmp @cell
+@done:
+    rts
 
 ; --- data ---------------------------------------------------------------------
 str_version:
