@@ -20,6 +20,7 @@
 
 .INCLUDE "snes.inc"
 .INCLUDE "ram.inc"
+.INCLUDE "song.inc"
 .INCLUDE "buildid.inc"      ; generated: .DEFINE BUILD_STAMP "..."
 
 .BANK 0 SLOT 0
@@ -32,6 +33,8 @@
 .INCLUDE "text.asm"
 .INCLUDE "input.asm"
 .INCLUDE "apu.asm"
+.INCLUDE "engine.asm"
+.INCLUDE "phrase.asm"
 .INCLUDE "splash.asm"
 
 ; --- main loop ---------------------------------------------------------------
@@ -47,11 +50,12 @@ main_loop:
 
     jsr input_update
     jsr apu_update
+    jsr engine_update
     jsr draw_apu_status
 
     lda ui_mode
     beq @splash
-    jsr stub_update
+    jsr phrase_update
     bra @frame_done
 @splash:
     jsr splash_update

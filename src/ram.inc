@@ -27,7 +27,20 @@ apu_tick     db      ; $11  APU master tick (port-3 telemetry mirror)
 hb_val       db      ; $12  heartbeat value (lands in DSP unused reg $1D)
 last_pitch   dw      ; $13  last DSP pitch value sent (audition/engine)
 kon_count    db      ; $15  count of KON commands issued
+eng_playing  db      ; $16  sequencer running
+eng_row      db      ; $17  current phrase row (0-15)
+eng_phrase   db      ; $18  phrase id being played/edited
+ed_col       db      ; $19  editor cursor column (0=note 1=instr 2=cmd 3=val)
 ; --- end frozen block ---
+eng_tickwait db      ; ticks left in current row
+eng_gpos     db      ; groove position
+eng_tick_last db     ; last consumed apu_tick
+ed_lastnote  db
+ed_lastinstr db
+ed_lastcmd   db
+ed_lastval   db
+b_down       db      ; B modifier edge state
+b_used       db      ; B was used as a modifier (suppress tap on release)
 up_src       dw      ; bulk upload: source (DB-relative)
 up_dest      dw      ;              dest ARAM address
 up_len       dw      ;              byte count (multiple of 3)

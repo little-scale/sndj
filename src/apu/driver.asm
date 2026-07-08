@@ -56,9 +56,9 @@ entry:
     mov x, #$EF
     mov sp, x               ; stack in page 1 ($01EF down)
 
-    ; timer 0: 8000 Hz / 125 = 64 Hz master tick (placeholder rate; the
-    ; groove engine will set this in M4)
-    mov rT0TARGET, #125
+    ; timer 0: 8000 Hz / 133 = 60.15 Hz master tick — the region-free
+    ; engine clock (grooves are the tempo: groove 6 = ~150 BPM)
+    mov rT0TARGET, #133
     mov rCONTROL, #$31      ; clear port latches, start timer 0
 
     ; DSP to a safe state: soft reset off, mute on, echo writes disabled

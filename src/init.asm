@@ -59,6 +59,15 @@ Reset:
     bcs +
     jsr apu_audio_init      ; factory sample + directory + voice 0 config
 +
+    jsr song_init           ; fresh song block (NEW)
+
+    ; editor defaults: first B tap inserts C-4 / instrument 0 / command A
+    lda #49
+    sta ed_lastnote
+    stz ed_lastinstr
+    lda #$01
+    sta ed_lastcmd
+    stz ed_lastval
 
     ; init complete: mark it, enable NMI + auto-joypad, screen on
     lda #MAGIC_BOOT_OK

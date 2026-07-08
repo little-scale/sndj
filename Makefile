@@ -69,6 +69,7 @@ check: all
 	@python3 tools/mesen_setup.py
 	@for c in $(CHECKS); do \
 	  echo "== $$c"; \
+	  SNESDJ_PHRASE_SHOT=$(abspath $(BUILD)/shot-phrase.png) \
 	  "$(MESEN)" --testrunner $(abspath $(ROM)) $(abspath $$c) || exit 1; \
 	done
 
@@ -79,8 +80,13 @@ shot: all
 
 shot-diff: shot
 	@cmp -s $(BUILD)/shot.png tools/goldens/splash.png \
-	  && echo "shot-diff: matches golden" \
+	  && echo "shot-diff: splash matches golden" \
 	  || { echo "shot-diff: MISMATCH vs tools/goldens/splash.png"; exit 1; }
+	@if [ -f $(BUILD)/shot-phrase.png ]; then \
+	  cmp -s $(BUILD)/shot-phrase.png tools/goldens/phrase.png \
+	    && echo "shot-diff: phrase matches golden" \
+	    || { echo "shot-diff: MISMATCH vs tools/goldens/phrase.png"; exit 1; }; \
+	fi
 
 # host-side unit tests, no emulator
 test:
