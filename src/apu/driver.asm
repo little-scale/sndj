@@ -40,6 +40,7 @@
 .DEFINE CMD_UPLOAD    $02   ; ports1/2 = dest ARAM addr; then bulk stream:
                             ;   port0 = 1..255 (cycling, !=0), ports1-3 = 3 data
                             ;   bytes each round, echoed; port0 = 0 ends bulk
+.DEFINE CMD_TICKRATE  $03   ; port1 = Timer-0 target (engine tick divider)
 
 ; --- zero-page state ----------------------------------------------------------
 .ENUM $0010
@@ -107,6 +108,12 @@ main:
 @not_dsp:
     cmp a, #CMD_UPLOAD
     beq @upload
+    cmp a, #CMD_TICKRATE
+    bne @not_tick
+    mov a, rPORT1
+    mov rT0TARGET, a        ; T command: retune the master tick
+    bra @ack
+@not_tick:
     ; unknown commands ack as NOP
 @ack:
     mov a, last_cmd

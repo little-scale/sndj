@@ -23,15 +23,24 @@ input_update:
     sta pad_prev
 
     ; --- DAS on the d-pad ---
+    ; Frame-delta based: heavy screens may run the main loop below 60 fps,
+    ; but auto-repeat cadence must track real (NMI) frames.
     lda pad_held
     and #PAD_DPAD
     beq @idle
     cmp pad_das_dir
     bne @newdir
-    ; same direction held: advance the repeat clock
+    ; same direction held: advance the repeat clock by elapsed frames
     sep #$20
 .ACCU 8
-    inc das_cnt
+    lda frame_cnt
+    sec
+    sbc das_last_fc
+    clc
+    adc das_cnt
+    sta das_cnt
+    lda frame_cnt
+    sta das_last_fc
     lda das_cnt
     cmp #DAS_DELAY
     bcc @done
@@ -54,6 +63,8 @@ input_update:
     sep #$20
 .ACCU 8
     stz das_cnt
+    lda frame_cnt
+    sta das_last_fc
     rts
 
 @idle:

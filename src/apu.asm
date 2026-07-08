@@ -8,6 +8,7 @@
 .DEFINE CMD_NOP       $00
 .DEFINE CMD_DSP_WRITE $01
 .DEFINE CMD_UPLOAD    $02
+.DEFINE CMD_TICKRATE  $03
 
 ; DSP register numbers
 .DEFINE DSP_V0VOLL   $00
@@ -279,9 +280,37 @@ apu_audio_init:
 @fail:
     rts
 
+; --- T command: set the engine tick rate from a BPM value ---------------------
+; tick Hz = BPM * 0.4 (groove 6 = 4 rows/beat); Timer-0 target = 20000/BPM.
+; Range 80-255 BPM (slower tempos come from longer grooves).
+apu_set_tempo:
+    cmp #80
+    bcs @ok
+    lda #80
+@ok:
+    ldx #20000
+    stx WRDIVL
+    sta WRDIVB              ; starts the hardware division
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop                     ; 16 cycles for the divider
+    ldx RDDIVL              ; quotient (fits a byte for BPM >= 79)
+    lda #CMD_TICKRATE
+    jmp apu_send
+
 ; --- set VxPITCH for note A (0-95) on voice trig_voice (no KON) ---------------
 ; pitch = pitch_octave7[semitone] >> (7 - octave); tables from maketables.py
+; note_pitch_calc_only computes last_pitch without touching the DSP.
 note_pitch:
+    jsr note_pitch_calc_only
+    bra voice_pitch_write
+
+note_pitch_calc_only:
     rep #$20
 .ACCU 16
     and #$00FF
@@ -307,6 +336,10 @@ note_pitch:
     sta last_pitch
     sep #$20
 .ACCU 8
+    rts
+
+; --- write last_pitch to trig_voice's pitch registers --------------------------
+voice_pitch_write:
     lda trig_voice
     asl
     asl

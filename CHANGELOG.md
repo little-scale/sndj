@@ -11,6 +11,12 @@
   IPL protocol; flip-bit mailbox with timeouts everywhere; SCB register
   writes land in the DSP; APU tick telemetry on port 3; a dead APU shows an
   `APU?` warning instead of hanging.
+- **M7 — Commands (partial: TABLE screen still to come).** The command
+  executor with per-tick effect processing on every track: A arpeggio,
+  D delay (within the row), G groove select, H hop, K kill, L slide/legato
+  (no retrigger, exact-target landing), P pan, R retrigger, T tempo (the
+  APU timer is retuned live — grooves stay the fine tempo), V vibrato.
+  DAS auto-repeat is now frame-delta based so heavy screens can't slow it.
 - **M6 — Instruments.** INSTR screen (field-list editor: type, sample, full
   ADSR, stereo volume, GRP span + three semitone offsets); per-track
   instrument selection from the phrase column with per-voice register

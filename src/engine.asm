@@ -11,6 +11,18 @@
 .ACCU 8
 .INDEX 16
 
+; command letter ids (1 = A ... 26 = Z)
+.DEFINE CMDID_A 1
+.DEFINE CMDID_D 4
+.DEFINE CMDID_G 7
+.DEFINE CMDID_H 8
+.DEFINE CMDID_K 11
+.DEFINE CMDID_L 12
+.DEFINE CMDID_P 16
+.DEFINE CMDID_R 18
+.DEFINE CMDID_T 20
+.DEFINE CMDID_V 22
+
 ; --- initialise a NEW song block ----------------------------------------------
 song_init:
     ; wipe the whole block
@@ -224,13 +236,24 @@ engine_halt_all:
 
 engine_go:
     ldx #$0000
+@fx_reset:
     lda #$FF
-@no_instr_yet:
     sta.w trk_instr,x
     sta.w trk_instr_active,x
+    sta.w trk_dly_cnt,x
+    sta.w trk_kill_cnt,x
+    lda #$00
+    sta.w trk_cmd,x
+    sta.w trk_ret_per,x
+    sta.w trk_sl_rate,x
+    sta.w trk_arp_ph,x
+    sta.w trk_vib_ph,x
     inx
     cpx #TRACKS
-    bne @no_instr_yet
+    bne @fx_reset
+    lda.l $7E0000 + SB_HEADER + SH_GROOVE
+    and #(GROOVE_COUNT - 1)
+    sta eng_groove
     lda #$0F
     sta eng_row
     stz eng_tickwait
@@ -258,9 +281,13 @@ engine_toggle:
 @start:
     lda ui_mode
     cmp #SCREEN_PHRASE
-    beq engine_play_phrase
+    bne @not_phr
+    jmp engine_play_phrase
+@not_phr:
     cmp #SCREEN_CHAIN
-    beq engine_play_chain
+    bne @not_chn
+    jmp engine_play_chain
+@not_chn:
     jmp engine_play
 
 ; --- per-frame: consume tick deltas from the APU -------------------------------
@@ -275,29 +302,39 @@ engine_update:
     bcc @n_ok
     lda #$08
 @n_ok:
-    sta tmp0
+    sta es3                 ; NOT tmp0: apu_wait_p0 clobbers it on DSP writes
     lda apu_tick
     sta eng_tick_last
 @tickloop:
     jsr engine_tick
-    dec tmp0
+    dec es3
     bne @tickloop
 @done:
     rts
 
 ; --- one engine tick ------------------------------------------------------------
 engine_tick:
+    stz kon_mask
+    stz koff_mask
     lda eng_tickwait
     beq @row
     dec eng_tickwait
-    rts
+    bra @fx
 @row:
-    ; ticks for this row from the groove
-    ldx #$0000
-    lda eng_gpos
-    rep #$20
+    ; ticks for this row from the active groove
+    lda eng_groove
+    rep #$30
 .ACCU 16
     and #$00FF
+    asl
+    asl
+    asl
+    asl
+    sta es0
+    lda eng_gpos
+    and #$00FF
+    clc
+    adc es0
     tax
     sep #$20
 .ACCU 8
@@ -312,9 +349,7 @@ engine_tick:
     and #(GROOVE_SZ - 1)
     sta eng_gpos
 
-    ; advance + trigger every track; batch KON/KOF
-    stz kon_mask
-    stz koff_mask
+    ; advance + trigger every track
     ldx #$0000
 @each:
     jsr track_row
@@ -323,6 +358,14 @@ engine_tick:
     bne @each
     lda trk_prow            ; mirror track 0 for playhead/checks
     sta eng_row
+@fx:
+    ; per-tick effects on every live track
+    ldx #$0000
+@fxloop:
+    jsr track_fx
+    inx
+    cpx #TRACKS
+    bne @fxloop
     ; ship the batched key events (KOF first, then KON — driver serialises)
     lda koff_mask
     beq @no_koff
@@ -388,9 +431,10 @@ track_row:
 @check:
     lda.w trk_phrase,x
     cmp #$FF
-    beq @done
+    bne @trigger
+    rts
 @trigger:
-    ; read the phrase cell: SB_PHRASES + phrase*64 + prow*4
+    ; read the phrase cell (4 bytes): SB_PHRASES + phrase*64 + prow*4
     phx
     rep #$30
 .ACCU 16
@@ -410,54 +454,217 @@ track_row:
     sep #$20
 .ACCU 8
     lda.l $7E0000 + SB_PHRASES,x
-    sta tmp1                ; note byte
+    sta.w str_buf + 28      ; note byte
     lda.l $7E0000 + SB_PHRASES + 1,x
-    sta tmp1 + 1            ; instrument byte
+    sta.w str_buf + 29      ; instrument byte
+    lda.l $7E0000 + SB_PHRASES + 2,x
+    sta.w str_buf + 30      ; command id
+    lda.l $7E0000 + SB_PHRASES + 3,x
+    sta.w str_buf + 31      ; command value
     plx
-    lda tmp1
-    beq @done               ; empty
-    cmp #NOTE_OFF
-    bne @note
-    ; key off this voice at end of tick
-    lda.w bit_for_track,x
-    ora koff_mask
-    sta koff_mask
-    rts
-@note:
-    sta trig_note           ; raw note byte (apu_send clobbers tmp1)
+    ; latch row command + per-row effect resets
+    lda.w str_buf + 30
+    sta.w trk_cmd,x
+    lda.w str_buf + 31
+    sta.w trk_cval,x
+    lda #$FF
+    sta.w trk_dly_cnt,x     ; pending delay is per-row
+    lda #$00
+    sta.w trk_arp_ph,x
+    sta.w trk_ret_per,x     ; retrig re-arms only via R
+    sta.w str_buf + 27      ; flags: bit0 = trigger consumed by a command
     ; instrument column selects the track's instrument (empty = keep)
-    lda tmp1 + 1
+    lda.w str_buf + 29
     cmp #INSTR_NONE
     beq @no_new_instr
     sta.w trk_instr,x
 @no_new_instr:
+    jsr row_cmd_pre         ; G/T/P/K/R immediates; D/L may consume the note
+    ; note handling
+    lda.w str_buf + 28
+    beq @after_note         ; empty
+    cmp #NOTE_OFF
+    bne @maybe_note
+    lda.w bit_for_track,x
+    ora koff_mask
+    sta koff_mask
+    bra @after_note
+@maybe_note:
+    lda.w str_buf + 27
+    bne @after_note         ; D or L consumed the trigger
+    lda.w str_buf + 28
+    jsr track_trigger_note
+@after_note:
+    jsr row_cmd_post
+    ; H: hop — force end of phrase so the next row advances the chain
+    lda.w trk_cmd,x
+    cmp #CMDID_H
+    bne @done
+    lda #$0F
+    sta.w trk_prow,x
+@done:
+    rts
+
+; --- trigger raw note byte A on track X (transpose, instrument, pitch, KON) ----
+track_trigger_note:
+    sta.w str_buf + 26
     txa
     sta trig_voice
     lda.w trk_instr,x
     cmp #INSTR_NONE
     beq @no_apply
     phx
-    jsr apply_instrument    ; loads SRCN/ADSR/VOL if not already active
+    jsr apply_instrument
     plx
 @no_apply:
-    ; apply transpose (signed), clamp to note range
-    lda trig_note
+    lda.w str_buf + 26
     clc
     adc.w trk_tsp,x
     dec a                   ; note byte 1..96 -> index 0..95
     cmp #NOTE_MAX
     bcc @in_range
-    lda #NOTE_MAX - 1       ; clamp (also catches signed underflow wraps)
+    lda #NOTE_MAX - 1
 @in_range:
     sta trig_note
+    sta.w trk_note,x
     phx
-    jsr note_pitch          ; writes VxPITCH for trig_voice
+    jsr note_pitch
     plx
+    lda last_pitch
+    sta.w trk_pitch_lo,x
+    lda last_pitch + 1
+    sta.w trk_pitch_hi,x
+    lda #$00
+    sta.w trk_sl_rate,x     ; a fresh note ends any slide
     lda.w bit_for_track,x
     ora kon_mask
     sta kon_mask
-    jsr grp_fanout          ; GRP span drives voices to the right
-@done:
+    jmp grp_fanout
+
+; --- post-trigger commands (X = track): P overrides the instrument volume ------
+row_cmd_post:
+    lda.w trk_cmd,x
+    cmp #CMDID_P
+    beq @pan
+    rts
+@pan:
+    ; pan: L = (255-val)>>1, R = val>>1
+    lda.w trk_cval,x
+    sta es0
+    lda #$FF
+    sec
+    sbc es0
+    lsr
+    tay
+    txa
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0VOLL
+    phx
+    jsr apu_dsp_write
+    plx
+    lda es0
+    lsr
+    tay
+    txa
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0VOLR
+    phx
+    jsr apu_dsp_write
+    plx
+    rts
+
+; --- row command pre-trigger dispatch (X = track) -------------------------------
+row_cmd_pre:
+    lda.w trk_cmd,x
+    bne @dispatch
+    rts
+@dispatch:
+    cmp #CMDID_G
+    bne @not_g
+    lda.w trk_cval,x
+    and #(GROOVE_COUNT - 1)
+    sta eng_groove
+    rts
+@not_g:
+    cmp #CMDID_T
+    bne @not_t
+    lda.w trk_cval,x
+    phx
+    jsr apu_set_tempo
+    plx
+    rts
+@not_t:
+    cmp #CMDID_K
+    bne @not_k
+    lda.w trk_cval,x
+    inc a                   ; val 0 kills on this very tick
+    sta.w trk_kill_cnt,x
+    rts
+@not_k:
+    cmp #CMDID_R
+    bne @not_r
+    lda.w trk_cval,x
+    and #$0F
+    bne @r_ok
+    lda #$01
+@r_ok:
+    sta.w trk_ret_per,x
+    sta.w trk_ret_cnt,x
+    rts
+@not_r:
+    cmp #CMDID_D
+    bne @not_d
+    lda.w str_buf + 28
+    beq @out                ; no note to delay
+    cmp #NOTE_OFF
+    beq @out
+    lda.w trk_cval,x
+    beq @out                ; D00 = no delay
+    sta.w trk_dly_cnt,x
+    lda.w str_buf + 28
+    sta.w trk_dly_note,x
+    lda #$01
+    sta.w str_buf + 27      ; consume the trigger
+    rts
+@not_d:
+    cmp #CMDID_L
+    beq @is_l
+    rts
+@is_l:
+    ; slide to the row's note without retriggering
+    lda.w str_buf + 28
+    beq @out
+    cmp #NOTE_OFF
+    beq @out
+    clc
+    adc.w trk_tsp,x
+    dec a
+    cmp #NOTE_MAX
+    bcc @l_ok
+    lda #NOTE_MAX - 1
+@l_ok:
+    sta.w trk_sl_note,x
+    phx
+    jsr note_pitch_calc_only
+    plx
+    lda last_pitch
+    sta.w trk_sl_tlo,x
+    lda last_pitch + 1
+    sta.w trk_sl_thi,x
+    lda.w trk_cval,x
+    bne @l_rate
+    lda #$01
+@l_rate:
+    sta.w trk_sl_rate,x
+    lda #$01
+    sta.w str_buf + 27      ; legato: no retrigger
+@out:
     rts
 @halt:
     lda #$FF
@@ -550,3 +757,245 @@ grp_fanout:
 
 bit_for_track:
     .DB $01, $02, $04, $08, $10, $20, $40, $80
+
+; --- per-tick effects on track X (delay, kill, retrig, slide, arp, vibrato) ----
+track_fx:
+    lda.w trk_phrase,x
+    cmp #$FF
+    bne @alive
+    rts
+@alive:
+    ; D: deferred trigger
+    lda.w trk_dly_cnt,x
+    cmp #$FF
+    beq @no_dly
+    dec a
+    sta.w trk_dly_cnt,x
+    bne @no_dly
+    lda #$FF
+    sta.w trk_dly_cnt,x
+    lda.w trk_dly_note,x
+    jsr track_trigger_note
+@no_dly:
+    ; K: deferred key-off
+    lda.w trk_kill_cnt,x
+    cmp #$FF
+    beq @no_kill
+    dec a
+    sta.w trk_kill_cnt,x
+    bne @no_kill
+    lda #$FF
+    sta.w trk_kill_cnt,x
+    lda.w bit_for_track,x
+    ora koff_mask
+    sta koff_mask
+@no_kill:
+    ; R: retrigger
+    lda.w trk_ret_per,x
+    beq @no_ret
+    lda.w trk_ret_cnt,x
+    dec a
+    sta.w trk_ret_cnt,x
+    bne @no_ret
+    lda.w trk_ret_per,x
+    sta.w trk_ret_cnt,x
+    lda.w bit_for_track,x
+    ora kon_mask
+    sta kon_mask
+@no_ret:
+    ; L: slide
+    lda.w trk_sl_rate,x
+    beq @no_slide
+    jsr fx_slide
+@no_slide:
+    ; A / V retune the voice every tick
+    lda.w trk_cmd,x
+    cmp #CMDID_A
+    bne @not_arp
+    jmp fx_arp
+@not_arp:
+    cmp #CMDID_V
+    bne @fx_done
+    jmp fx_vib
+@fx_done:
+    rts
+
+; --- L: move trk_pitch toward the target by rate*4 per tick --------------------
+fx_slide:
+    txa
+    sta trig_voice
+    lda.w trk_sl_rate,x
+    sta es0
+    stz es0 + 1
+    lda.w trk_pitch_lo,x
+    sta es1
+    lda.w trk_pitch_hi,x
+    sta es1 + 1
+    lda.w trk_sl_tlo,x
+    sta es2
+    lda.w trk_sl_thi,x
+    sta es2 + 1
+    rep #$20
+.ACCU 16
+    lda es0
+    asl
+    asl                     ; step = rate * 4
+    sta es0
+    lda es1
+    cmp es2
+    beq @reached16
+    bcc @up
+    ; sliding down
+    sec
+    sbc es0
+    bcc @snap               ; underflow: snap to target
+    cmp es2
+    bcc @snap
+    bra @store16
+@up:
+    clc
+    adc es0
+    bcs @snap
+    cmp es2
+    bcs @snap
+    bra @store16
+@snap:
+    lda es2
+@store16:
+    sta last_pitch
+    cmp es2
+    sep #$20
+.ACCU 8
+    bne @still_moving
+    ; target reached: stop sliding, adopt the target note as the new base
+    lda #$00
+    sta.w trk_sl_rate,x
+    lda.w trk_sl_note,x
+    sta.w trk_note,x
+@still_moving:
+    lda last_pitch
+    sta.w trk_pitch_lo,x
+    lda last_pitch + 1
+    sta.w trk_pitch_hi,x
+    phx
+    jsr voice_pitch_write
+    plx
+    rts
+@reached16:
+    sep #$20
+.ACCU 8
+    lda #$00
+    sta.w trk_sl_rate,x
+    rts
+
+; --- A xy: cycle root / +x / +y each tick ---------------------------------------
+fx_arp:
+    txa
+    sta trig_voice
+    lda.w trk_arp_ph,x
+    inc a
+    cmp #3
+    bcc @ph_ok
+    lda #$00
+@ph_ok:
+    sta.w trk_arp_ph,x
+    beq @root
+    cmp #1
+    beq @hi_nib
+    lda.w trk_cval,x
+    and #$0F
+    bra @add
+@hi_nib:
+    lda.w trk_cval,x
+    lsr
+    lsr
+    lsr
+    lsr
+    bra @add
+@root:
+    lda #$00
+@add:
+    clc
+    adc.w trk_note,x
+    cmp #NOTE_MAX
+    bcc @n_ok
+    lda #NOTE_MAX - 1
+@n_ok:
+    phx
+    jsr note_pitch          ; calc + write (base pitch untouched)
+    plx
+    rts
+
+; --- V xy: triangle vibrato around the base pitch (speed x, depth y) -----------
+fx_vib:
+    txa
+    sta trig_voice
+    ; phase += speed
+    lda.w trk_cval,x
+    lsr
+    lsr
+    lsr
+    lsr
+    clc
+    adc.w trk_vib_ph,x
+    sta.w trk_vib_ph,x
+    ; triangle 0..15 from phase bits
+    and #$1F
+    cmp #$10
+    bcc @rising
+    eor #$1F                ; falling half: 31-t
+@rising:
+    sec
+    sbc #$08                ; centre: -8..7
+    sta es0                 ; signed offset
+    ; |offset| * depth -> es1 (max 8*15 = 120)
+    bpl @pos
+    eor #$FF
+    inc a
+@pos:
+    sta es0 + 1             ; magnitude
+    lda.w trk_cval,x
+    and #$0F
+    sta es1 + 1             ; depth counter
+    stz es1
+    lda es1 + 1
+    beq @apply
+@mul:
+    lda es1
+    clc
+    adc es0 + 1
+    sta es1
+    dec es1 + 1
+    bne @mul
+@apply:
+    ; pitch = base +/- (product << 2)
+    lda.w trk_pitch_lo,x
+    sta last_pitch
+    lda.w trk_pitch_hi,x
+    sta last_pitch + 1
+    rep #$20
+.ACCU 16
+    lda es1
+    and #$00FF
+    asl
+    asl
+    sta es1
+    lda es0
+    and #$0080              ; sign of the centred offset
+    beq @add16
+    lda last_pitch
+    sec
+    sbc es1
+    bra @wr16
+@add16:
+    lda last_pitch
+    clc
+    adc es1
+@wr16:
+    sta last_pitch
+    sep #$20
+.ACCU 8
+    phx
+    jsr voice_pitch_write
+    plx
+    rts

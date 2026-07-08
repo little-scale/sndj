@@ -43,6 +43,18 @@ trk_phrase   ds 8    ; $28  per-track: phrase id ($FF = halted)
 trk_prow     ds 8    ; $30  per-track: phrase row
 trk_songrow  ds 8    ; $38  per-track: song grid row
 ; --- end pinned blocks ---
+; DP-required (used with (dp),y indirect addressing — must stay below $100)
+up_src       dw      ; bulk upload: source (DB-relative)
+up_dest      dw      ;              dest ARAM address
+up_len       dw      ;              byte count (multiple of 3)
+; hot scalars (keep below $100 for direct-page speed)
+das_last_fc  db      ; frame_cnt low byte at last DAS update
+text_x       db
+text_y       db      ; must follow text_x
+text_attr    dw
+tmp0         dw
+tmp1         dw
+tmp2         dw
 trk_cpos     ds 8    ; per-track: position within chain
 trk_tsp      ds 8    ; per-track: active transpose (chain entry)
 trk_instr    ds 8    ; per-track: current instrument id ($FF = none yet)
@@ -54,6 +66,29 @@ grp_span     db
 grp_m        db
 ed_instr     db      ; instrument id under edit (INSTR screen)
 if_cur       db      ; INSTR screen field cursor
+; --- per-track command/effect state (M7) — grows past the direct page; all
+; access is indexed absolute, which WLA emits automatically ---
+eng_groove   db      ; active groove id
+trk_cmd      ds 8    ; current row command id (0 = none)
+trk_cval     ds 8    ; current row command value
+trk_note     ds 8    ; current note index (arp/vib base)
+trk_pitch_lo ds 8    ; current pitch (slides move it)
+trk_pitch_hi ds 8
+trk_dly_cnt  ds 8    ; D: ticks until deferred trigger ($FF = none)
+trk_dly_note ds 8
+trk_kill_cnt ds 8    ; K: ticks until KOF ($FF = none)
+trk_ret_per  ds 8    ; R: retrigger period (0 = off)
+trk_ret_cnt  ds 8
+trk_arp_ph   ds 8
+trk_vib_ph   ds 8
+trk_sl_rate  ds 8    ; L: slide rate (0 = off)
+trk_sl_tlo   ds 8    ; L: target pitch
+trk_sl_thi   ds 8
+trk_sl_note  ds 8    ; L: target note index (arp base once reached)
+es0          dw      ; engine scratch (safe across apu_send/text_*)
+es1          dw
+es2          dw
+es3          dw
 kon_mask     db      ; voices to key on at end of row tick
 koff_mask    db      ; voices to key off at end of row tick
 trig_voice   db      ; note_on target voice
@@ -72,18 +107,9 @@ b_down       db      ; B modifier edge state
 b_used       db      ; B was used as a modifier (suppress tap on release)
 a_down       db      ; A (screen) modifier edge state
 a_used       db
-up_src       dw      ; bulk upload: source (DB-relative)
-up_dest      dw      ;              dest ARAM address
-up_len       dw      ;              byte count (multiple of 3)
 pad_prev     dw
 pad_das_dir  dw      ; d-pad bits DAS is tracking
 das_cnt      db
-text_x       db
-text_y       db      ; must follow text_x
-text_attr    dw
-tmp0         dw
-tmp1         dw
-tmp2         dw
 str_buf      ds 40   ; scratch line buffer for formatted text
 .ENDE
 
