@@ -24,8 +24,13 @@ cur_y        db      ; $0F  editor cursor row
 ; --- check-visible APU block: also frozen for tools/checks/ ---
 apu_seq      db      ; $10  last mailbox port-0 byte sent (flip handshake)
 apu_tick     db      ; $11  APU master tick (port-3 telemetry mirror)
-hb_val       db      ; $12  M2 heartbeat value (lands in DSP MVOLL)
+hb_val       db      ; $12  heartbeat value (lands in DSP unused reg $1D)
+last_pitch   dw      ; $13  last DSP pitch value sent (audition/engine)
+kon_count    db      ; $15  count of KON commands issued
 ; --- end frozen block ---
+up_src       dw      ; bulk upload: source (DB-relative)
+up_dest      dw      ;              dest ARAM address
+up_len       dw      ;              byte count (multiple of 3)
 pad_prev     dw
 pad_das_dir  dw      ; d-pad bits DAS is tracking
 das_cnt      db

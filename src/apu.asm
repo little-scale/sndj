@@ -7,6 +7,36 @@
 
 .DEFINE CMD_NOP       $00
 .DEFINE CMD_DSP_WRITE $01
+.DEFINE CMD_UPLOAD    $02
+
+; DSP register numbers
+.DEFINE DSP_V0VOLL   $00
+.DEFINE DSP_V0VOLR   $01
+.DEFINE DSP_V0PITCHL $02
+.DEFINE DSP_V0PITCHH $03
+.DEFINE DSP_V0SRCN   $04
+.DEFINE DSP_V0ADSR1  $05
+.DEFINE DSP_V0ADSR2  $06
+.DEFINE DSP_MVOLL    $0C
+.DEFINE DSP_MVOLR    $1C
+.DEFINE DSP_EVOLL    $2C
+.DEFINE DSP_EVOLR    $3C
+.DEFINE DSP_KON      $4C
+.DEFINE DSP_KOF      $5C
+.DEFINE DSP_FLG      $6C
+.DEFINE DSP_ENDX     $7C
+.DEFINE DSP_EFB      $0D
+.DEFINE DSP_UNUSED   $1D    ; heartbeat lands here (no audible effect)
+.DEFINE DSP_PMON     $2D
+.DEFINE DSP_NON      $3D
+.DEFINE DSP_EON      $4D
+.DEFINE DSP_DIR      $5D
+.DEFINE DSP_ESA      $6D
+.DEFINE DSP_EDL      $7D
+
+; ARAM layout (CLAUDE.md §14.1)
+.DEFINE ARAM_DIR     $1000
+.DEFINE ARAM_SAMPLES $1200
 
 ; --- wait until $2140 == A; carry set on timeout ------------------------------
 apu_wait_p0:
@@ -104,6 +134,157 @@ apu_dsp_write:
     lda #CMD_DSP_WRITE
     jmp apu_send
 
+; --- bulk upload to ARAM: up_src (CPU addr, DB), up_dest (ARAM), up_len -------
+; up_len must be a multiple of 3 (pad; BRR blocks are 9 bytes so samples fit).
+; Carry set on timeout.
+apu_upload_block:
+    ldx up_dest
+    lda #CMD_UPLOAD
+    jsr apu_send
+    bcs @fail
+    stz tmp1                ; round counter (1..255, cycling, never 0)
+    ldy #$0000
+@round:
+    lda (up_src),y
+    sta APUIO1
+    iny
+    lda (up_src),y
+    sta APUIO2
+    iny
+    lda (up_src),y
+    sta APUIO3
+    iny
+    lda tmp1
+    inc a
+    bne @nz
+    inc a
+@nz:
+    sta tmp1
+    sta APUIO0
+    phy
+    jsr apu_wait_p0
+    ply
+    bcs @fail
+    cpy up_len
+    bcc @round
+    ; end of stream: counter 0 resyncs both sides' handshake state
+    lda #$00
+    sta APUIO0
+    jsr apu_wait_p0
+    bcs @fail
+    stz apu_seq
+    clc
+    rts
+@fail:
+    lda #$01
+    sta apu_status
+    sec
+    rts
+
+; --- one-time audio setup after driver upload ---------------------------------
+; Uploads the factory sample + directory, configures the DSP for voice 0.
+apu_audio_init:
+    ; sample 0 -> ARAM_SAMPLES
+    ldx #sample0_brr
+    stx up_src
+    ldx #ARAM_SAMPLES
+    stx up_dest
+    ldx #(sample0_brr_end - sample0_brr)
+    stx up_len
+    jsr apu_upload_block
+    bcs @fail
+    ; directory (entry 0: start/loop = ARAM_SAMPLES) -> ARAM_DIR
+    ldx #dir0_data
+    stx up_src
+    ldx #ARAM_DIR
+    stx up_dest
+    ldx #(dir0_data_end - dir0_data)
+    stx up_len
+    jsr apu_upload_block
+    bcs @fail
+    ; global DSP state
+    lda #DSP_DIR
+    ldy #(ARAM_DIR >> 8)
+    jsr apu_dsp_write
+    lda #DSP_MVOLL
+    ldy #$60
+    jsr apu_dsp_write
+    lda #DSP_MVOLR
+    ldy #$60
+    jsr apu_dsp_write
+    lda #DSP_ESA
+    ldy #$FF                ; park the (disabled) echo buffer at top of ARAM
+    jsr apu_dsp_write
+    lda #DSP_EDL
+    ldy #$00
+    jsr apu_dsp_write
+    lda #DSP_KOF
+    ldy #$00                ; release the boot-time all-voices key-off latch
+    jsr apu_dsp_write
+    lda #DSP_FLG
+    ldy #$20                ; unmute; echo buffer writes stay disabled
+    jsr apu_dsp_write
+    ; voice 0: volumes, sample 0, musical ADSR
+    lda #DSP_V0VOLL
+    ldy #$50
+    jsr apu_dsp_write
+    lda #DSP_V0VOLR
+    ldy #$50
+    jsr apu_dsp_write
+    lda #DSP_V0SRCN
+    ldy #$00
+    jsr apu_dsp_write
+    lda #DSP_V0ADSR1
+    ldy #$AF                ; adsr on, attack 15, decay 2
+    jsr apu_dsp_write
+    lda #DSP_V0ADSR2
+    ldy #$CA                ; sustain level 6, sustain rate 10
+    jsr apu_dsp_write
+@fail:
+    rts
+
+; --- audition: play note A (0-95) on voice 0 ----------------------------------
+; pitch = pitch_octave7[semitone] >> (7 - octave); tables from maketables.py
+audition_note:
+    rep #$20
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w note_shift,x
+    sta tmp1
+    stz tmp1 + 1
+    lda.w note_semi2,x
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    lda.w pitch_octave7,x
+    ldy tmp1
+    beq @shifted
+@shift:
+    lsr a
+    dey
+    bne @shift
+@shifted:
+    sta last_pitch
+    sep #$20
+.ACCU 8
+    lda #DSP_V0PITCHL
+    ldy last_pitch
+    jsr apu_dsp_write
+    ldy #$0000
+    lda last_pitch + 1
+    tay
+    lda #DSP_V0PITCHH
+    jsr apu_dsp_write
+    lda #DSP_KON
+    ldy #$0001
+    jsr apu_dsp_write
+    inc kon_count
+    rts
+
 ; --- per-frame APU housekeeping (main loop) ------------------------------------
 ; Mirrors tick telemetry and sends the M2 heartbeat: an incrementing value
 ; into MVOLL every 64 frames, so checks can watch the full SCB path land in
@@ -125,7 +306,7 @@ apu_update:
     and #$3F
     sta hb_val
     tay
-    lda #$0C                ; MVOLL
+    lda #DSP_UNUSED         ; APU-alive heartbeat, inaudible
     jsr apu_dsp_write
 @done:
     rts

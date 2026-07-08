@@ -36,8 +36,11 @@ $(BUILD):
 $(BUILD)/font.bin: tools/makefont.py | $(BUILD)
 	python3 tools/makefont.py $@
 
-$(BUILD)/pal.bin $(BUILD)/gradient.bin: tools/maketables.py | $(BUILD)
+$(BUILD)/pal.bin $(BUILD)/gradient.bin $(BUILD)/tables.inc: tools/maketables.py | $(BUILD)
 	python3 tools/maketables.py $(BUILD)
+
+$(BUILD)/sample0.brr: tools/sndj_brr.py | $(BUILD)
+	python3 tools/sndj_brr.py --gen pad $@
 
 # SPC700 driver blob
 $(BUILD)/driver.o: src/apu/driver.asm | $(BUILD)
@@ -47,7 +50,7 @@ $(BUILD)/driver.spc700.bin: $(BUILD)/driver.o
 	@printf '[objects]\n%s\n' "$(BUILD)/driver.o" > $(BUILD)/linkfile-apu
 	$(WLALINK) -S $(BUILD)/linkfile-apu $@
 
-$(BUILD)/main.o: $(SRCS) $(BUILD)/buildid.inc $(BUILD)/font.bin $(BUILD)/pal.bin $(BUILD)/gradient.bin $(BUILD)/driver.spc700.bin
+$(BUILD)/main.o: $(SRCS) $(BUILD)/buildid.inc $(BUILD)/font.bin $(BUILD)/pal.bin $(BUILD)/gradient.bin $(BUILD)/tables.inc $(BUILD)/sample0.brr $(BUILD)/driver.spc700.bin
 	$(WLA65816) -I src -I $(BUILD) -o $@ src/main.asm
 
 $(BUILD)/linkfile: | $(BUILD)
@@ -83,6 +86,7 @@ shot-diff: shot
 test:
 	python3 tools/makefont.py /tmp/snesdj-font-test.bin > /dev/null
 	python3 tools/maketables.py /tmp > /dev/null
+	python3 tools/sndj_brr.py --selftest
 	@echo "test: OK"
 
 dist: all

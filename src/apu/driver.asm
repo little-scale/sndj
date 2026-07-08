@@ -37,11 +37,16 @@
 ; --- commands (port 0 low 7 bits) --------------------------------------------
 .DEFINE CMD_NOP       $00
 .DEFINE CMD_DSP_WRITE $01   ; port1 = dsp reg, port2 = value
+.DEFINE CMD_UPLOAD    $02   ; ports1/2 = dest ARAM addr; then bulk stream:
+                            ;   port0 = 1..255 (cycling, !=0), ports1-3 = 3 data
+                            ;   bytes each round, echoed; port0 = 0 ends bulk
 
 ; --- zero-page state ----------------------------------------------------------
 .ENUM $0010
 last_cmd  db      ; last port-0 byte processed
 tick      db      ; master tick counter (T0-derived)
+dest_lo   db      ; bulk upload write pointer
+dest_hi   db
 .ENDE
 
 .BANK 0 SLOT 0
@@ -92,14 +97,52 @@ main:
     and a, #$7F
 
     cmp a, #CMD_DSP_WRITE
-    bne @ack                ; unknown commands ack as NOP
+    bne @not_dsp
     ; single DSP register write; the only $F2/$F3 code path
     mov a, rPORT1
     mov rDSPADDR, a
     mov a, rPORT2
     mov rDSPDATA, a
-
+    bra @ack
+@not_dsp:
+    cmp a, #CMD_UPLOAD
+    beq @upload
+    ; unknown commands ack as NOP
 @ack:
     mov a, last_cmd
     mov rPORT0, a           ; echo completes the handshake
+    bra main
+
+; --- bulk upload: 3 bytes per handshake round into ARAM -----------------------
+@upload:
+    mov a, rPORT1
+    mov dest_lo, a
+    mov a, rPORT2
+    mov dest_hi, a
+    mov a, last_cmd
+    mov rPORT0, a           ; ack; CPU may now stream rounds
+@bulk_wait:
+    mov a, rPORT0
+    cmp a, last_cmd
+    beq @bulk_wait
+    mov last_cmd, a
+    cmp a, #$00
+    beq @bulk_end           ; counter 0 = end of stream
+    mov y, #$00
+    mov a, rPORT1
+    mov [dest_lo]+y, a
+    inc y
+    mov a, rPORT2
+    mov [dest_lo]+y, a
+    inc y
+    mov a, rPORT3
+    mov [dest_lo]+y, a
+    clrc
+    adc dest_lo, #$03
+    adc dest_hi, #$00
+    mov a, last_cmd
+    mov rPORT0, a           ; echo the round counter
+    bra @bulk_wait
+@bulk_end:
+    mov rPORT0, a           ; echo the 0; both sides now at seq 0
     bra main

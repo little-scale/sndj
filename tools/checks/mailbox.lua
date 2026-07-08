@@ -4,7 +4,7 @@
 --
 -- WRAM map (frozen block, src/ram.inc): $01 magic_boot, $0D apu_status,
 -- $11 apu_tick, $12 hb_val. Heartbeat: hb_val -> DSP MVOLL ($0C) every
--- 64 frames.
+-- 64 frames (into unused DSP reg $1D).
 
 local frames = 0
 local fails = 0
@@ -43,15 +43,15 @@ local function onFrame()
     local t = wram(0x0011)
     check(t ~= tick_sample, "APU tick telemetry advancing (" ..
       tick_sample .. " -> " .. t .. ")")
-    -- driver parked the DSP safely at boot: FLG = $60 (mute, echo off)
-    check(dsp(0x6C) == 0x60, "DSP FLG parked safe by driver ($" ..
+    -- after audio init: unmuted, echo buffer writes still disabled
+    check(dsp(0x6C) == 0x20, "DSP FLG unmuted with echo writes off ($" ..
       string.format("%02X", dsp(0x6C)) .. ")")
   elseif frames == 100 then
     -- heartbeat fires at ROM frame 64 (~lua frame 75): check after it
     local hb = wram(0x0012)
-    local mv = dsp(0x0C)
+    local mv = dsp(0x1D)
     check(hb > 0, "heartbeat counter running (hb=" .. hb .. ")")
-    check(mv == hb, "SCB path: heartbeat landed in DSP MVOLL (" ..
+    check(mv == hb, "SCB path: heartbeat landed in DSP reg $1D (" ..
       mv .. " == " .. hb .. ")")
   elseif frames == 110 then
     -- kill the APU: fill the driver region with SLEEP opcodes ($EF).

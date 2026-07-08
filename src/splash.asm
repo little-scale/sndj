@@ -219,6 +219,27 @@ stub_uncursor:
     rts
 
 stub_update:
+    ; B auditions the scale note for the cursor row on voice 0
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_B
+    sep #$20
+.ACCU 8
+    beq @no_audition
+    ldx #$0000
+    lda cur_y
+    rep #$20
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w scale_semis,x
+    clc
+    adc #48                 ; C-4 base
+    jsr audition_note
+@no_audition:
     rep #$20
 .ACCU 16
     lda pad_event
@@ -277,6 +298,10 @@ stub_update:
     jsr stub_cursor
 @done:
     rts
+
+; two octaves of C major for the 16 grid rows (semitones above C-4)
+scale_semis:
+    .DB 0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17, 19, 21, 23, 24, 26
 
 str_title:    .DB "SNESDJ", 0
 str_subtitle: .DB "SNES/SFC MUSIC TRACKER", 0
