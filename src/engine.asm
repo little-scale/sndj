@@ -11,6 +11,9 @@
 .ACCU 8
 .INDEX 16
 
+factory_instr_type: .DB 0, 0, 0, 0, 0, 2, 3, 1
+factory_instr_smp:  .DB 0, 1, 2, 3, 4, 0, 0, 0
+
 ; command letter ids (1 = A ... 26 = Z)
 .DEFINE CMDID_A 1
 .DEFINE CMDID_B 2
@@ -78,17 +81,75 @@ song_init:
     inx
     cpx #GROOVE_SZ
     bne @groove
-    ; instrument 0: SMP, sample 0, ADSR a15/d2/s6/r10, vol 50/50, no GRP
-    lda #$00
-    sta.l $7E0000 + SB_INSTR + 0    ; type SMP
-    sta.l $7E0000 + SB_INSTR + 1    ; sample 0
+    ; factory instruments 0-7 (matching the MIDI track defaults):
+    ; 0-4 SMP on pool samples 0-4, 5 WAV bank 0, 6 NSE, 7 KIT 0
+    ldx #$0000
+@finstr:
+    rep #$30
+.ACCU 16
+    txa
+    asl
+    asl
+    asl
+    asl
+    tay
+    sep #$20
+.ACCU 8
+    lda.w factory_instr_type,x
+    phx
+    rep #$30
+.ACCU 16
+    tyx
+    sep #$20
+.ACCU 8
+    sta.l $7E0000 + SB_INSTR,x      ; type
+    ply
+    lda.w factory_instr_smp,y
+    sta.l $7E0000 + SB_INSTR + 1,x  ; sample / bank / kit
     lda #$2F
-    sta.l $7E0000 + SB_INSTR + 2    ; ADSR1 (bit7 forced on at apply time)
+    sta.l $7E0000 + SB_INSTR + 2,x  ; ADSR1 (bit7 forced on at apply)
     lda #$CA
-    sta.l $7E0000 + SB_INSTR + 3    ; ADSR2
+    sta.l $7E0000 + SB_INSTR + 3,x  ; ADSR2
     lda #$50
-    sta.l $7E0000 + SB_INSTR + 4    ; vol L
-    sta.l $7E0000 + SB_INSTR + 5    ; vol R
+    sta.l $7E0000 + SB_INSTR + 4,x  ; vol L
+    sta.l $7E0000 + SB_INSTR + 5,x  ; vol R
+    rep #$30
+.ACCU 16
+    tyx
+    sep #$20
+.ACCU 8
+    inx
+    cpx #$0008
+    bne @finstr
+    ; factory kits: kit 0 = 808 (pool 8-23), kit 1 = 909 (pool 24-39)
+    ldx #$0000
+@fkits:
+    rep #$30
+.ACCU 16
+    txa
+    asl
+    asl                     ; slot record offset (kit*64 + slot*4 = x*4)
+    tay
+    sep #$20
+.ACCU 8
+    txa
+    clc
+    adc #$08                ; 808 starts at pool sample 8; kit 1 follows
+    phx
+    rep #$30
+.ACCU 16
+    tyx
+    sep #$20
+.ACCU 8
+    sta.l $7E0000 + SB_KITS,x       ; sample
+    lda #$00
+    sta.l $7E0000 + SB_KITS + 1,x   ; tune
+    lda #$50
+    sta.l $7E0000 + SB_KITS + 2,x   ; vol
+    plx
+    inx
+    cpx #$0020                      ; 32 slots = kits 0 and 1
+    bne @fkits
     ; header
     lda #$00
     sta.l $7E0000 + SB_HEADER + SH_GROOVE
@@ -248,8 +309,9 @@ engine_halt_all:
 engine_go:
     ldx #$0000
 @fx_reset:
+    lda #$00
+    sta.w trk_instr,x       ; instrument-less notes play instrument 0
     lda #$FF
-    sta.w trk_instr,x
     sta.w trk_instr_active,x
     sta.w trk_dly_cnt,x
     sta.w trk_kill_cnt,x
@@ -397,26 +459,11 @@ engine_tick:
 @no_kon:
     rts
 
-; --- advance one row on track X and trigger its phrase cell --------------------
-track_row:
-    lda.w trk_phrase,x
-    cmp #$FF
-    bne @alive
-    rts
-@alive:
-    ; next phrase row
-    lda.w trk_prow,x
-    cmp #$FF
-    bne @advance
-    lda #$00                ; start sentinel: begin at row 0
-    sta.w trk_prow,x
-    bra @trigger
-@advance:
-    inc a
-    and #$0F
-    sta.w trk_prow,x
-    bne @trigger
-    ; wrapped: a LIVE-queued chain launches exactly here (quantised)
+; --- advance to the next chain position for track X ------------------------------
+; (LIVE-queued launch beats everything; standalone phrase loops; chain end
+; walks the song grid or loops a standalone chain.) May halt the track.
+track_chain_step:
+    ; a LIVE-queued chain launches exactly here (quantised)
     lda.w trk_pending,x
     cmp #$FF
     beq @no_launch
@@ -426,14 +473,12 @@ track_row:
     sta.w trk_songrow,x     ; behave as a standalone (looping) chain
     lda #$00
     sta.w trk_cpos,x
-    jsr track_load_chain_entry
-    jmp @check
+    jmp track_load_chain_entry
 @no_launch:
     ; standalone phrase mode just loops
     lda.w trk_chain,x
     cmp #$FE
-    beq @trigger
-    ; next chain entry
+    beq @done
     lda.w trk_cpos,x
     inc a
     and #$0F
@@ -449,11 +494,34 @@ track_row:
     rts
 @row_ok:
     sta.w trk_songrow,x
-    jsr track_load_songrow
-    bra @check
+    jmp track_load_songrow
 @entry:
-    jsr track_load_chain_entry
-@check:
+    jmp track_load_chain_entry
+@done:
+    rts
+
+; --- advance one row on track X and trigger its phrase cell --------------------
+track_row:
+    lda.w trk_phrase,x
+    cmp #$FF
+    bne @alive
+    rts
+@alive:
+    lda #$04
+    sta hop_guard
+    ; next phrase row
+    lda.w trk_prow,x
+    cmp #$FF
+    bne @advance
+    lda #$00                ; start sentinel: begin at row 0
+    sta.w trk_prow,x
+    bra @trigger
+@advance:
+    inc a
+    and #$0F
+    sta.w trk_prow,x
+    bne @trigger
+    jsr track_chain_step    ; wrapped: next chain entry / launch / loop
     lda.w trk_phrase,x
     cmp #$FF
     bne @trigger
@@ -493,6 +561,24 @@ track_row:
     lda.l $7E0000 + SB_PHRASES + 3,x
     sta.w str_buf + 31      ; command value
     plx
+    ; H hops NOW: this row tick plays row 0 of the next chain entry
+    ; (hop_guard caps chained hops so a hop cycle can't wedge the tick)
+    lda.w str_buf + 30
+    cmp #CMDID_H
+    bne @no_hop
+    lda hop_guard
+    beq @no_hop             ; guard exhausted: treat as a plain row
+    dec hop_guard
+    jsr track_chain_step
+    lda.w trk_phrase,x
+    cmp #$FF
+    bne @hopped
+    rts
+@hopped:
+    lda #$00
+    sta.w trk_prow,x
+    jmp @trigger
+@no_hop:
     ; latch row command + per-row effect resets
     lda.w str_buf + 30
     sta.w trk_cmd,x
@@ -527,12 +613,6 @@ track_row:
     jsr track_trigger_note
 @after_note:
     jsr row_cmd_post
-    ; H: hop — force end of phrase so the next row advances the chain
-    lda.w trk_cmd,x
-    cmp #CMDID_H
-    bne @done
-    lda #$0F
-    sta.w trk_prow,x
 @done:
     rts
 
@@ -564,43 +644,13 @@ track_trigger_note:
     lda trig_type
     cmp #$01
     bne @not_kit
-    ; KIT (v1): the note picks a pool sample chromatically (mod 12),
-    ; played at native rate; full kit tables arrive with the kit editor
-    lda trig_note
-@kit_mod:
-    cmp #$0C
-    bcc @kit_slot
-    sec
-    sbc #$0C
-    bra @kit_mod
-@kit_slot:
-    cmp pool_count
-    bcc @kit_ok
-    lda pool_count
-    dec a
-@kit_ok:
-    tay
-    txa
-    asl
-    asl
-    asl
-    asl
-    ora #DSP_V0SRCN
     phx
-    jsr apu_dsp_write
+    jsr kit_trigger         ; full slot lookup; clears C when nothing to play
     plx
-    ; kit voices' SRCN no longer matches the instrument record
-    lda #$FF
-    sta.w trk_instr_active,x
-    rep #$20
-.ACCU 16
-    lda #$1000
-    sta last_pitch
-    sep #$20
-.ACCU 8
-    phx
-    jsr voice_pitch_write
-    plx
+    bcs @kit_played
+    ; empty slot: no KON for this voice
+    rts
+@kit_played:
     bra @pitched
 @not_kit:
     cmp #$03
@@ -699,10 +749,11 @@ row_cmd_pre:
 @not_g:
     cmp #CMDID_B
     bne @not_b
-    ; B: wave bank select for this voice (SRCN = 32 + bank)
+    ; B: wave bank select for this voice (SRCN = 56 + bank)
     lda.w trk_cval,x
     and #$07
-    ora #$20
+    clc
+    adc #56
     tay
     txa
     asl
@@ -915,6 +966,115 @@ grp_fanout:
 
 bit_for_track:
     .DB $01, $02, $04, $08, $10, $20, $40, $80
+
+; --- KIT trigger: LSDJ-style 16-slot kits ----------------------------------------
+; Instrument rec[1] low nibble = kit id; slot = note % 16. A slot is
+; sample + tune (signed semitones around native) + vol. Returns carry SET
+; when a note was played, CLEAR for an empty (vol 0) slot. Uses trig_id /
+; trig_note / trig_voice; clobbers X.
+kit_trigger:
+    ; kit id from the instrument record
+    lda trig_id
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR + 1,x
+    and #$0F
+    sta es0                 ; kit id
+    lda trig_note
+    and #$0F
+    sta es0 + 1             ; slot
+    ; record = SB_KITS + kit*64 + slot*4
+    rep #$30
+.ACCU 16
+    lda es0
+    and #$00FF
+    xba
+    lsr
+    lsr                     ; * 64
+    sta es1
+    lda es0 + 1
+    and #$00FF
+    asl
+    asl                     ; * 4
+    clc
+    adc es1
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_KITS + 2,x   ; vol
+    bne @has
+    clc
+    rts
+@has:
+    sta es1                 ; vol
+    lda.l $7E0000 + SB_KITS + 1,x   ; tune (signed semitones)
+    sta es1 + 1
+    lda.l $7E0000 + SB_KITS,x       ; sample -> resident SRCN
+    and #$3F
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w pool_map,x
+    tay
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0SRCN
+    jsr apu_dsp_write
+    ; per-slot volume overrides the instrument's
+    lda es1
+    tay
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0VOLL
+    jsr apu_dsp_write
+    lda es1
+    tay
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0VOLR
+    jsr apu_dsp_write
+    ; pitch: native ($1000 = note 60) +/- tune
+    lda es1 + 1
+    clc
+    adc #60
+    cmp #NOTE_MAX
+    bcc @tuned
+    lda #60                 ; wild tunes snap back to native
+@tuned:
+    jsr note_pitch_calc_only
+    jsr voice_pitch_write
+    ; SRCN/vol no longer match the instrument record on this voice
+    lda trig_voice
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda #$FF
+    sta.w trk_instr_active,x
+    sec
+    rts
 
 ; --- per-tick effects on track X (delay, kill, retrig, slide, arp, vibrato) ----
 track_fx:

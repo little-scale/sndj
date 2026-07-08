@@ -87,6 +87,16 @@ ed_wave      db      ; wave bank under edit (WAVE screen)
 wv_x         db      ; WAVE screen cursor column (0-31)
 trig_type    db      ; instrument type at trigger time
 pool_count   db      ; samples in the ROM pool (set at boot)
+pool_map     ds 64   ; pool index -> resident SRCN (0 = silent stub)
+res_cursor   dw      ; residency: next free ARAM byte
+res_slot     db      ; residency: next directory slot
+res_scan     db      ; residency: scan counter
+res_cur      db      ; residency: pool index being marked
+res_ceil     db      ; residency: ARAM ceiling page (echo buffer floor)
+ed_kit       db      ; kit under edit (KIT screen)
+kt_row       db      ; KIT screen cursor slot
+kt_col       db      ; KIT screen cursor column (0=sample 1=tune 2=vol)
+hop_guard    db      ; H-command chain-hop limiter per row tick
 trk_pending  ds 8    ; LIVE: chain queued to launch at the phrase boundary
 trk_mute     db      ; bit per track: muted
 envx_mirror  ds 8    ; per-voice ENVX from driver telemetry

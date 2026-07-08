@@ -112,16 +112,34 @@ function brrDecode(bytes) {
 }
 
 // ---------------------------------------------------------------- pool image
+// v2: offsets/sizes in 9-byte BRR blocks; sample data never crosses a
+// 32 KB ROM bank boundary (the image starts 6 bytes into its first bank).
+const POOL_BANK0_SPAN = 0x7FFA;
+const POOL_BANK_SPAN = 0x8000;
+const POOL_MAX_ENTRIES = 56;
+
+function poolBankPad(offset, size) {
+  const bankOf = o => o < POOL_BANK0_SPAN ? 0
+    : 1 + Math.floor((o - POOL_BANK0_SPAN) / POOL_BANK_SPAN);
+  const bankEnd = o => {
+    const b = bankOf(o);
+    return b === 0 ? POOL_BANK0_SPAN : POOL_BANK0_SPAN + b * POOL_BANK_SPAN;
+  };
+  if (bankOf(offset) === bankOf(offset + size - 1)) return 0;
+  return bankEnd(offset) - offset;
+}
+
 function poolParse(bytes) {
   const magic = String.fromCharCode(...bytes.slice(0, 8));
   if (magic !== 'SNDJPOOL') throw new Error('bad pool magic');
+  if (bytes[8] !== 2) throw new Error('pool format v' + bytes[8]);
   const count = bytes[9];
   const entries = [];
   for (let i = 0; i < count; i++) {
     const e = 16 + i * 16;
     const name = String.fromCharCode(...bytes.slice(e, e + 8)).trimEnd();
-    const off = bytes[e + 8] | (bytes[e + 9] << 8);
-    const size = bytes[e + 10] | (bytes[e + 11] << 8);
+    const off = (bytes[e + 8] | (bytes[e + 9] << 8)) * 9;
+    const size = (bytes[e + 10] | (bytes[e + 11] << 8)) * 9;
     const loop = bytes[e + 12] | (bytes[e + 13] << 8);
     entries.push({
       name,
@@ -133,28 +151,39 @@ function poolParse(bytes) {
 }
 
 function poolBuild(entries) {
+  if (entries.length > POOL_MAX_ENTRIES) {
+    throw new Error('too many pool entries (max ' + POOL_MAX_ENTRIES + ')');
+  }
   const table = [];
-  const blobs = [];
-  let off = 16 + entries.length * 16;
+  const chunks = [];
+  const base = 16 + entries.length * 16;
+  const dataStart = Math.ceil(base / 9) * 9;
+  let off = dataStart;
   for (const e of entries) {
+    let pad = poolBankPad(off, e.brr.length);
+    if (pad) {
+      pad = Math.ceil(pad / 9) * 9;
+      chunks.push(new Uint8Array(pad).fill(0xFF));
+      off += pad;
+    }
     const name = (e.name || '').padEnd(8).slice(0, 8);
     const loop = e.loopBlock === null || e.loopBlock === undefined
       ? 0xFFFF : e.loopBlock;
+    const offB = off / 9, sizeB = e.brr.length / 9;
     table.push(...[...name].map(c => c.charCodeAt(0)),
-      off & 0xFF, off >> 8, e.brr.length & 0xFF, e.brr.length >> 8,
+      offB & 0xFF, offB >> 8, sizeB & 0xFF, sizeB >> 8,
       loop & 0xFF, loop >> 8, 0, 0);
-    blobs.push(e.brr);
+    chunks.push(e.brr);
     off += e.brr.length;
   }
   const head = [...'SNDJPOOL'].map(c => c.charCodeAt(0));
-  head.push(1, entries.length, 0, 0, 0, 0, 0, 0);
-  const total = head.length + table.length +
-    blobs.reduce((a, b) => a + b.length, 0);
-  const out = new Uint8Array(total);
+  head.push(2, entries.length, 0, 0, 0, 0, 0, 0);
+  const out = new Uint8Array(off);
+  out.fill(0xFF, base, dataStart);
   out.set(head, 0);
   out.set(table, 16);
-  let p = 16 + table.length;
-  for (const b of blobs) {
+  let p = dataStart;
+  for (const b of chunks) {
     out.set(b, p);
     p += b.length;
   }

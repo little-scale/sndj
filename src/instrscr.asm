@@ -275,6 +275,12 @@ if_nudge:
 @in_range:
 @store:
     jsr if_set_x
+    ; type or sample edits change which pool samples the song needs
+    lda if_cur
+    cmp #$02
+    bcs @no_res
+    jsr residency_build
+@no_res:
     rts
 
 instr_draw:

@@ -64,8 +64,18 @@ Reset:
     lda apu_status
     bne +
     jsr wave_sync_all       ; compile + upload the 8 wave banks
+    jsr residency_build     ; upload the samples this song references
     jsr apu_echo_apply      ; song echo defaults -> DSP (safe reconfig)
 +
+
+    ; per-voice instrument shadows start unknown so the first apply loads
+    ldx #$0000
+    lda #$FF
+-
+    sta.w trk_instr_active,x
+    inx
+    cpx #TRACKS
+    bne -
 
     ; editor defaults: first B tap inserts C-4 / instrument 0 / command A
     lda #49

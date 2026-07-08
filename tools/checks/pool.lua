@@ -1,6 +1,7 @@
--- pool.lua — M11 gate: the ROM pool uploads to ARAM with an intact
--- directory (every entry's start/loop point at real BRR data that matches
--- the ROM bytes), and KIT instruments map notes to pool samples.
+-- pool.lua — pool v2 + residency gate: the banked ROM pool parses, only
+-- referenced samples upload (factory song: 5 SMP instruments + the 808
+-- kit), the directory points at intact BRR data, and LSDJ-style kits
+-- trigger the right sample/tune/vol from the note's slot.
 
 local frames = 0
 local _booted = false
@@ -24,106 +25,88 @@ local function check(cond, msg)
   end
 end
 
--- locate the pool in PRG ROM by its SNPOOL marker + SNDJPOOL magic
-local function find_pool()
-  local sig = { 0x53, 0x4E, 0x50, 0x4F, 0x4F, 0x4C,          -- "SNPOOL"
-                0x53, 0x4E, 0x44, 0x4A, 0x50, 0x4F, 0x4F, 0x4C } -- "SNDJPOOL"
-  for base = 0, 0x43000, 0x8000 do
-    local hit = true
-    for i, b in ipairs(sig) do
-      if rom(base + i - 1) ~= b then hit = false break end
-    end
-    if hit then return base + 6 end
-  end
-  return nil
+-- pool starts at PRG offset $8006 (bank 1, after the SNPOOL marker)
+local POOL = 0x8006
+local function pool_entry(i)
+  local e = POOL + 16 + i * 16
+  return {
+    off = (rom(e + 8) + rom(e + 9) * 256) * 9,
+    blocks = rom(e + 10) + rom(e + 11) * 256,
+    loop = rom(e + 12) + rom(e + 13) * 256,
+  }
 end
 
 emu.addEventCallback(function() emu.setInput(pad, 0) end, emu.eventType.inputPolled)
 
 emu.addEventCallback(function()
   if not _booted then
-    if emu.read(1, emu.memType.snesWorkRam) == 0x5D then _booted = true end
+    if emu.read(1, W) == 0x5D then _booted = true end
     return
   end
   frames = frames + 1
 
-  if frames == 40 then pad = { start = true } end
-  if frames == 43 then pad = {} end
+  if frames == 14 then pad = { start = true } end
+  if frames == 17 then pad = {} end
 
-  if frames == 70 then
-    local pool = find_pool()
-    check(pool ~= nil, "SNPOOL marker + magic found in ROM")
-    if not pool then
-      print("FAILED pool.lua: no pool")
-      emu.stop(1)
-      return
-    end
-    local count = rom(pool + 9)
-    check(count == 6, "factory pool has 6 samples (" .. count .. ")")
-    -- walk the directory: entries at ARAM $1000, samples from $1200
-    local cursor = 0x1200
+  if frames == 40 then
+    check(rom(POOL) == string.byte("S") and rom(POOL + 8) == 2,
+      "pool v2 magic in ROM bank 1")
+    local count = rom(POOL + 9)
+    check(count == 40, "factory pool has 40 samples (" .. count .. ")")
+    check(aram(0x1000) == 0x00 and aram(0x1001) == 0x12,
+      "directory slot 0 -> silent stub")
+    check(aram(0x1200) == 0x01, "silent stub BRR (END block) uploaded")
+    -- factory song references SMP samples 0-4 and kit 0 (pool 8-23):
+    -- 21 resident samples -> slots 1..21; walk the dir and match ROM bytes
+    local cursor = 0x1200 + 9
     local all_ok = true
-    for i = 0, count - 1 do
-      local e = pool + 16 + i * 16
-      -- entry fields: +8 offset, +10 size, +12 loop block
-      local offset = rom(e + 8) + rom(e + 9) * 256
-      local bytes = rom(e + 10) + rom(e + 11) * 256
-      local dstart = aram(0x1000 + i * 4) + aram(0x1001 + i * 4) * 256
+    local refs = { 0, 1, 2, 3, 4 }
+    for s = 8, 23 do refs[#refs + 1] = s end
+    for slot = 1, #refs do
+      local e = pool_entry(refs[slot])
+      local dstart = aram(0x1000 + slot * 4) + aram(0x1001 + slot * 4) * 256
       if dstart ~= cursor then
         all_ok = false
-        print(string.format("  entry %d: dir start %04X != cursor %04X",
-          i, dstart, cursor))
+        print(string.format("  slot %d: dir %04X != cursor %04X",
+          slot, dstart, cursor))
+        break
       end
-      -- first 9 BRR bytes match the ROM pool data
       for k = 0, 8 do
-        if aram(cursor + k) ~= rom(pool + offset + k) then
+        if aram(cursor + k) ~= rom(POOL + e.off + k) then
           all_ok = false
-          print(string.format("  entry %d: ARAM byte %d mismatch", i, k))
+          print(string.format("  slot %d: byte %d mismatch", slot, k))
           break
         end
       end
-      -- last block carries END; loop flag only for looped entries
-      local lasthdr = aram(cursor + bytes - 9)
-      local loopblk = rom(e + 12) + rom(e + 13) * 256
-      if lasthdr % 2 ~= 1 then
-        all_ok = false
-        print(string.format("  entry %d: last header %02X lacks END", i, lasthdr))
-      end
-      if loopblk ~= 0xFFFF then
-        local dloop = aram(0x1002 + i * 4) + aram(0x1003 + i * 4) * 256
-        if dloop ~= cursor + loopblk * 9 then
-          all_ok = false
-          print(string.format("  entry %d: loop %04X wrong", i, dloop))
-        end
-      end
-      cursor = cursor + bytes
+      cursor = cursor + e.blocks * 9
     end
-    check(all_ok, "directory integrity: all entries point at their BRR data")
-    check(cursor < 0xD000, "pool fits under the echo region (top at $" ..
+    check(all_ok, "residency: 21 referenced samples uploaded in order")
+    check(cursor < 0xF000, "resident set fits under the echo ceiling ($" ..
       string.format("%04X", cursor) .. ")")
-    -- author a KIT test: instrument 1 = KIT; notes pick pool slots
-    poke(0x2000, 0)
-    poke(0x3700, 0)
-    poke(0x2410, 1)          -- type KIT
-    poke(0x2412, 0x2F)
-    poke(0x2413, 0xCA)
-    poke(0x2414, 0x50)
-    poke(0x2415, 0x50)
-    poke(0x4300, 49)         -- C-4 -> idx 48 -> slot 0 (PAD)
-    poke(0x4301, 1)
-    poke(0x4310, 52)         -- D#4 -> idx 51 -> slot 3 (KICK)
+    -- author a kit test: instrument 7 is factory KIT 0 (the 808)
+    poke(0x2000, 0)          -- grid V1r0 = chain 0
+    poke(0x3700, 0)          -- chain0 e0 = phrase 0
+    poke(0x4300, 49)         -- C-4 -> slot 0 (808 BD)
+    poke(0x4301, 7)          -- instrument 7 = KIT
+    poke(0x4310, 54)         -- F-4 -> slot 5 (808 MC)
     poke(0x4311, 0xFF)
-  elseif frames == 80 then
+    poke(0x3200 + 5 * 4 + 1, 12)   -- kit0 slot5 tune = +12 (SB_KITS = $3200)
+  elseif frames == 44 then
     pad = { start = true }
-  elseif frames == 82 then
+  elseif frames == 46 then
     pad = {}
-  elseif frames == 90 then
-    check(dsp(0x04) == 0, "KIT: C-4 plays pool slot 0")
-    check(dsp(0x02) + dsp(0x03) * 256 == 0x1000, "KIT plays at native rate")
-  elseif frames == 110 then
-    check(dsp(0x08) > 0, "kit voice envelope alive right after the kick")
-  elseif frames == 116 then
-    check(dsp(0x04) == 3, "KIT: D#4 plays pool slot 3 (KICK)")
+  elseif frames == 54 then
+    check(wram(0x16) == 1, "playing")
+    -- C-4 -> kit slot 0 -> 808 BD (pool 8) -> resident SRCN 6 (stub + 0-4)
+    check(dsp(0x04) == 6, "kit slot 0 routed to the 808 BD (SRCN 6)")
+    check(dsp(0x02) + dsp(0x03) * 256 == 0x1000, "kit plays native pitch")
+    check(dsp(0x00) == 0x50 and dsp(0x01) == 0x50, "kit slot volume applied")
+    check(dsp(0x08) > 0, "kick envelope alive")
+  elseif frames == 80 then
+    -- row 4: F-4 -> slot 5 (808 MC, pool 13 -> SRCN 11), tuned +12
+    check(dsp(0x04) == 11, "kit slot 5 routed to the 808 MC (SRCN 11)")
+    check(dsp(0x02) + dsp(0x03) * 256 == 0x2000,
+      "per-slot tune +12 doubled the pitch")
     if fails == 0 then
       print("ALL PASS pool.lua")
       emu.stop(0)

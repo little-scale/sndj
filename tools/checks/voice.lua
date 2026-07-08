@@ -71,9 +71,8 @@ local function onFrame()
     check(aram(0x1000) == 0x00 and aram(0x1001) == 0x12 and
           aram(0x1002) == 0x00 and aram(0x1003) == 0x12,
           "sample directory uploaded to ARAM $1000")
-    -- BRR block 0: filter 0 forced, loop sample -> header nibble check +
-    -- END+LOOP flags on the last of 8 blocks
-    check(aram(0x1200 + 63 * 1) ~= nil and (aram(0x1200 + 7 * 9) & 0x03) == 0x03,
+    -- resident sample 1 (SF2 00, 92 blocks at $1209): END+LOOP on the last
+    check((aram(0x1209 + 91 * 9) & 0x03) == 0x03,
           "BRR sample in ARAM with END+LOOP flags")
     check(wram(0x0015) == 0, "no KONs yet")
   elseif frames == 68 then

@@ -63,11 +63,11 @@ emu.addEventCallback(function()
     -- boot state: compiled banks + directory entries
     check(aram(0x1100) == 0xB0, "bank 0 BRR block 0 header (range 11)")
     check(aram(0x1109) == 0xB3, "bank 0 BRR block 1 header (END+LOOP)")
-    check(aram(0x1080) == 0x00 and aram(0x1081) == 0x11 and
-          aram(0x1082) == 0x00 and aram(0x1083) == 0x11,
-          "directory entry 32 -> wave slot 0")
-    check(aram(0x1084) == 0x12 and aram(0x1085) == 0x11,
-          "directory entry 33 -> wave slot 1 ($1112)")
+    check(aram(0x10E0) == 0x00 and aram(0x10E1) == 0x11 and
+          aram(0x10E2) == 0x00 and aram(0x10E3) == 0x11,
+          "directory entry 56 -> wave slot 0")
+    check(aram(0x10E4) == 0x12 and aram(0x10E5) == 0x11,
+          "directory entry 57 -> wave slot 1 ($1112)")
     -- author the test song: WAV instrument 1 (bank 1), NSE instrument 2
     poke(0x2000, 0)
     poke(0x3700, 0)
@@ -95,12 +95,12 @@ emu.addEventCallback(function()
     poke(0x4330, 49)
     poke(0x4331, 1)
   elseif frames == play + 8 then
-    check(dsp(0x04) == 33, "WAV instrument routes SRCN to wave slot 33")
+    check(dsp(0x04) == 57, "WAV instrument routes SRCN to wave slot 57")
     check(dsp(0x02) + dsp(0x03) * 256 == 0x0200,
       "WAV pitch dropped 2 octaves ($0200 for C-4)")
     check(dsp(0x3D) == 0, "no noise yet")
   elseif frames == play + 32 then
-    check(dsp(0x04) == 34, "B02 wave-sequenced to bank 2 (SRCN 34)")
+    check(dsp(0x04) == 58, "B02 wave-sequenced to bank 2 (SRCN 58)")
   elseif frames == play + 56 then
     check(dsp(0x3D) == 0x01, "NSE set the voice's NON bit")
     check(dsp(0x6C) % 32 == 23, "noise clock follows the note (G-4 -> 23)")

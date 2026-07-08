@@ -186,8 +186,9 @@ emu.addEventCallback(function()
     check(ok, "load restored a byte-identical song block" ..
       (ok and "" or (" (first diff at $" .. string.format("%04X", at) .. ")")))
     emu.reset()
-    stage = "rebooting"
-    t0 = frames + 30
+    _booted = false          -- re-arm the boot gate; frames pause until
+    stage = "rebooting"      -- the reboot completes
+    t0 = frames + 10
   elseif stage == "rebooting" and frames == t0 then
     pad = { start = true }
     stage = "reboot_song"

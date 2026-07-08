@@ -46,6 +46,7 @@
 .INCLUDE "wave.asm"
 .INCLUDE "wavescr.asm"
 .INCLUDE "livescr.asm"
+.INCLUDE "kitscr.asm"
 .INCLUDE "splash.asm"
 
 ; --- main loop ---------------------------------------------------------------
@@ -114,6 +115,19 @@ pal_data:
 gradient_data:
     .INCBIN "gradient.bin"
 
+; 8 factory FIR curves x 8 taps, marker-wrapped so firdesign.html patches
+; the ROM instead of rebuilding it
+    .DB "SNFIR0"
+fir_presets:
+    .DB $7F, $00, $00, $00, $00, $00, $00, $00   ; 0 FLAT (pass-through)
+    .DB $58, $30, $12, $08, $00, $00, $00, $00   ; 1 DARK (lowpass hall)
+    .DB $70, $E8, $18, $F4, $00, $00, $00, $00   ; 2 BRIGHT (presence)
+    .DB $40, $00, $00, $40, $00, $00, $00, $00   ; 3 COMB
+    .DB $20, $30, $40, $30, $20, $10, $08, $04   ; 4 SOFT (smeared)
+    .DB $4C, $21, $12, $09, $05, $03, $02, $01   ; 5 DKC HALL (decay tail)
+    .DB $60, $A0, $40, $D0, $20, $E8, $10, $F8   ; 6 METAL (alternating)
+    .DB $7F, $00, $00, $00, $00, $00, $00, $00   ; 7 USER (starts flat)
+
 ; SPC700 driver blob, uploaded via the IPL protocol at boot
 driver_blob:
     .INCBIN "driver.spc700.bin"
@@ -138,6 +152,12 @@ pool_data:
 .BANK 3 SLOT 0
 .ORG $0000
     .INCBIN "pool.bin" SKIP $FFFA READ $8000
+.BANK 4 SLOT 0
+.ORG $0000
+    .INCBIN "pool.bin" SKIP $17FFA READ $8000
+.BANK 5 SLOT 0
+.ORG $0000
+    .INCBIN "pool.bin" SKIP $1FFFA READ $8000
 
 .BANK 0 SLOT 0
 ; --- internal header (hand-rolled; checksum fixed by tools/fixsum.py) --------

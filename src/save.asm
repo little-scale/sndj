@@ -649,6 +649,7 @@ load_slot:
     jsr rle_unpack
     jsr stage_in
     jsr wave_sync_all       ; the loaded song's waves come back with it
+    jsr residency_build     ; ...its resident sample set
     jsr apu_echo_apply      ; ...and its room (long sequence last)
     lda #SV_OK
     rts

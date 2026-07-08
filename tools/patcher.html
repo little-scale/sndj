@@ -48,7 +48,7 @@ audition the decoded BRR, and export a patched ROM. Everything runs locally.</p>
 <script>
 'use strict';
 const S = window.SNDJ;
-const RESERVED = 0x4000;
+const RESERVED = 0x27FFA;
 let rom = null, poolOff = -1, entries = [], replacing = -1, romName = 'snesdj.sfc';
 
 const $ = id => document.getElementById(id);

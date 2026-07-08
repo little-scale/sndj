@@ -1,137 +1,224 @@
-; pool.asm — parse the self-describing ROM sample pool, upload every BRR to
-; ARAM (sequential from ARAM_SAMPLES), and build the directory entries.
-; Songs will reference by name+hash later (M15); the runtime uses indices.
+; pool.asm — the ROM sample pool (format v2) and per-song residency.
+;
+; The pool spans ROM banks 1-5; entry offsets/sizes are in 9-byte BRR
+; blocks and no sample crosses a bank boundary (the builder pads), so a
+; sample's data is addressable with one bank byte + 16-bit maths.
+;
+; Residency (CLAUDE.md §14.2): only the samples a song references are
+; uploaded. residency_build scans instruments (SMP sample fields) and
+; kits (slots with vol > 0), assigns ARAM directory slots 1..55 in
+; first-seen order, uploads each sample, and fills pool_map[pool idx] ->
+; SRCN. Slot 0 is a permanently-resident silent stub, and unreferenced /
+; over-budget samples map to it. Waves own directory slots 56-63.
 
 .ACCU 8
 .INDEX 16
 
-; carry set on failure
-pool_upload:
-    ; sanity: entry count
-    lda.l pool_data + 9
-    beq @bad_near
-    cmp #33
-    bcc @count_ok
-@bad_near:
-    sec
-    rts
-@count_ok:
-    sta pool_count
-    ; ARAM write cursor
-    ldx #ARAM_SAMPLES
-    stx es3
-    stz es2                 ; entry index
-@entry:
-    ; table entry address -> X (pool_data + 16 + i*16)
-    lda es2
+.DEFINE POOL_TABLE   (POOL_ROM + 16)
+.DEFINE DIR_SLOT_MAX 56           ; sample slots 0-55 (0 = silence)
+
+; A = pool entry index -> sets up_src (24-bit) + up_len for its BRR data;
+; also leaves the entry's loop block in es2 (16-bit; $FFFF one-shot).
+pool_entry_src:
     rep #$30
 .ACCU 16
     and #$00FF
     asl
     asl
     asl
-    asl
-    clc
-    adc #$0010              ; table starts at +16
-    tax                     ; X = entry offset within the pool image
+    asl                     ; * 16
+    tax
     sep #$20
 .ACCU 8
-    lda #:pool_data
-    sta up_src + 2
-    ; up_src = pool_data + entry.offset ; up_len = entry.size (mult of 9)
+    ; linear byte offset F = entry.offset_blocks * 9 + 6 (marker skip)
     rep #$30
 .ACCU 16
-    lda.l pool_data + 8,x   ; BRR offset within the pool image
-    clc
-    adc #pool_data
-    sta up_src
-    lda.l pool_data + 10,x  ; BRR byte length
-    sta up_len
-    lda es3
-    sta up_dest
-    sep #$20
-.ACCU 8
-    ; directory entry i in str_buf: start, loop (start + loopblk*9)
-    phx
-    lda es2
-    rep #$30
-.ACCU 16
-    and #$00FF
-    asl
-    asl
-    clc
-    adc #str_buf
-    tay                     ; dir entry dest in str_buf
-    lda es3
-    sta.w $0000,y           ; start (16-bit store writes lo+hi)
-    sep #$20
-.ACCU 8
-    plx
-    ; loop address
-    rep #$30
-.ACCU 16
-    lda.l pool_data + 12,x  ; loop block ($FFFF = one-shot)
-    cmp #$FFFF
-    beq @oneshot
-    ; loop addr = start + loop*9
+    lda.l POOL_TABLE + 8,x  ; offset in blocks (POOL_ROM is a constant)
     sta es0
-    asl
-    asl
-    asl                     ; *8
-    clc
-    adc es0                 ; *9
-    clc
-    adc es3
-    bra @loop_set
-@oneshot:
-    lda es3                 ; loop = start (never taken without the flag)
-@loop_set:
-    sta es1                 ; hold the loop address
-    ; advance the ARAM cursor
-    lda es3
-    clc
-    adc up_len
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr                     ; blocks >> 13 = bits of blocks*8 above 16
     sta es3
+    lda es0
+    asl
+    asl
+    asl                     ; blocks * 8 (low 16)
+    clc
+    adc es0                 ; * 9
+    sta es1
+    lda es3
+    adc #$0000              ; carry from the *9 add
+    sta es3
+    lda es1
+    clc
+    adc #$0006              ; skip the SNPOOL marker
+    sta es1
+    lda es3
+    adc #$0000
+    sta es3                 ; F = es3:es1 (17-bit)
+    ; bank = $81 + (F >> 15); addr = $8000 | (F & $7FFF)
+    lda es1
+    and #$7FFF
+    ora #$8000
+    sta up_src
+    lda es1
+    xba
+    and #$00FF
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr                     ; (F_lo >> 15)
+    sta es0
+    lda es3
+    asl                     ; F bit 16 counts double in bank steps
+    clc
+    adc es0
+    clc
+    adc #$0081
     sep #$20
 .ACCU 8
-    ; write loop into the dir entry (+2)
-    lda es2
+    sta up_src + 2
+    ; length in bytes = blocks * 9 (entries stay comfortably under 32 KB)
     rep #$30
 .ACCU 16
-    and #$00FF
+    lda.l POOL_TABLE + 10,x
+    sta es0
+    asl
     asl
     asl
     clc
-    adc #(str_buf + 2)
-    tay
-    lda es1
-    sta.w $0000,y
+    adc es0
+    sta up_len
+    lda.l POOL_TABLE + 12,x ; loop block
+    sta es2
     sep #$20
 .ACCU 8
-    ; upload this sample
-    jsr apu_upload_block
-    bcc @up_ok
+    rts
+
+; --- rebuild the resident sample set from the song ------------------------------
+; Carry set on mailbox failure.
+residency_build:
+    lda.l POOL_ROM + 8
+    cmp #$02
+    beq @v_ok
     sec
     rts
-@up_ok:
-    inc es2
-    lda es2
-    cmp pool_count
-    beq @entries_done
-    jmp @entry
-@entries_done:
-    ; upload the directory (count*4, padded to a multiple of 3)
-    lda pool_count
+@v_ok:
+    lda.l POOL_ROM + 9
+    sta pool_count
+    ; clear the map (all samples -> silence)
+    ldx #$0000
+    lda #$00
+@clr:
+    sta.w pool_map,x
+    inx
+    cpx #$0040
+    bne @clr
+    ; slot 0: the silent stub, always resident at ARAM_SAMPLES
+    ldx #silent_brr
+    stx up_src
+    lda #:silent_brr
+    sta up_src + 2
+    ldx #ARAM_SAMPLES
+    stx up_dest
+    ldx #$0009
+    stx up_len
+    jsr apu_upload_block
+    bcc @stub_ok
+    rts
+@stub_ok:
+    lda #<ARAM_SAMPLES
+    sta.w str_buf
+    sta.w str_buf + 2
+    lda #>ARAM_SAMPLES
+    sta.w str_buf + 1
+    sta.w str_buf + 3
+    rep #$30
+.ACCU 16
+    lda #(ARAM_SAMPLES + 9)
+    sta res_cursor
+    sep #$20
+.ACCU 8
+    lda #$01
+    sta res_slot
+    ; ARAM ceiling: below the echo buffer (ESA page = $100 - 8*EDL)
+    lda.l $7E0000 + SB_HEADER + SH_EDL
+    and #$0F
+    asl
+    asl
+    asl
+    eor #$FF
+    inc a
+    bne @ceil_ok
+    lda #$FF
+@ceil_ok:
+    sta res_ceil
+    ; scan instruments: SMP (type 0) sample fields
+    stz res_scan
+@instr:
+    lda res_scan
     rep #$30
 .ACCU 16
     and #$00FF
     asl
-    asl                     ; bytes
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR,x
+    and #$03
+    bne @not_smp
+    lda.l $7E0000 + SB_INSTR + 1,x
+    jsr res_mark
+@not_smp:
+    inc res_scan
+    lda res_scan
+    cmp #INSTR_COUNT
+    bne @instr
+    ; scan kits: every slot with vol > 0
+    stz res_scan
+@kit_slot:
+    lda res_scan
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl                     ; * 4 (slot record)
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_KITS + 2,x   ; vol
+    beq @kit_next
+    lda.l $7E0000 + SB_KITS,x       ; sample
+    jsr res_mark
+@kit_next:
+    inc res_scan            ; 256 slots: loop until the counter wraps
+    lda res_scan
+    bne @kit_slot
+    ; upload the directory (sample slots only; waves live at 56-63)
+    lda res_slot
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
 @pad3:
-    ; round up to /3: while (n % 3) n++
     sta es0
-    ; n mod 3 via subtraction
-    lda es0
 @mod3:
     cmp #$0003
     bcc @mod_done
@@ -155,10 +242,106 @@ pool_upload:
 .ACCU 8
     lda #$7E
     sta up_src + 2
-    jsr apu_upload_block
-    bcs @bad
+    jmp apu_upload_block
+
+; --- mark pool sample A as needed: assign a slot + upload if new -----------------
+res_mark:
+    cmp pool_count
+    bcs @done               ; out of range: stays mapped to silence
+    sta res_cur
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w pool_map,x
+    beq @new
+@done:
+    rts
+@new:
+    lda res_slot
+    cmp #DIR_SLOT_MAX
+    bcs @done               ; directory full: silence
+    phx
+    lda res_cur
+    jsr pool_entry_src      ; up_src/up_len + es2 (loop block)
+    ; budget: end page must stay under the echo ceiling (a 16-bit carry
+    ; here means we wrapped ARAM entirely — definitely over)
+    rep #$30
+.ACCU 16
+    lda res_cursor
     clc
+    adc up_len
+    bcs @over16
+    xba
+    and #$00FF
+    sta es0
+    sep #$20
+.ACCU 8
+    lda es0
+    cmp res_ceil
+    bcc @fits
+    plx
+    rts                     ; over budget: silence
+@over16:
+.ACCU 16
+    sep #$20
+.ACCU 8
+    plx
     rts
-@bad:
-    sec
+@fits:
+    rep #$30
+.ACCU 16
+    lda res_cursor
+    sta up_dest
+    sep #$20
+.ACCU 8
+    ; dir entry: start + loop (start + loopblock*9; one-shot -> start)
+    lda res_slot
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    clc
+    adc #str_buf
+    tay
+    lda res_cursor
+    sta.w $0000,y
+    ldx es2
+    cpx #$FFFF
+    beq @oneshot
+    lda es2
+    asl
+    asl
+    asl
+    clc
+    adc es2
+    clc
+    adc res_cursor
+    bra @loop_set
+@oneshot:
+    lda res_cursor
+@loop_set:
+    sta.w $0002,y
+    lda res_cursor
+    clc
+    adc up_len
+    sta res_cursor
+    sep #$20
+.ACCU 8
+    jsr apu_upload_block
+    bcs @up_fail
+    plx
+    lda res_slot
+    sta.w pool_map,x
+    inc res_slot
     rts
+@up_fail:
+    plx
+    rts
+
+; one silent BRR block (END, no loop)
+silent_brr:
+    .DB $01, $00, $00, $00, $00, $00, $00, $00, $00

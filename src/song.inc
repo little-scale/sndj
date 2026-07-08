@@ -67,6 +67,10 @@
 .DEFINE CMD_NONE      0
 
 ; ROM pool reservation (patcher.html may grow the pool up to this; the
-; pool spans ROM banks — entry offsets/sizes are in 9-byte BRR blocks)
-.DEFINE POOL_RESERVED $17FFA           ; banks 1-3 minus the SNPOOL marker
-.DEFINE POOL_BANKS    3
+; pool spans ROM banks 1-5 — entry offsets/sizes are in 9-byte BRR blocks).
+; POOL_ROM is a NUMERIC constant (fixed by main.asm's bank-1 layout)
+; because WLA drops the bank byte on cross-bank label expressions in
+; long-indexed operands.
+.DEFINE POOL_RESERVED $27FFA           ; banks 1-5 minus the SNPOOL marker
+.DEFINE POOL_BANKS    5
+.DEFINE POOL_ROM      $818006

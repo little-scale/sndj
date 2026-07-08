@@ -191,13 +191,9 @@ apu_upload_block:
     rts
 
 ; --- one-time audio setup after driver upload ---------------------------------
-; Parses the ROM pool, uploads every sample to ARAM, builds the directory,
-; then configures the DSP and all 8 voices.
+; Configures the DSP and all 8 voices (sample uploads happen via
+; residency_build once the song block exists).
 apu_audio_init:
-    jsr pool_upload
-    bcc +
-    jmp @fail
-+
     ; global DSP state
     lda #DSP_DIR
     ldy #(ARAM_DIR >> 8)
@@ -351,17 +347,6 @@ apu_fir_preset:
     bne @tap
     rts
 
-; 8 factory FIR curves x 8 taps (signed bytes; tap0-dominant = dry-ish)
-fir_presets:
-    .DB $7F, $00, $00, $00, $00, $00, $00, $00   ; 0 FLAT (pass-through)
-    .DB $58, $30, $12, $08, $00, $00, $00, $00   ; 1 DARK (lowpass hall)
-    .DB $70, $E8, $18, $F4, $00, $00, $00, $00   ; 2 BRIGHT (presence)
-    .DB $40, $00, $00, $40, $00, $00, $00, $00   ; 3 COMB
-    .DB $20, $30, $40, $30, $20, $10, $08, $04   ; 4 SOFT (smeared)
-    .DB $4C, $21, $12, $09, $05, $03, $02, $01   ; 5 DKC HALL (decay tail)
-    .DB $60, $A0, $40, $D0, $20, $E8, $10, $F8   ; 6 METAL (alternating)
-    .DB $7F, $00, $00, $00, $00, $00, $00, $00   ; 7 USER (starts flat)
-
 ; --- T command: set the engine tick rate from a BPM value ---------------------
 ; tick Hz = BPM * 0.4 (groove 6 = 4 rows/beat); Timer-0 target = 20000/BPM.
 ; Range 80-255 BPM (slower tempos come from longer grooves).
@@ -492,14 +477,26 @@ apply_instrument:
     lda.l $7E0000 + SB_INSTR,x
     and #$03
     sta trig_type
-    cmp #$02                ; WAV: SRCN = 32 + bank
+    cmp #$02                ; WAV: SRCN = 56 + bank
     bne @not_wav
     lda.l $7E0000 + SB_INSTR + 1,x
     and #$07
-    ora #$20
+    clc
+    adc #56
     bra @srcn
 @not_wav:
+    ; SMP/NSE: the sample field is a POOL index -> resident SRCN
     lda.l $7E0000 + SB_INSTR + 1,x
+    and #$3F
+    phx
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w pool_map,x
+    plx
 @srcn:
     tay
     lda trig_voice
@@ -595,15 +592,22 @@ apply_instrument:
 ; --- audition: immediate note on voice 0 (editor insert/nudge) ----------------
 ; Uses the last-inserted instrument so what you hear is what the row plays.
 audition_note:
-    pha
+    sta trig_note
     stz trig_voice
     lda ed_lastinstr
     cmp #INSTR_NONE
     beq @no_instr
     jsr apply_instrument
+    lda trig_type
+    cmp #$01
+    bne @no_instr
+    jsr kit_trigger         ; kit instruments audition the note's slot
+    bcs @kon
+    rts                     ; empty slot: silence
 @no_instr:
-    pla
+    lda trig_note
     jsr note_pitch
+@kon:
     lda #DSP_KON
     ldy #$0001
     jsr apu_dsp_write

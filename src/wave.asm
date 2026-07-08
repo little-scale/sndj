@@ -9,7 +9,7 @@
 
 .DEFINE WAVE_SLOT0   $1100      ; ARAM scratch (18 bytes per bank)
 .DEFINE WAVE_SLOT_SZ 18
-.DEFINE WAVE_SRCN0   32
+.DEFINE WAVE_SRCN0   56
 .DEFINE WAVE_DIR     (ARAM_DIR + WAVE_SRCN0 * 4)
 .DEFINE BRR_RANGE    11         ; nibble -8..7 -> +/-8192 (filter 0)
 
@@ -116,16 +116,11 @@ wave_compile:
     jmp apu_upload_block
 
 ; --- compile + upload all 8 banks (boot / song load) ----------------------------
+; The directory goes FIRST: its 33-byte (3-padded) upload ends exactly on
+; $1100, and bank 0's compile must overwrite that pad byte, not lose its
+; BRR header to it.
 wave_sync_all:
-    stz sv_slot             ; bank loop counter (wave_compile eats es0-es3)
-@bank:
-    lda sv_slot
-    jsr wave_compile
-    inc sv_slot
-    lda sv_slot
-    cmp #$08
-    bne @bank
-    ; directory entries 32-39 -> the scratch slots (start = loop)
+    ; directory entries 56-63 -> the scratch slots (start = loop)
     stz es0                 ; bank
 @dir:
     lda es0
@@ -174,4 +169,14 @@ wave_sync_all:
     stx up_dest
     ldx #33
     stx up_len
-    jmp apu_upload_block
+    jsr apu_upload_block
+    ; now the banks (bank 0 restores the byte the dir pad touched)
+    stz sv_slot             ; bank loop counter (wave_compile eats es0-es3)
+@bank:
+    lda sv_slot
+    jsr wave_compile
+    inc sv_slot
+    lda sv_slot
+    cmp #$08
+    bne @bank
+    rts

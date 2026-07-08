@@ -113,7 +113,8 @@ emu.addEventCallback(function()
     check(p2 == 0x0BFC, "voice 2 = G-4 ($" .. string.format("%04X", p2) .. ")")
     check(dsp(0x08) > 0 and dsp(0x18) > 0 and dsp(0x28) > 0,
       "three envelopes alive")
-    check(dsp(0x14) == 0 and dsp(0x24) == 0, "GRP members use the sample")
+    check(dsp(0x04) == 1 and dsp(0x14) == 1 and dsp(0x24) == 1,
+      "GRP members use the resident sample (SRCN 1)")
   elseif frames == done then
     if fails == 0 then
       print("ALL PASS instr.lua")

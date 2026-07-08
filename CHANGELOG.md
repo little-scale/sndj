@@ -11,6 +11,18 @@
   IPL protocol; flip-bit mailbox with timeouts everywhere; SCB register
   writes land in the DSP; APU tick telemetry on port 3; a dead APU shows an
   `APU?` warning instead of hanging.
+- **Kits, residency & game-authentic factory content.** LSDJ-style kits:
+  16 kits x 16 slots (sample + signed tune + volume), notes pick slots
+  chromatically; KIT screen (A+Right from WAVE) with per-slot audition;
+  factory kits 0/1 = the 808 and 909 from samples/. Pool format v2:
+  block-addressed offsets spanning ROM banks 1-5 (up to 160 KB), factory
+  pool = 8 SSF2 melodics + 32 drums. Per-song sample residency: only the
+  samples a song references upload to ARAM (scanned from instruments +
+  kit slots, echo-aware budget, silent-stub fallback); sample-field edits
+  re-upload live. H now hops immediately (the H row plays the next
+  phrase's row 0, so phrases shorten cleanly). FIR presets are
+  marker-wrapped (SNFIR0) for browser patching. NEW seeds instruments
+  0-7 (5 samples, wave, noise, kit) matching the planned MIDI defaults.
 - **M13 — LIVE mode.** The clip launcher: Select toggles LIVE from any
   screen; B queues the cursor cell's chain on its track and it launches
   exactly at that track's next phrase boundary (quantised — verified to

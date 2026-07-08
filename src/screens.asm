@@ -19,6 +19,7 @@
 .DEFINE SCREEN_ECHO   6
 .DEFINE SCREEN_WAVE   7
 .DEFINE SCREEN_LIVE   8
+.DEFINE SCREEN_KIT    9
 
 ; called every frame from the main loop
 screen_update:
@@ -56,6 +57,8 @@ screen_update:
     beq @wave
     cmp #SCREEN_LIVE
     beq @live
+    cmp #SCREEN_KIT
+    beq @kit
     jmp song_update
 @phrase:
     jmp phrase_update
@@ -67,6 +70,8 @@ screen_update:
     jmp wave_update
 @live:
     jmp live_update
+@kit:
+    jmp kit_update
 @chain:
     jmp chain_update
 @instr:
@@ -179,6 +184,16 @@ nav_update:
     beq @to_phrase
     cmp #SCREEN_PHRASE
     beq @to_instr
+    cmp #SCREEN_WAVE
+    bne @no_right
+    jsr kit_init
+    rep #$20
+.ACCU 16
+    lda #$0000
+    sta pad_event
+    sep #$20
+.ACCU 8
+@no_right:
     rts
 @to_instr:
     ; instrument under the phrase cursor row, else the insert default
@@ -247,6 +262,16 @@ nav_update:
     beq @to_song
     cmp #SCREEN_INSTR
     beq @to_phrase2
+    cmp #SCREEN_KIT
+    bne @no_left
+    jsr wave_init
+    rep #$20
+.ACCU 16
+    lda #$0000
+    sta pad_event
+    sep #$20
+.ACCU 8
+@no_left:
     rts
 @to_phrase2:
     jsr phrase_init
