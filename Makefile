@@ -36,7 +36,7 @@ $(BUILD):
 $(BUILD)/font.bin: tools/makefont.py | $(BUILD)
 	python3 tools/makefont.py $@
 
-$(BUILD)/pal.bin $(BUILD)/gradient.bin $(BUILD)/tables.inc: tools/maketables.py | $(BUILD)
+$(BUILD)/schemes.bin $(BUILD)/tables.inc: tools/maketables.py | $(BUILD)
 	python3 tools/maketables.py $(BUILD)
 
 $(BUILD)/pool.bin: tools/sndj_pool.py tools/sndj_brr.py | $(BUILD)
@@ -50,7 +50,7 @@ $(BUILD)/driver.spc700.bin: $(BUILD)/driver.o
 	@printf '[objects]\n%s\n' "$(BUILD)/driver.o" > $(BUILD)/linkfile-apu
 	$(WLALINK) -S $(BUILD)/linkfile-apu $@
 
-$(BUILD)/main.o: $(SRCS) $(BUILD)/buildid.inc $(BUILD)/font.bin $(BUILD)/pal.bin $(BUILD)/gradient.bin $(BUILD)/tables.inc $(BUILD)/pool.bin $(BUILD)/driver.spc700.bin
+$(BUILD)/main.o: $(SRCS) $(BUILD)/buildid.inc $(BUILD)/font.bin $(BUILD)/schemes.bin $(BUILD)/tables.inc $(BUILD)/pool.bin $(BUILD)/driver.spc700.bin
 	$(WLA65816) -I src -I $(BUILD) -o $@ src/main.asm
 
 $(BUILD)/linkfile: | $(BUILD)

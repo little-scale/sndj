@@ -20,6 +20,7 @@
 .DEFINE SCREEN_WAVE   7
 .DEFINE SCREEN_LIVE   8
 .DEFINE SCREEN_KIT    9
+.DEFINE SCREEN_OPTIONS 10
 
 ; called every frame from the main loop
 screen_update:
@@ -60,6 +61,8 @@ screen_update:
     beq @live
     cmp #SCREEN_KIT
     beq @kit
+    cmp #SCREEN_OPTIONS
+    beq @options
     jmp song_update
 @phrase:
     jmp phrase_update
@@ -73,6 +76,8 @@ screen_update:
     jmp live_update
 @kit:
     jmp kit_update
+@options:
+    jmp options_update
 @chain:
     jmp chain_update
 @instr:
@@ -131,6 +136,11 @@ nav_update:
     jsr files_init
     bra @eat_far
 @down_not_song:
+    cmp #SCREEN_OPTIONS
+    bne @down_not_opt
+    jsr song_init_screen
+    bra @eat_far
+@down_not_opt:
     cmp #SCREEN_INSTR
     bne @down_not_instr
     jsr echo_init
@@ -160,8 +170,13 @@ nav_update:
     bra @eat_far
 @up_not_echo:
     cmp #SCREEN_INSTR
-    bne @not_up
+    bne @up_not_instr
     jsr wave_init
+    bra @eat_far
+@up_not_instr:
+    cmp #SCREEN_SONG
+    bne @not_up
+    jsr options_init
 @eat_far:
     rep #$20
 .ACCU 16
@@ -476,5 +491,9 @@ screen_reopen:
     cmp #SCREEN_WAVE
     bne +
     jmp wave_init
++
+    cmp #SCREEN_OPTIONS
+    bne +
+    jmp options_init
 +
     jmp song_init_screen

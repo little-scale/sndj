@@ -42,6 +42,19 @@ Vec_NMI:
     lda #$01
     sta MDMAEN
 
+    ; --- palette: drain pal_buf into CGRAM when a scheme was applied ---
+    lda pal_dirty
+    beq @no_pal
+    stz CGADD
+    ldx #$0000
+@pal:
+    lda.w pal_buf,x
+    sta CGDATA
+    inx
+    cpx #$0020
+    bne @pal
+    stz pal_dirty
+@no_pal:
     ; --- pads: wait for auto-read completion, then latch raw state ---
 @joywait:
     lda HVBJOY

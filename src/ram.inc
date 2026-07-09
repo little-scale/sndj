@@ -168,6 +168,22 @@ fl_mitem     db      ; menu cursor (0 save, 1 load, 2 clear)
 fl_ncur      db      ; name-edit character cursor 0-7
 tick_ctr     dw      ; free-running 16-bit APU tick counter (top-right)
 tick_last8   db      ; last apu_tick byte folded into tick_ctr
+opt_pal      db      ; active palette scheme 0-7 (persists in SRAM $0007)
+pal_dirty    db      ; pal_buf awaits its VBlank CGRAM write
+pal_buf      ds 32   ; CGRAM colours 0-15, drained by the NMI
+gr_top       dw      ; gradient endpoints + lerp state (apply-time scratch)
+gr_bot       dw
+gr_racc      dw
+gr_gacc      dw
+gr_bacc      dw
+gr_rstep     dw
+gr_gstep     dw
+gr_bstep     dw
+gr_tmp       dw
+gr_tmp2      dw
+opt_cur      db      ; OPTIONS field cursor
+res_dir      ds 224  ; ARAM directory staging (56 slots x 4; NEVER str_buf —
+                     ; 40 resident samples overflowed it and smashed vars)
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

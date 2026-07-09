@@ -188,20 +188,8 @@ init_video:
     lda #$01
     sta MDMAEN
 
-    ; palette
-    stz CGADD
-    lda #$00                ; linear source, 1 byte -> 1 reg
-    sta DMAP0
-    lda #$22                ; -> $2122 CGDATA
-    sta BBAD0
-    ldx #pal_data
-    stx A1T0L
-    lda #:pal_data
-    sta A1B0
-    ldx #512
-    stx DAS0L
-    lda #$01
-    sta MDMAEN
+    ; palette: build CGRAM + the gradient from the persisted scheme
+    jsr palette_boot
 
     ; font -> BG3 chr
     ldx #VRAM_BG3_CHR
@@ -229,14 +217,15 @@ init_video:
     lda #$04                ; BG3 only for now
     sta TM
 
-    ; HDMA channel 7: backdrop gradient (mode 3 -> $2121)
+    ; HDMA channel 7: backdrop gradient (mode 3 -> $2121), table in WRAM
+    ; so palette_apply can regenerate it at run time
     lda #$03
     sta DMAP7
     lda #$21
     sta BBAD7
-    ldx #gradient_data
+    ldx #GRAD_TAB
     stx A1T7L
-    lda #:gradient_data
+    lda #$7E
     sta A1B7
     lda #$80
     sta HDMAEN

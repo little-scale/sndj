@@ -47,6 +47,8 @@
 .INCLUDE "wavescr.asm"
 .INCLUDE "livescr.asm"
 .INCLUDE "kitscr.asm"
+.INCLUDE "optionscr.asm"
+.INCLUDE "palette.asm"
 .INCLUDE "splash.asm"
 
 ; --- main loop ---------------------------------------------------------------
@@ -161,10 +163,10 @@ str_stop:    .DB "STOP", 0
 ;   [S][C][P][I][T]      SONG    CHAIN  PHRASE INSTR TABLE
 ;   [F][G][ ][E][F]      FILES   GROOVE   -   ECHO  FIR
 minimap_chars: .DB "OP WKSCPITFG EF"
-minimap_impl:  .DB 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 0
+minimap_impl:  .DB 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 0
 ; ui_mode -> minimap cell index ($FF = no highlight; LIVE is a mode of
 ; SONG so it highlights S)
-minimap_pos:   .DB $FF, 7, 6, 5, 8, 10, 13, 3, 5, 4
+minimap_pos:   .DB $FF, 7, 6, 5, 8, 10, 13, 3, 5, 4, 0
 
 draw_minimap:
     lda ui_mode
@@ -273,12 +275,8 @@ font_data_end:
 
 ; factory palette (marker-wrapped for the patcher)
     .DB "SNPAL0"
-pal_data:
-    .INCBIN "pal.bin"
-
-; HDMA backdrop gradient table
-gradient_data:
-    .INCBIN "gradient.bin"
+pal_schemes:
+    .INCBIN "schemes.bin"
 
 ; 8 factory FIR curves x 8 taps, marker-wrapped so firdesign.html patches
 ; the ROM instead of rebuilding it

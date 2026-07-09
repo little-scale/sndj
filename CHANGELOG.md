@@ -8,6 +8,10 @@
   insert, as before).
 - SONG/CHAIN/PHRASE grids sit four rows lower (headers at row 7,
   grids at row 8) and PHRASE cells line up under the NOTE/IN/CMD ruler.
+- Palette schemes: 8 factory palettes (snesdj house style + the
+  genmddj set), selectable on the new OPTIONS screen (A+Up from SONG),
+  applied instantly (CGRAM + HDMA gradient rebuilt at run time) and
+  persisted in SRAM; marker-wrapped SNPAL0 block for patching.
 - Right-column chrome moved to the top right, smsggdj-style: 16-bit
   tick counter (APU? on fault), PLAY/STOP, then the mini map with the
   sibling letters (PHRASE = P, FIR = F); MIDI and LIVE left the map.

@@ -141,11 +141,11 @@ residency_build:
     rts
 @stub_ok:
     lda #<ARAM_SAMPLES
-    sta.w str_buf
-    sta.w str_buf + 2
+    sta.w res_dir
+    sta.w res_dir + 2
     lda #>ARAM_SAMPLES
-    sta.w str_buf + 1
-    sta.w str_buf + 3
+    sta.w res_dir + 1
+    sta.w res_dir + 3
     rep #$30
 .ACCU 16
     lda #(ARAM_SAMPLES + 9)
@@ -234,7 +234,7 @@ residency_build:
 @aligned:
     lda es0
     sta up_len
-    lda #str_buf
+    lda #res_dir
     sta up_src
     lda #ARAM_DIR
     sta up_dest
@@ -305,7 +305,7 @@ res_mark:
     asl
     asl
     clc
-    adc #str_buf
+    adc #res_dir
     tay
     lda res_cursor
     sta.w $0000,y
