@@ -5,6 +5,11 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- PHRASE: tapping B on a `C` chord command auditions the chord (root
+  + both offset voices) through the row's note and instrument. Command
+  cells now only accept a B-tap insert while empty (the genmddj rule),
+  so auditioning can never overwrite a written command.
+
 - SNDJ1 v2 saves: genmddj-style variable packing — a 16-entry
   directory over one dense ~31.7 KB heap replaces the four fixed
   slots. Saves append and flip the entry; overwrites and clears close

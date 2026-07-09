@@ -77,7 +77,12 @@ are shortcuts to things the core grammar can already do.
 - **Audition**: tapping B on a note (or nudging one) plays it with
   its instrument — but only while the transport is stopped, so edits
   during playback never double-strike. Tapping B on the instrument
-  column auditions that row's note through that instrument.
+  column auditions that row's note through that instrument. Tapping B
+  on a **C** chord command auditions the whole chord — root plus the
+  two offset voices — through that row's note and instrument.
+- Command cells only accept an insert while **empty** (nudge or cut
+  first to change a written command), so tapping a command to hear or
+  inspect it can never overwrite it.
 
 ### Block select
 

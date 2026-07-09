@@ -913,6 +913,92 @@ audition_note:
     inc kon_count
     rts
 
+; --- audition: a C-command chord on voices 0/1/2 -------------------------------
+; A = root note index (0-based), aud_instr = instrument ($FF = none),
+; aud_chord = x/y semitone nibbles ($00 = chord off -> root alone).
+; The root mirrors audition_note (kit slots, WAV octave); the two members
+; mirror a grp_fanout member (apply + note_pitch), so what you hear is what
+; the row plays.
+audition_chord:
+    pha
+    lda eng_playing         ; auditions stay quiet while the transport runs
+    beq @quiet_ok
+    pla
+    rts
+@quiet_ok:
+    pla
+    sta aud_note
+    sta trig_note           ; kit_trigger reads the note from here
+    stz trig_voice
+    lda aud_instr
+    cmp #INSTR_NONE
+    bne @have_instr
+    stz trig_type
+    bra @root_pitch
+@have_instr:
+    jsr apply_instrument
+    lda trig_type
+    cmp #$01
+    bne @root_pitch
+    jsr kit_trigger         ; kit root auditions the note's slot
+    bcs @members
+    rts                     ; empty slot: silence (engine skips members too)
+@root_pitch:
+    lda aud_note
+    jsr note_pitch_calc_only
+    lda trig_type
+    cmp #$02
+    bne @root_wr
+    rep #$20
+.ACCU 16
+    lsr last_pitch          ; WAV: same -1 octave as the trigger path
+    sep #$20
+.ACCU 8
+@root_wr:
+    jsr voice_pitch_write
+@members:
+    lda aud_chord
+    bne @fan
+    lda #DSP_KON            ; C00: the root alone
+    ldy #$0001
+    jsr apu_dsp_write
+    inc kon_count
+    rts
+@fan:
+    lda #$01
+    sta trig_voice
+    lda aud_chord
+    lsr
+    lsr
+    lsr
+    lsr                     ; x nibble -> voice 1 (grp_fanout m=1)
+    jsr @member
+    lda #$02
+    sta trig_voice
+    lda aud_chord
+    and #$0F                ; y nibble -> voice 2 (grp_fanout m=2)
+    jsr @member
+    lda #DSP_KON
+    ldy #$0007
+    jsr apu_dsp_write
+    inc kon_count
+    rts
+@member:
+    clc
+    adc aud_note
+    cmp #NOTE_MAX
+    bcc @m_ok
+    lda #NOTE_MAX - 1
+@m_ok:
+    pha
+    lda aud_instr
+    cmp #INSTR_NONE
+    beq @m_bare
+    jsr apply_instrument
+@m_bare:
+    pla
+    jmp note_pitch
+
 ; --- per-frame APU housekeeping (main loop) ------------------------------------
 ; Mirrors tick telemetry and sends the M2 heartbeat: an incrementing value
 ; into MVOLL every 64 frames, so checks can watch the full SCB path land in

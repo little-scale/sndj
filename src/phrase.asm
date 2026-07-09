@@ -381,11 +381,42 @@ cell_tap:
 @not_instr:
     cmp #2
     bne @val
-    ; command: the letter brings its value along
+    ; command: the letter (with its value) drops into an EMPTY cell only,
+    ; the genmddj rule; a tap on a C chord auditions it through the row's
+    ; note + instrument
+    lda.l $7E0000 + SB_PHRASES,x
+    beq @cmd_ins
+    cmp #CMDID_C
+    beq @chord_aud
+    rts
+@cmd_ins:
     lda ed_lastcmd
     sta.l $7E0000 + SB_PHRASES,x
     lda ed_lastval
     sta.l $7E0000 + SB_PHRASES + 1,x
+    rts
+@chord_aud:
+    ; X = the cmd cell; the row reads note(-2) instr(-1) cmd(0) val(+1);
+    ; empty note/instr cells inherit the insert buffers, as at playback
+    lda.l $7E0000 + SB_PHRASES + 1,x
+    sta aud_chord
+    lda.l $7E0000 + SB_PHRASES - 1,x
+    cmp #INSTR_NONE
+    bne @ca_instr
+    lda ed_lastinstr
+@ca_instr:
+    sta aud_instr
+    lda.l $7E0000 + SB_PHRASES - 2,x
+    beq @ca_last
+    cmp #NOTE_OFF
+    bcc @ca_note
+@ca_last:
+    lda ed_lastnote
+    beq @ca_done            ; nothing sensible to root the chord on
+@ca_note:
+    dec a                   ; note byte 1..96 -> index 0..95
+    jmp audition_chord
+@ca_done:
     rts
 @val:
     lda ed_lastval

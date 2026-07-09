@@ -215,6 +215,9 @@ sv_limit     dw      ; pack budget: free heap bytes for this save
 sv_hole      dw      ; compaction: hole offset in the heap
 sv_hsize     dw      ; compaction: hole size
 sv_mlen      dw      ; compaction: bytes left to move
+aud_note     db      ; chord audition: root note index (0-based)
+aud_instr    db      ; chord audition: resolved instrument ($FF = none)
+aud_chord    db      ; chord audition: C-command x/y nibbles
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;
