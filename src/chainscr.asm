@@ -88,6 +88,11 @@ chain_update:
     sep #$20
 .ACCU 8
     beq @no_ab
+    lda eng_playing
+    beq @ab_play
+    jsr engine_stop         ; A+B while playing = stop, on every screen
+    bra @ab_used
+@ab_play:
     jsr engine_play_chain
     lda chain_cy
     sta trk_cpos
@@ -95,6 +100,7 @@ chain_update:
     jsr track_load_chain_entry
     lda #$FF
     sta trk_prow
+@ab_used:
     lda #$01
     sta a_used
 @no_ab:

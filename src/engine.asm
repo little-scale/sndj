@@ -335,6 +335,8 @@ track_load_chain_entry:
     sta.w trk_phrase,x
     lda tmp1 + 1
     sta.w trk_tsp,x
+    lda #16
+    sta walk_guard          ; a real phrase resets the empty-walk budget
     rts
 @next_songrow:
     lda.w trk_songrow,x
@@ -348,11 +350,41 @@ track_load_chain_entry:
     sta.w trk_cpos,x
     jmp track_load_chain_entry
 @from_song:
-    ; end of chain: advance the song row (halt at end of grid)
+    ; end of chain: next song row, or loop back to the top of this
+    ; track's contiguous block (same rule as the entry-15 wrap).
+    ; The guard stops a block whose chains never yield a phrase from
+    ; recursing forever (it decays here, resets on any real phrase).
+    dec walk_guard
+    beq @halt
     lda.w trk_songrow,x
     inc a
     cmp #SONG_ROWS
-    bcs @halt
+    bcs @block_top
+    pha
+    jsr track_song_cell
+    cmp #$FF
+    beq @next_empty
+    pla
+    sta.w trk_songrow,x
+    jmp track_load_songrow
+@next_empty:
+    pla
+@block_top:
+    lda.w trk_songrow,x
+@scan:
+    cmp #$00
+    beq @top
+    dec a
+    pha
+    jsr track_song_cell
+    cmp #$FF
+    beq @gap
+    pla
+    bra @scan
+@gap:
+    pla
+    inc a
+@top:
     sta.w trk_songrow,x
     jmp track_load_songrow
 @halt:
@@ -438,21 +470,13 @@ engine_stop:
     ldy #$0000              ; drop the latch so later KONs win
     jmp apu_dsp_write
 
-; Start: stop if playing; else play what the current screen shows
+; Start: the transport — stop if playing, else play the whole song,
+; whatever screen you're on (contextual play lives on A+B)
 engine_toggle:
     lda eng_playing
     beq @start
-    bra engine_stop
+    jmp engine_stop
 @start:
-    lda ui_mode
-    cmp #SCREEN_PHRASE
-    bne @not_phr
-    jmp engine_play_phrase
-@not_phr:
-    cmp #SCREEN_CHAIN
-    bne @not_chn
-    jmp engine_play_chain
-@not_chn:
     jmp engine_play
 
 ; --- per-frame: consume tick deltas from the APU -------------------------------
@@ -575,20 +599,64 @@ track_chain_step:
     and #$0F
     sta.w trk_cpos,x
     bne @entry
-    ; wrapped past entry 15: next song row
+    ; wrapped past entry 15: next song row, or loop back to the top of
+    ; this track's contiguous block when the block (or the grid) ends
     lda.w trk_songrow,x
     inc a
     cmp #SONG_ROWS
-    bcc @row_ok
-    lda #$FF                ; end of grid: halt this track
-    sta.w trk_phrase,x
-    rts
-@row_ok:
+    bcs @block_top
+    pha
+    jsr track_song_cell     ; peek the next row's cell
+    cmp #$FF
+    beq @next_empty
+    pla
+    sta.w trk_songrow,x
+    jmp track_load_songrow
+@next_empty:
+    pla
+@block_top:
+    ; scan up from the current row to the first row of the block
+    lda.w trk_songrow,x
+@scan:
+    cmp #$00
+    beq @top
+    dec a
+    pha
+    jsr track_song_cell
+    cmp #$FF
+    beq @gap
+    pla
+    bra @scan
+@gap:
+    pla
+    inc a                   ; the row just below the gap
+@top:
     sta.w trk_songrow,x
     jmp track_load_songrow
 @entry:
     jmp track_load_chain_entry
 @done:
+    rts
+
+; A = song row -> A = that row's chain cell on track X (X preserved)
+track_song_cell:
+    sta tmp2
+    phx
+    rep #$30
+.ACCU 16
+    txa
+    xba
+    lsr                     ; track * 128
+    sta tmp0
+    lda tmp2
+    and #$00FF
+    clc
+    adc tmp0
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_SONG,x
+    plx
     rts
 
 ; --- advance one row on track X and trigger its phrase cell --------------------

@@ -174,6 +174,7 @@ pal_buf      ds 32   ; CGRAM colours 0-15, drained by the NMI
 opt_cur      db      ; OPTIONS field cursor
 res_dir      ds 224  ; ARAM directory staging (56 slots x 4; NEVER str_buf —
                      ; 40 resident samples overflowed it and smashed vars)
+walk_guard   db      ; empty-entry recursion budget (block loops must halt)
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

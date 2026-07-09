@@ -93,7 +93,13 @@ song_update:
     sep #$20
 .ACCU 8
     beq @no_ab
+    lda eng_playing
+    beq @ab_play
+    jsr engine_stop         ; A+B while playing = stop, on every screen
+    bra @ab_used
+@ab_play:
     jsr engine_play_from_cursor
+@ab_used:
     lda #$01
     sta a_used
 @no_ab:

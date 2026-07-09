@@ -2,6 +2,14 @@
 
 ## 0.1.0-dev (unreleased)
 
+- Transport: Start plays/stops the whole song on every screen; A+B is
+  the contextual control — stop when playing, else play all tracks
+  from the cursor (SONG), just the chain (CHAIN) or just the phrase
+  (PHRASE).
+- A chain in the song grid loops back to the top of its contiguous
+  block instead of running into empty rows (with a guard so a block
+  that never yields a phrase halts the track gracefully).
+
 - Factory melodics now come from the Mario Paint soundfont, picked by
   preset: AC GUITR, AC BASS, SQUARE, ORGAN1, TRUMPET, GLOCKEN, VIBES,
   RECORDER. Drums stay the provided 808/909 kits.

@@ -71,11 +71,17 @@ phrase_update:
     sep #$20
 .ACCU 8
     beq @no_ab
+    lda eng_playing
+    beq @ab_play
+    jsr engine_stop         ; A+B while playing = stop, on every screen
+    bra @ab_used
+@ab_play:
     jsr engine_play_phrase
     lda cur_y
     dec a
     and #$0F
     sta trk_prow            ; next tick advances INTO the cursor row
+@ab_used:
     lda #$01
     sta a_used
 @no_ab:
