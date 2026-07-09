@@ -5,6 +5,13 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- The **FIR designer merged into the patcher** (firdesign.html
+  retired): a collapsible section in the soundfont column with the
+  live frequency-response plot, tap sliders/hex, and the echo-loop
+  audition (EDL + feedback), writing the loaded ROM's 8 preset slots
+  in place — one drop, one export, for samples, kits, boot
+  instruments, palettes and the room.
+
 - **Fixed: a track whose column starts with empty rows never played.**
   Tracks now enter at the first populated cell at/below the start row
   (the genmddj rule), so a chain placed at row 01 joins the song; a

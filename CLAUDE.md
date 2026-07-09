@@ -349,7 +349,8 @@ sndj/
     check.lua + checks/    Mesen test-runner assertions
     sndj.js           THE shared JS library (format, RLE, BRR codec,
                       reference sequencer, DSP model) — node self-test
-    patcher.html  savetool.html  firdesign.html  kitbuild.html
+    patcher.html  savetool.html   (FIR designer + kit builder live
+                                    inside patcher.html)
     als2sndj.html  spcexport.html  sramconvert.html
   samples/            sample sources; samples/pool.bin = production bank
   instrument-patches/ factory instrument/kit presets
@@ -827,7 +828,7 @@ Bidirectional, like the genmddj tool:
   tempo from groove, echo settings as a text note in the set) and → `.mid`.
   Round-trip fidelity is tested in `make test` on fixture songs.
 
-### 17.4 `firdesign.html` — the FIR designer
+### 17.4 the FIR designer (merged into patcher.html, Seb 2026-07-10)
 
 The 8 taps as sliders/hex; live magnitude (and phase) response plot;
 preset library (the ROM's 8 curves + a community section); **audition**:

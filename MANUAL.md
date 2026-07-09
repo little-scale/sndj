@@ -303,7 +303,8 @@ instrument:
 Recipes: long dark hall = EDL 12+, DARK curve, moderate feedback.
 Tempo-synced slapback = EDL near one row's length. Metallic comb =
 METAL curve with high feedback. Design taps precisely in
-`user-tools/firdesign.html` with a live frequency plot, then punch
+the patcher's FIR designer (a live frequency plot + echo-loop
+audition), then punch
 the hex in on the FIR screen.
 
 ## 10. WAVE and KIT
@@ -428,7 +429,7 @@ everything runs locally:
   through a bit-exact model of the console's BRR + Gaussian playback,
   so what you hear in the browser is what the cart plays.
 - **savetool.html** — song manager for cart saves (§12).
-- **firdesign.html** — echo filter designer with a live frequency
+- *(the FIR designer lives inside patcher.html)* — a live frequency
   response plot (§9).
 
 All three share `sndj.js`, the reference library (keep it next to

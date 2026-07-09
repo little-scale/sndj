@@ -44,6 +44,20 @@
                        font: inherit; padding: .2rem .3rem; }
   select { background: #2a2e48; color: #dee2e8; border: 1px solid #606888;
            border-radius: 4px; font: inherit; padding: .25rem .4rem; }
+  canvas { width: 100%; background: #0a0c1e; border: 1px solid #2a2e48;
+           border-radius: 6px; }
+  .taps { display: grid; grid-template-columns: repeat(8, 1fr); gap: .5rem;
+          margin: 1rem 0; }
+  .tap { text-align: center; }
+  .tap input[type=range] { writing-mode: vertical-lr; direction: rtl;
+        height: 110px; width: 100%; }
+  .tap input[type=text] { width: 100%; background: #2a2e48; color: #dee2e8;
+        border: 1px solid #606888; border-radius: 4px; text-align: center;
+        font: inherit; box-sizing: border-box; }
+  .tap label { color: #606888; font-size: .85em; }
+  #firsum { color: #606888; }
+  #firsum.hot { color: #ff6060; }
+  .fold { color: #ffb020; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -100,6 +114,34 @@ export a patched ROM. Everything runs locally.</p>
   settings above; drag a row onto a pool slot to import it there.</p>
   <table id="sf2list"></table>
 </div>
+<div id="firview" hidden>
+  <h1><small class="fold" id="firfold">&#9656; FIR designer — the room's tone control</small></h1>
+  <div id="firbody" hidden>
+    <p class="hint">the 8-tap FIR runs on every sample read back from the
+    echo delay line, inside the feedback loop — each repeat filters again.
+    Audition through the real loop shape, then write a ROM preset slot;
+    the ECHO/FIR screens recall it.</p>
+    <canvas id="firplot" width="640" height="200"></canvas>
+    <div class="taps" id="firtaps"></div>
+    <div class="row">
+      <span id="firsum">&Sigma; taps = 127</span>
+      <label>preset</label>
+      <select id="firpreset"></select>
+      <button id="firload">load</button>
+      <button class="primary" id="firwrite">write into slot</button>
+    </div>
+    <div class="row">
+      <label>EDL</label>
+      <select id="firedl"></select>
+      <label>feedback</label>
+      <input type="range" id="firefb" min="-128" max="127" value="72" style="width:120px">
+      <span id="firefbv">72</span>
+      <button id="firplay">noise</button>
+      <button id="firclick">clicks</button>
+      <button id="firstop">stop</button>
+    </div>
+  </div>
+</div>
 </div>
 </div>
 <div id="palview" hidden>
@@ -153,6 +195,12 @@ async function loadRom(f) {
   palOff = S.findMarker(rom, 'SNPAL0');
   kitOff = S.findMarker(rom, 'SNKIT0');
   defOff = S.findMarker(rom, 'SNDEF0');
+  firOff = S.findMarker(rom, 'SNFIR0');
+  $('firview').hidden = firOff < 0;
+  if (firOff >= 0) {
+    firTaps = Array.from(rom.slice(firOff + 40, firOff + 48)).map(s8);
+    firSync();          // start on preset 5 (DKC HALL)
+  }
   kitExpand[0] = true;
   status(`loaded ${f.name}: ${entries.length} samples in the pool`);
   render();
@@ -469,6 +517,154 @@ function renderKits() {
   }
   $('kitview').hidden = false;
 }
+
+// --------------------------------------------------------- FIR designer
+// the firdesign.html feature set, folded in: design the echo FIR with a
+// live response plot, audition through the S-DSP loop shape, and write
+// the ROM's 8 preset slots in place (the main export ships them).
+const FIR_NAMES = ['FLAT', 'DARK', 'BRIGHT', 'COMB', 'SOFT', 'DKC HALL',
+  'METAL', 'USER'];
+let firOff = -1;
+let firTaps = [0x4C, 0x21, 0x12, 0x09, 0x05, 0x03, 0x02, 0x01].map(s8);
+
+for (let i = 0; i < 8; i++) {
+  const d = document.createElement('div');
+  d.className = 'tap';
+  d.innerHTML = '<input type="range" min="-128" max="127" value="0" data-i="' +
+    i + '"><input type="text" data-h="' + i + '"><label>t' + i + '</label>';
+  $('firtaps').appendChild(d);
+}
+FIR_NAMES.forEach((n, i) => {
+  const o = document.createElement('option');
+  o.value = i;
+  o.textContent = i + ' ' + n;
+  $('firpreset').appendChild(o);
+});
+$('firpreset').value = 5;
+for (let e = 0; e <= 15; e++) {
+  const o = document.createElement('option');
+  o.value = e;
+  o.textContent = e + ' (' + e * 16 + ' ms)';
+  $('firedl').appendChild(o);
+}
+$('firedl').value = 6;
+
+$('firfold').onclick = () => {
+  const b = $('firbody');
+  b.hidden = !b.hidden;
+  $('firfold').innerHTML = (b.hidden ? '\u25B8' : '\u25BE') +
+    ' FIR designer \u2014 the room\u2019s tone control';
+  if (!b.hidden) firSync();
+};
+
+function firSync() {
+  document.querySelectorAll('#firtaps [data-i]').forEach(r => {
+    r.value = firTaps[+r.dataset.i];
+  });
+  document.querySelectorAll('#firtaps [data-h]').forEach(t => {
+    t.value = (firTaps[+t.dataset.h] & 0xFF).toString(16)
+      .toUpperCase().padStart(2, '0');
+  });
+  const sum = firTaps.reduce((a, b) => a + b, 0);
+  $('firsum').textContent = '\u03A3 taps = ' + sum;
+  $('firsum').className = Math.abs(sum) > 127 ? 'hot' : '';
+  firPlot();
+}
+
+$('firtaps').oninput = e => {
+  if (e.target.dataset.i !== undefined) {
+    firTaps[+e.target.dataset.i] = +e.target.value;
+  } else if (e.target.dataset.h !== undefined) {
+    const v = parseInt(e.target.value, 16);
+    if (!isNaN(v)) firTaps[+e.target.dataset.h] = s8(v & 0xFF);
+  }
+  firSync();
+};
+
+$('firload').onclick = () => {
+  const i = +$('firpreset').value;
+  firTaps = Array.from(rom.slice(firOff + i * 8, firOff + i * 8 + 8)).map(s8);
+  firSync();
+  status('loaded FIR preset ' + i + ' (' + FIR_NAMES[i] + ') from the ROM');
+};
+
+$('firwrite').onclick = () => {
+  const i = +$('firpreset').value;
+  for (let k = 0; k < 8; k++) rom[firOff + i * 8 + k] = firTaps[k] & 0xFF;
+  status('FIR preset ' + i + ' (' + FIR_NAMES[i] + ') written \u2014 ' +
+    'export to keep it; the ECHO screen recalls it as FIR ' + i);
+};
+
+function firPlot() {
+  const c = $('firplot'), g = c.getContext('2d');
+  const dbY = db => ((12 - db) / 48) * c.height;
+  g.clearRect(0, 0, c.width, c.height);
+  g.strokeStyle = '#2a2e48';
+  for (let db = 12; db >= -36; db -= 12) {
+    const y = dbY(db);
+    g.beginPath(); g.moveTo(0, y); g.lineTo(c.width, y); g.stroke();
+    g.fillStyle = '#606888';
+    g.fillText(db + ' dB', 4, y - 3);
+  }
+  g.fillStyle = '#606888';
+  [2, 4, 8, 16].forEach(k => {
+    const x = (k * 1000 / 16000) * c.width;
+    g.fillText(k + 'k', x - 14, c.height - 4);
+  });
+  g.strokeStyle = '#40d0c8';
+  g.lineWidth = 2;
+  g.beginPath();
+  for (let px = 0; px < c.width; px++) {
+    const f = (px / c.width) * Math.PI;
+    let re = 0, im = 0;
+    for (let k = 0; k < 8; k++) {
+      re += firTaps[k] * Math.cos(-f * k);
+      im += firTaps[k] * Math.sin(-f * k);
+    }
+    const mag = Math.hypot(re, im) / 128;
+    const db = 20 * Math.log10(Math.max(mag, 1e-4));
+    px ? g.lineTo(px, dbY(db)) : g.moveTo(px, dbY(db));
+  }
+  g.stroke();
+  g.lineWidth = 1;
+}
+
+// echo-loop audition: buf[n] = send + efb*FIR(buf[n-D]); out = dry + FIR
+let firNode = null;
+function firAudition(kind) {
+  firStop();
+  actx = actx || new AudioContext({ sampleRate: 32000 });
+  const D = Math.max(1, +$('firedl').value * 512);
+  const buf = new Float32Array(D);
+  const hist = new Float32Array(8);
+  let w = 0, n = 0;
+  const efb = +$('firefb').value / 128;
+  firNode = actx.createScriptProcessor(1024, 0, 1);
+  firNode.onaudioprocess = ev => {
+    const out = ev.outputBuffer.getChannelData(0);
+    for (let i = 0; i < out.length; i++, n++) {
+      let x = 0;
+      if (kind === 'noise') x = (Math.random() * 2 - 1) * (n < 8000 ? 0.5 : 0);
+      else if (n % 16000 < 40) x = ((n & 4) ? 1 : -1) * 0.6;
+      for (let k = 7; k > 0; k--) hist[k] = hist[k - 1];
+      hist[0] = buf[w];
+      let fir = 0;
+      for (let k = 0; k < 8; k++) fir += hist[k] * firTaps[k];
+      fir /= 128;
+      buf[w] = Math.max(-1, Math.min(1, x + fir * efb));
+      w = (w + 1) % D;
+      out[i] = Math.max(-1, Math.min(1, x * 0.7 + fir * 0.8));
+    }
+  };
+  firNode.connect(actx.destination);
+  status('auditioning ' + kind + ' through EDL ' + $('firedl').value +
+    ', feedback ' + $('firefb').value);
+}
+function firStop() { if (firNode) { firNode.disconnect(); firNode = null; } }
+$('firplay').onclick = () => firAudition('noise');
+$('firclick').onclick = () => firAudition('clicks');
+$('firstop').onclick = firStop;
+$('firefb').oninput = () => { $('firefbv').textContent = $('firefb').value; };
 
 // ------------------------------------------------------------ soundfont
 // several fonts stack in the panel: drop one after another and mix and
