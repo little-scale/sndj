@@ -64,6 +64,8 @@ emu.addEventCallback(function()
 
   if frames == 30 then
     poke(0x2401, 23)           -- instr 0 -> SW ORCH (tune 0)
+    poke(0x2450, 2)            -- instr 5 -> WAV bank 0 (all slots ship SMP now)
+    poke(0x2451, 0)
     poke(0x036A, 4)            -- SYNC: MIDI (midi_service applies next frame)
   elseif frames == 40 then
     check(wram(0x0373) == 0 and wram(0x0374) == 1 and wram(0x037A) == 7,
@@ -88,7 +90,7 @@ emu.addEventCallback(function()
     push_event(0x10, 60, 0)    -- note off
   elseif frames == 58 then
     check(wram(0x037B) == 0xFF, "note-off released the voice")
-    -- program change on ch 2 -> instrument 5 (factory WAV bank 0),
+    -- program change on ch 2 -> instrument 5 (poked to WAV bank 0),
     -- then a note through it
     push_event(0x41, 5, 0)
     push_event(0x21, 72, 127)

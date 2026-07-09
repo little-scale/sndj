@@ -125,8 +125,12 @@ emu.addEventCallback(function()
     check(p0 == 0x0800, "voice 0 = C-4 ($" .. string.format("%04X", p0) .. ")")
     check(p1 == 0x0A14, "voice 1 = E-4 ($" .. string.format("%04X", p1) .. ")")
     check(p2 == 0x0BFC, "voice 2 = G-4 ($" .. string.format("%04X", p2) .. ")")
-    check(dsp(0x04) == 24 and dsp(0x14) == 24 and dsp(0x24) == 24,
-      "GRP members use the resident sample (SRCN 24 = SW ORCH)")
+    -- sample 23 is boot-resident via kit 0; its SRCN comes from the
+    -- residency map, not a fixed order
+    local srcn = wram(0x0097 + 23)
+    check(srcn > 0 and dsp(0x04) == srcn and dsp(0x14) == srcn and
+      dsp(0x24) == srcn,
+      "GRP members use the resident sample (SRCN " .. srcn .. ")")
   elseif frames == done then
     if fails == 0 then
       print("ALL PASS instr.lua")

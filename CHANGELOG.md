@@ -5,6 +5,19 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- **The factory model got lean and legible.** Instruments 00-06 are
+  pitched SMP melodics, 07 is KIT 0 (SMW percussion); slots 08-63
+  ship as SMP-on-sample-0 and kits 1-15 as blank canvases. Since
+  audio RAM only holds *referenced* samples, boot residency drops
+  from 51.5 KB to 19 KB — echo headroom out of the box goes from
+  EDL 4 to the full EDL 15 — and the rest of the pool loads on demand
+  the moment an instrument or kit slot points at it. The **ECHO
+  screen shows a live RAM/FREE ledger** balanced against the delay
+  setting, and the patcher mirrors the same truth: a **RAM column**
+  on every pool slot (boot vs on-demand), the ARAM bar computed on
+  the boot set, and the **boot instruments themselves editable**
+  (I0-I6 sample pickers + the kit id) so you control what preloads.
+
 - patcher.html grew a **kit builder**: the factory kits moved from
   code into a marker-wrapped `SNKIT0` ROM block (16 kits x 16 slots x
   sample/tune/vol; NEW copies it verbatim), and the patcher edits it —

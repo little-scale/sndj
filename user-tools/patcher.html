@@ -63,6 +63,12 @@ export a patched ROM. Everything runs locally.</p>
   <div class="bar"><div id="aram" style="width:0"></div></div>
   <p id="aramtext"></p>
   <p><button id="clearall">clear all</button></p>
+  <div id="bootview" hidden>
+    <p class="hint">boot instruments (the factory set NEW seeds — these
+    plus the kits define what loads into audio RAM at boot; everything
+    else loads on demand when an instrument references it):</p>
+    <p id="bootrow" class="row"></p>
+  </div>
   <table id="pool"></table>
 </div>
 <div id="kitview" hidden>
@@ -146,6 +152,7 @@ async function loadRom(f) {
   } catch (err) { status('pool parse failed: ' + err.message, 1); return; }
   palOff = S.findMarker(rom, 'SNPAL0');
   kitOff = S.findMarker(rom, 'SNKIT0');
+  defOff = S.findMarker(rom, 'SNDEF0');
   kitExpand[0] = true;
   status(`loaded ${f.name}: ${entries.length} samples in the pool`);
   render();
@@ -171,7 +178,8 @@ $('clearall').onclick = () => {
 function render() {
   const t = $('pool');
   t.innerHTML = '<tr><th>#</th><th>name</th><th>BRR bytes</th><th>loop</th>' +
-    '<th>tune</th><th></th><th></th><th></th></tr>';
+    '<th>tune</th><th>RAM</th><th></th><th></th><th></th></tr>';
+  const resident = bootResident();
   entries.forEach((e, i) => {
     const row = t.insertRow();
     row.innerHTML =
@@ -210,6 +218,13 @@ function render() {
     tune.appendChild(semis);
     tune.appendChild(document.createTextNode(':'));
     tune.appendChild(fine);
+    const ram = row.insertCell();
+    const boot = !resident || resident.has(i);
+    ram.textContent = boot ? 'boot' : '\u00B7';
+    ram.title = boot ? 'loaded into audio RAM at boot (referenced by the ' +
+      'factory instruments/kits)' : 'ROM only — loads on demand when an ' +
+      'instrument or kit slot references it';
+    ram.style.color = boot ? '#40d0c8' : '#606888';
     const play = document.createElement('button');
     play.textContent = 'play';
     play.onclick = () => audition(e);
@@ -249,26 +264,88 @@ function render() {
   $('budgettext').textContent =
     `pool ${used} / ${RESERVED} bytes ROM budget` +
     (used > RESERVED ? ' — TOO BIG, replace with smaller samples' : '');
-  // the real constraint: the whole pool resident in 64 KB audio RAM,
-  // sharing it with the echo buffer (mirrors the console's residency)
-  const a = S.aramBudget(entries);
+  // audio RAM holds the BOOT-RESIDENT set (factory instruments + kit
+  // slots) alongside the echo buffer; the rest of the pool loads on
+  // demand, so it costs ROM only (mirrors the console's residency)
+  const a = S.aramBudget(entries, bootResident());
   const kb = n => (n / 1024).toFixed(1);
   $('aram').style.width = Math.min(100, a.sampleBytes * 100 / a.capacity) + '%';
   if (a.maxEdl < 0) {
     $('aram').className = 'over';
     $('aramtext').innerHTML = `audio RAM ${kb(a.sampleBytes)} / ` +
-      `${kb(a.capacity)} KB — <span class="warn">over by ${a.overBy} bytes: ` +
-      `samples at the end of the pool will be SILENT on the console, ` +
+      `${kb(a.capacity)} KB boot-resident — <span class="warn">over by ` +
+      `${a.overBy} bytes: boot samples will be SILENT on the console, ` +
       `and no echo fits</span>`;
   } else {
     $('aram').className = a.maxEdl === 0 ? 'over' : '';
     $('aramtext').textContent = `audio RAM ${kb(a.sampleBytes)} / ` +
-      `${kb(a.capacity)} KB samples — echo headroom ` +
+      `${kb(a.capacity)} KB boot-resident — echo headroom ` +
       (a.maxEdl === 0 ? 'NONE (delay time maxes at 0 ms)'
-        : `EDL ${a.maxEdl} (${a.maxMs} ms)`);
+        : `EDL ${a.maxEdl} (${a.maxMs} ms)`) +
+      '; other samples load on demand';
   }
   $('poolview').hidden = false;
+  renderBoot();
   renderKits();
+}
+
+// ------------------------------------------------------- boot residency
+// mirror of the console's residency_build: the boot-resident set is
+// every pool sample referenced by the factory instruments (SNDEF0,
+// SMP type) or a kit slot with vol > 0 (SNKIT0). The rest of the pool
+// costs no ARAM until a song references it.
+let defOff = -1;
+
+function bootResident() {
+  if (defOff < 0) return null;           // old ROM: assume everything
+  const set = new Set();
+  for (let i = 0; i < 8; i++) {
+    if (rom[defOff + i] === 0) set.add(rom[defOff + 8 + i] & 0x3F);
+  }
+  if (kitOff >= 0) {
+    for (let k = 0; k < 16; k++) {
+      for (let sl = 0; sl < 16; sl++) {
+        const off = kitSlotOff(k, sl);
+        if (rom[off + 2]) set.add(rom[off] & 0x3F);
+      }
+    }
+  }
+  return set;
+}
+
+function renderBoot() {
+  if (defOff < 0) { $('bootview').hidden = true; return; }
+  const row = $('bootrow');
+  row.innerHTML = '';
+  for (let i = 0; i < 8; i++) {
+    const lab = document.createElement('label');
+    lab.textContent = 'I' + i + ' ';
+    if (rom[defOff + i] === 1) {         // the kit instrument
+      const kin = document.createElement('input');
+      kin.type = 'number';
+      kin.min = 0; kin.max = 15;
+      kin.value = rom[defOff + 8 + i];
+      kin.title = 'kit id';
+      kin.style.width = '2.6rem';
+      kin.oninput = () => { rom[defOff + 8 + i] = (+kin.value || 0) & 0x0F; };
+      lab.textContent = 'I' + i + ' KIT ';
+      lab.appendChild(kin);
+    } else {
+      const pick = document.createElement('select');
+      entries.forEach((e, n) => {
+        const o = document.createElement('option');
+        o.value = n;
+        o.textContent = n + ' ' + e.name;
+        pick.appendChild(o);
+      });
+      pick.value = rom[defOff + 8 + i] & 0x3F;
+      pick.title = 'boot sample for instrument ' + i;
+      pick.onchange = () => { rom[defOff + 8 + i] = +pick.value; render(); };
+      lab.appendChild(pick);
+    }
+    row.appendChild(lab);
+  }
+  $('bootview').hidden = false;
 }
 
 // ---------------------------------------------------------- factory kits

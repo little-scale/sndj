@@ -298,8 +298,8 @@ pal_schemes:
 ; can re-voice a built ROM without a toolchain:
 ; 8 track instrument types, 8 track samples/banks/kits
     .DB "SNDEF0"
-factory_instr_type: .DB 0, 0, 0, 0, 0, 2, 3, 1
-factory_instr_smp:  .DB 0, 1, 2, 3, 4, 0, 0, 0
+factory_instr_type: .DB 0, 0, 0, 0, 0, 0, 0, 1
+factory_instr_smp:  .DB 0, 1, 2, 3, 4, 5, 6, 0
 
 
 ; 8 factory FIR curves x 8 taps, marker-wrapped so firdesign.html patches

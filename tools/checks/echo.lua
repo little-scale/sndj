@@ -70,16 +70,20 @@ gest({ a = true, right = true }, 4)       -- PHRASE
 gest({ a = true, right = true }, 4)       -- INSTR
 gest({ a = true, down = true }, 6)        -- ECHO
 local at_echo = t
--- EDL: 0 -> +4 = 4, the ARAM-derived max with the factory set resident
--- (the screen clamps so the echo buffer can't reach resident samples)
+-- EDL: the lean factory boot set (instr 0-6 samples + kit 0) leaves
+-- room for the full EDL 15; the screen still clamps so the buffer can
+-- never reach resident samples
 nudge("up", 45)
 local edl4 = t
--- further nudges must clamp at the ARAM limit, not walk higher
-nudge("up", 70)
-nudge("right", 60)
+nudge("up", 55)
+nudge("up", 60)
+nudge("up", 70)              -- 12 -> 15 (ceiling)
+nudge("up", 80)              -- must clamp, not walk higher
 local edl_clamp = t
--- back down to 3 (left = -1)
-nudge("left", 60)
+-- big steps back down to 3
+nudge("down", 80)
+nudge("down", 70)
+nudge("down", 60)
 local edl3 = t
 -- FIR field (down 5) -> preset 1
 gest({ down = true })
@@ -127,12 +131,14 @@ emu.addEventCallback(function()
     check(dsp(0x2C) == 0x30 and dsp(0x0D) == 0x30,
       "echo volume/feedback applied at boot")
   elseif frames == edl4 then
-    check(dsp(0x7D) == 4, "EDL walked to the ARAM max (4)")
+    check(dsp(0x7D) == 4, "EDL walked to 4")
     check(dsp(0x6D) == 0xE0, "ESA tracks EDL (top of ARAM)")
     check(dsp(0x6C) == 0x00, "FLG re-enabled after reconfig")
     check(aram_intact(aram_snap), "samples intact at EDL 4")
   elseif frames == edl_clamp then
-    check(dsp(0x7D) == 4, "EDL edits clamp at the resident-set limit")
+    check(dsp(0x7D) == 15, "EDL reaches 15 with the lean boot set, then clamps")
+    check(dsp(0x6D) == 0x88, "ESA tracks EDL 15")
+    check(aram_intact(aram_snap), "samples intact at the ceiling")
   elseif frames == edl3 then
     check(dsp(0x7D) == 3, "EDL walked back to 3")
     check(dsp(0x6D) == 0xE8, "ESA tracks EDL 3")

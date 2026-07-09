@@ -106,10 +106,12 @@ def tables_inc():
 # 16 kits x 16 slots x 4 bytes (pool sample, tune, vol, flags); vol 0 =
 # empty slot. Marker-wrapped SNKIT0 in ROM; song NEW copies the block
 # verbatim into the song's kit section, and patcher.html edits it.
-# Kit 0 = SMW percussion, 1 = Mario Paint drums, 2 = MP toybox — runs of
-# pool samples at 8 kHz, so tune -24 ($E8), vol $50.
+# Only kit 0 (SMW percussion) ships filled — the factory boot set stays
+# small so the pool loads on demand (residency follows references).
+# Kits 1-15 are blank canvases for the patcher's kit builder / the
+# console KIT screen. 8 kHz drums: tune -24 ($E8), vol $50.
 
-FACTORY_KITS = [(16, 10), (26, 12), (38, 10)]  # (first pool sample, count)
+FACTORY_KITS = [(16, 10)]  # (first pool sample, count)
 
 
 def kits_bin():

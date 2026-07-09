@@ -322,6 +322,56 @@ echo_draw:
     beq @taps
     jmp @rows
 @taps:
+    ; ARAM ledger: resident samples vs what the current EDL leaves free
+    ; (the echo buffer and the sample set share the same 64 KB)
+    lda #2
+    sta text_x
+    lda #16
+    sta text_y
+    rep #$20
+.ACCU 16
+    lda #ATTR_DIM
+    sta text_attr
+    sep #$20
+.ACCU 8
+    ldx #str_ram
+    jsr text_puts
+    rep #$30
+.ACCU 16
+    lda res_cursor
+    sec
+    sbc #$1200
+    sta tmp0
+    sep #$20
+.ACCU 8
+    jsr fl_kb
+    ldx #str_free
+    jsr text_puts
+    ; free = echo floor - resident end; floor page = $100 - 8*EDL
+    ; (EDL 0 still reserves the top page, matching residency_build)
+    lda.l $7E0000 + SB_HEADER + SH_EDL
+    and #$0F
+    asl
+    asl
+    asl
+    eor #$FF
+    inc a
+    bne @floor_ok
+    lda #$FF
+@floor_ok:
+    rep #$30
+.ACCU 16
+    and #$00FF
+    xba                     ; floor page -> byte address
+    sec
+    sbc res_cursor
+    bcs @free_ok
+    lda #$0000              ; floor at/below the samples: nothing free
+@free_ok:
+    sta tmp0
+    sep #$20
+.ACCU 8
+    jsr fl_kb
     ; current FIR preset taps, read-only
     lda #2
     sta text_x
@@ -369,3 +419,5 @@ echo_draw:
 
 str_echo: .DB "ECHO", 0
 str_taps: .DB "FIR TAPS", 0
+str_ram:  .DB "RAM ", 0
+str_free: .DB "  FREE ", 0

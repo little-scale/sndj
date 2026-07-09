@@ -58,14 +58,16 @@ emu.addEventCallback(function()
     check(aram(0x1000) == 0x00 and aram(0x1001) == 0x12,
       "directory slot 0 -> silent stub")
     check(aram(0x1200) == 0x01, "silent stub BRR (END block) uploaded")
-    -- auto-populated instruments reference every pool sample, so the
-    -- resident set is samples 0..39 in pool order until the echo-aware
-    -- ceiling; over-budget samples map to the silent stub
+    -- the boot-resident set is exactly what the factory set references:
+    -- instruments 0-6 (samples 0-6, in scan order) then kit 0's slots
+    -- (samples 16-25); everything else stays in ROM until referenced
+    local order = { 0, 1, 2, 3, 4, 5, 6,
+                    16, 17, 18, 19, 20, 21, 22, 23, 24, 25 }
     local cursor = 0x1200 + 9
     local all_ok = true
     local slot = 1
     srcn_of = {}
-    for s = 0, count - 1 do
+    for _, s in ipairs(order) do
       local e = pool_entry(s)
       local endcur = cursor + e.blocks * 9
       if slot < 56 and math.floor(endcur / 256) < 0xFF then
@@ -88,20 +90,17 @@ emu.addEventCallback(function()
         slot = slot + 1
       end
     end
-    check(all_ok, "residency: referenced samples uploaded in order (" ..
+    check(all_ok, "residency: the boot set uploads in reference order (" ..
       (slot - 1) .. " resident)")
+    check(slot - 1 == 17, "boot set = instr 0-6 + kit 0 exactly (17 samples)")
     check(srcn_of[16] ~= nil and srcn_of[21] ~= nil,
       "the SMW kit samples made the budget")
     check(wram(0x3200) == 16 and wram(0x3201) == 0xE8 and wram(0x3202) == 0x50,
       "kit 0 slot 0 = SW KICK (pool 16, tune -24)")
-    check(wram(0x3240) == 26 and wram(0x3241) == 0xE8,
-      "kit 1 slot 0 = MP KICK (pool 26, tune -24)")
-    check(wram(0x326C) == 37, "kit 1 slot 11 = MP UNDO")
-    check(wram(0x3272) == 0, "kit 1 slots 12-15 empty")
-    check(wram(0x3280) == 38, "kit 2 slot 0 = MP BONGO1 (toybox)")
-    check(wram(0x32A4) == 47, "kit 2 slot 9 = MP CHEER")
-    check(wram(0x32A8) == 0, "kit 2 slots 10-15 empty")
-    check(wram(0x27A0) == 1 and wram(0x27A1) == 2, "instrument 58 is KIT 2")
+    check(wram(0x3242) == 0 and wram(0x3282) == 0,
+      "kits 1-2 ship empty (blank canvases for the builder)")
+    check(wram(0x27A0) == 0 and wram(0x27A1) == 0,
+      "instrument 58 defaults to SMP sample 0 (no ARAM until referenced)")
     -- author a kit test: instrument 7 is factory KIT 0 (the 808)
     poke(0x2000, 0)          -- grid V1r0 = chain 0
     poke(0x3700, 0)          -- chain0 e0 = phrase 0

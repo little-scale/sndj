@@ -462,9 +462,11 @@ function sf2Oneshot(s, capMs) {
 // page BELOW the echo floor (ESA page = $100 - 8*EDL; EDL 0 still
 // reserves the top page). Anything past the floor is mapped to the
 // silent stub on the console — it simply doesn't sound.
-function aramBudget(entries) {
+function aramBudget(entries, resident) {
   const base = 0x1209;
-  const sampleBytes = entries.reduce((a, e) => a + e.brr.length, 0);
+  const inSet = i => !resident || resident.has(i);
+  const sampleBytes = entries.reduce((a, e, i) =>
+    a + (inSet(i) ? e.brr.length : 0), 0);
   const end = base + sampleBytes;
   const endPage = end >> 8;
   let maxEdl = -1;

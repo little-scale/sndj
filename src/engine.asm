@@ -91,8 +91,8 @@ song_init:
     inx
     cpx #GROOVE_SZ
     bne @groove
-    ; factory instruments 0-7 (matching the MIDI track defaults):
-    ; 0-4 SMP on pool samples 0-4, 5 WAV bank 0, 6 NSE, 7 KIT 0
+    ; factory instruments 0-7 (the MIDI channel map): 0-6 pitched SMP
+    ; on pool samples 0-6, 7 = KIT 0 — the whole factory boot set
     ldx #$0000
 @finstr:
     rep #$30
@@ -135,50 +135,14 @@ song_init:
     inx
     cpx #$0008
     bne @finstr
-    ; auto-populate 8-63 so every slot is playable out of the box:
-    ; 8-47 SMP on pool samples 0-39, 48-55 WAV banks 0-7,
-    ; 56-58 the three kits, 59 NSE, 60-63 SMP melodics 0-3 again
+    ; 8-63: SMP on sample 0 — every slot plays out of the box, but the
+    ; factory boot set stays 0-7: residency follows REFERENCES, so a
+    ; sample only costs ARAM once an instrument or kit slot points at
+    ; it (edits rebuild the resident set on the spot)
 @autoinstr:
-    txa
-    sec
-    sbc #$08
-    sta es0 + 1             ; default: SMP, sample = slot - 8
     lda #$00
-    sta es0
-    txa
-    cmp #$30
-    bcc @ai_have            ; 8-47: SMP
-    cmp #$38
-    bcs @ai_not_wav
-    sec
-    sbc #$30
-    sta es0 + 1
-    lda #$02                ; 48-55: WAV bank 0-7
-    sta es0
-    bra @ai_have
-@ai_not_wav:
-    cmp #$3B
-    bcs @ai_not_kit
-    sec
-    sbc #$38
-    sta es0 + 1
-    lda #$01                ; 56-58: KIT 0/1/2
-    sta es0
-    bra @ai_have
-@ai_not_kit:
-    cmp #$3B
-    bne @ai_tail
-    lda #$03                ; 59: NSE
-    sta es0
-    lda #$00
-    sta es0 + 1
-    bra @ai_have
-@ai_tail:
-    sec
-    sbc #$3C                ; 60-63: melodics 0-3
-    sta es0 + 1
-    lda #$00
-    sta es0
+    sta es0                 ; type SMP
+    sta es0 + 1             ; sample 0
 @ai_have:
     phx
     rep #$30

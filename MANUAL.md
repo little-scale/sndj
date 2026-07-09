@@ -176,10 +176,14 @@ sound. An instrument's **TYPE** decides what the voice does:
 | **NSE** | the DSP noise generator; the note sets the noise clock |
 
 Any type can go on any of the 8 voices — there are no special
-channels. Eight kits at once is legal. The factory bank leads with
-the classic Super Mario World four (xylophone, steel drum, e-piano,
-slap bass), Mario Paint melodics, and three kits (SMW percussion,
-Mario Paint drums, the MP toybox).
+channels. Eight kits at once is legal. The factory set is deliberately
+lean: **instruments 00-06 are pitched SMP melodics** (the SMW four —
+xylophone, steel drum, e-piano, slap bass — plus strings, recorder,
+guitar) and **07 is KIT 0** (SMW percussion); slots 08-63 start as
+SMP on sample 0, ready to repoint. Audio RAM only holds what the song
+*references* — point an instrument or kit slot at any pool sample and
+it loads on the spot, so the rest of the pool costs nothing until you
+use it (the ECHO screen's RAM/FREE line shows the live balance).
 
 ### INSTR fields
 
@@ -280,10 +284,11 @@ loop*. This is the DKC cathedral, and in sndj it's sequenced like an
 instrument:
 
 - **ECHO screen** — EDL sets the delay (0–240 ms in 16 ms steps).
-  The screen shows exactly what each step costs in sample RAM
-  (`EDL 6 = 96MS = 12.0KB`) and won't let the buffer grow into your
-  samples. Feedback, return level L/R, and per-voice send toggles
-  live here too.
+  The screen shows what each step costs (`-12KB` beside DELAY) plus a
+  live **RAM / FREE ledger** — how much audio RAM the song's resident
+  samples hold versus what the current delay leaves free — and won't
+  let the buffer grow into your samples. Feedback, return level L/R,
+  and per-voice send toggles live here too.
 - **FIR screen** — the 8 filter taps as signed hex bytes. Eight
   presets (FLAT, DARK, BRIGHT, COMB, SOFT, DKC HALL, METAL, USER)
   recall with Y+↑/↓; B+d-pad hand-tweaks a tap (the readout shows
