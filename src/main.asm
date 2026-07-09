@@ -48,6 +48,8 @@
 .INCLUDE "livescr.asm"
 .INCLUDE "kitscr.asm"
 .INCLUDE "optionscr.asm"
+.INCLUDE "groovescr.asm"
+.INCLUDE "projectscr.asm"
 .INCLUDE "palette.asm"
 .INCLUDE "splash.asm"
 
@@ -163,10 +165,10 @@ str_stop:    .DB "STOP", 0
 ;   [S][C][P][I][T]      SONG    CHAIN  PHRASE INSTR TABLE
 ;   [F][G][ ][E][F]      FILES   GROOVE   -   ECHO  FIR
 minimap_chars: .DB "OP WKSCPITFG EF"
-minimap_impl:  .DB 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 0
+minimap_impl:  .DB 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0
 ; ui_mode -> minimap cell index ($FF = no highlight; LIVE is a mode of
 ; SONG so it highlights S)
-minimap_pos:   .DB $FF, 7, 6, 5, 8, 10, 13, 3, 5, 4, 0
+minimap_pos:   .DB $FF, 7, 6, 5, 8, 10, 13, 3, 5, 4, 0, 11, 1
 
 draw_minimap:
     lda ui_mode

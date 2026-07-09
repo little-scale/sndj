@@ -8,6 +8,11 @@
 .INDEX 16
 
 song_init_screen:
+    ; MODE LIVE: the S map position shows the launcher view
+    lda.l $7E0000 + SB_HEADER + SH_MODE
+    beq +
+    jmp live_init
++
     stz blk_mode
     lda #SCREEN_SONG
     sta ui_mode

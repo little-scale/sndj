@@ -818,6 +818,8 @@ track_trigger_note:
     lda.w str_buf + 26
     clc
     adc.w trk_tsp,x
+    clc
+    adc.l $7E0000 + SB_HEADER + SH_TRANSPOSE
     dec a                   ; note byte 1..96 -> index 0..95
     cmp #NOTE_MAX
     bcc @in_range

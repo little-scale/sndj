@@ -175,6 +175,11 @@ opt_cur      db      ; OPTIONS field cursor
 res_dir      ds 224  ; ARAM directory staging (56 slots x 4; NEVER str_buf —
                      ; 40 resident samples overflowed it and smashed vars)
 walk_guard   db      ; empty-entry recursion budget (block loops must halt)
+ed_groove    db      ; GROOVE screen: edited groove id
+gv_row       db      ; GROOVE screen: step cursor
+ed_lastgroove db     ; GROOVE insert buffer
+pj_cur       db      ; PROJECT field cursor
+pj_arm       db      ; PROJECT NEW confirm armed
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

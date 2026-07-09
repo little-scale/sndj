@@ -2,6 +2,15 @@
 
 ## 0.1.0-dev (unreleased)
 
+- GROOVE screen (A+Down from CHAIN): edit each groove's 16 ticks-per-
+  row steps live (B+d-pad, clamped 1-15; B tap repeats; Y+up/down
+  pages grooves) with a derived BPM readout and a playing-step marker.
+  Tempo is finally editable — grooves ARE the tempo.
+- PROJECT screen (A+Up from CHAIN): song name, TMPO readout, default
+  groove, song transpose (applied at trigger), MODE SONG/LIVE (LIVE
+  makes the S map position open the launcher), and NEW with a
+  tap-to-confirm.
+
 - patcher.html gains a palette editor (8 schemes x 5 colours, snapped
   to 15-bit BGR) alongside the sample pool; factory defaults (track
   instruments + kit layout) are marker-wrapped as SNDEF0 so tools can

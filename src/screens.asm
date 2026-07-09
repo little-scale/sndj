@@ -21,6 +21,8 @@
 .DEFINE SCREEN_LIVE   8
 .DEFINE SCREEN_KIT    9
 .DEFINE SCREEN_OPTIONS 10
+.DEFINE SCREEN_GROOVE 11
+.DEFINE SCREEN_PROJECT 12
 
 ; called every frame from the main loop
 screen_update:
@@ -63,6 +65,10 @@ screen_update:
     beq @kit
     cmp #SCREEN_OPTIONS
     beq @options
+    cmp #SCREEN_GROOVE
+    beq @groove
+    cmp #SCREEN_PROJECT
+    beq @project
     jmp song_update
 @phrase:
     jmp phrase_update
@@ -78,6 +84,10 @@ screen_update:
     jmp kit_update
 @options:
     jmp options_update
+@groove:
+    jmp groove_update
+@project:
+    jmp project_update
 @chain:
     jmp chain_update
 @instr:
@@ -141,6 +151,16 @@ nav_update:
     jsr song_init_screen
     bra @eat_far
 @down_not_opt:
+    cmp #SCREEN_CHAIN
+    bne @down_not_chain
+    jsr groove_init
+    bra @eat_far
+@down_not_chain:
+    cmp #SCREEN_PROJECT
+    bne @down_not_proj
+    jsr chain_init
+    bra @eat_far
+@down_not_proj:
     cmp #SCREEN_INSTR
     bne @down_not_instr
     jsr echo_init
@@ -175,8 +195,18 @@ nav_update:
     bra @eat_far
 @up_not_instr:
     cmp #SCREEN_SONG
-    bne @not_up
+    bne @up_not_song
     jsr options_init
+    bra @eat_far
+@up_not_song:
+    cmp #SCREEN_GROOVE
+    bne @up_not_groove
+    jsr chain_init
+    bra @eat_far
+@up_not_groove:
+    cmp #SCREEN_CHAIN
+    bne @not_up
+    jsr project_init
 @eat_far:
     rep #$20
 .ACCU 16

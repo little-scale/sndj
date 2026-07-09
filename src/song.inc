@@ -59,6 +59,7 @@
 .DEFINE SH_EON        7                ; per-voice echo send mask
 .DEFINE SH_FIR        8                ; FIR preset 0-7
 .DEFINE SH_NAME       9                ; 8-char song name (ASCII, space pad)
+.DEFINE SH_MODE       17               ; 0 = SONG, 1 = LIVE (S shows launcher)
 
 ; phrase row cell values
 .DEFINE NOTE_EMPTY    0                ; note byte: 0=empty, 1-96=C-0..B-7
