@@ -37,7 +37,7 @@ function brrEncodeBlock(samples, p1, p2, forceF0) {
       const nibs = [];
       let tp1 = p1, tp2 = p2, err = 0;
       for (const s of samples) {
-        const target = Math.trunc(s / 2);
+        const target = Math.floor(s / 2);  // python // floors negatives
         const pred = filterPredict(filt, tp1, tp2);
         const resid = target - pred;
         const base = rng ? (resid * 2) >> rng : resid * 2;
@@ -291,6 +291,171 @@ function fromImage(img) {
 }
 
 // ---------------------------------------------------------------- tuning/rom
+// ------------------------------------------------------------------ SF2
+// Mirror of tools/sndj_pool.py's soundfont pipeline, so the browser
+// patcher imports .sf2 presets exactly like the factory build does.
+
+function sf2Parse(bytes) {
+  const u16 = o => bytes[o] | (bytes[o + 1] << 8);
+  const u32 = o => (bytes[o] | (bytes[o + 1] << 8) | (bytes[o + 2] << 16) |
+    (bytes[o + 3] << 24)) >>> 0;
+  const chunks = {};
+  const walk = (pos, end) => {
+    while (pos < end - 8) {
+      const cid = String.fromCharCode(...bytes.slice(pos, pos + 4));
+      const size = u32(pos + 4);
+      const body = pos + 8;
+      if (cid === 'LIST') walk(body + 4, body + size);
+      else chunks[cid] = { off: body, size };
+      pos = body + size + (size & 1);
+    }
+  };
+  walk(12, bytes.length);
+  if (!chunks.smpl || !chunks.shdr) throw new Error('not an SF2 (no smpl/shdr)');
+  const recs = (name, sz) => {
+    if (!chunks[name]) return [];
+    const out = [];
+    for (let i = 0; i < Math.floor(chunks[name].size / sz); i++) {
+      out.push(chunks[name].off + i * sz);
+    }
+    return out;
+  };
+  const str = (o, n) => {
+    let s = '';
+    for (let i = 0; i < n; i++) {
+      if (bytes[o + i] === 0) break;
+      s += String.fromCharCode(bytes[o + i]);
+    }
+    return s;
+  };
+  // preset ownership: phdr -> pbag -> pgen(41) -> inst -> ibag -> igen(53)
+  const phdr = recs('phdr', 38), pbag = recs('pbag', 4), pgen = recs('pgen', 4);
+  const inst = recs('inst', 22), ibag = recs('ibag', 4), igen = recs('igen', 4);
+  const instSamples = [];
+  for (let i = 0; i < inst.length - 1; i++) {
+    const b0 = u16(inst[i] + 20), b1 = u16(inst[i + 1] + 20);
+    const sids = new Set();
+    for (let bg = b0; bg < b1; bg++) {
+      const g0 = u16(ibag[bg]), g1 = u16(ibag[bg + 1]);
+      for (let g = g0; g < g1; g++) {
+        if (u16(igen[g]) === 53) sids.add(u16(igen[g] + 2));
+      }
+    }
+    instSamples.push(sids);
+  }
+  const presetOf = {};
+  for (let p = 0; p < phdr.length - 1; p++) {
+    const pname = str(phdr[p], 20);
+    const b0 = u16(phdr[p] + 24), b1 = u16(phdr[p + 1] + 24);
+    for (let bg = b0; bg < b1; bg++) {
+      const g0 = u16(pbag[bg]), g1 = u16(pbag[bg + 1]);
+      for (let g = g0; g < g1; g++) {
+        if (u16(pgen[g]) === 41) {
+          const sids = instSamples[u16(pgen[g] + 2)];
+          if (sids) for (const sid of sids) {
+            if (!(sid in presetOf)) presetOf[sid] = pname;
+          }
+        }
+      }
+    }
+  }
+  const smpl = chunks.smpl.off;
+  const out = [];
+  const n = Math.floor(chunks.shdr.size / 46) - 1;
+  for (let i = 0; i < n; i++) {
+    const r = chunks.shdr.off + i * 46;
+    const start = u32(r + 20), end = u32(r + 24);
+    const ls = u32(r + 28), le = u32(r + 32);
+    const rate = u32(r + 36);
+    const root = bytes[r + 40];
+    const corr = bytes[r + 41] > 127 ? bytes[r + 41] - 256 : bytes[r + 41];
+    const pcm = new Int16Array(end - start);
+    for (let k = 0; k < pcm.length; k++) {
+      const o = smpl + (start + k) * 2;
+      const v = bytes[o] | (bytes[o + 1] << 8);
+      pcm[k] = v > 32767 ? v - 65536 : v;
+    }
+    out.push({
+      name: str(r, 20), pcm, rate, root, corr,
+      loop: (le > ls && ls >= start) ? [ls - start, le - start] : null,
+      preset: presetOf[i] || null,
+    });
+  }
+  return out;
+}
+
+// linear resample, bit-matching tools/sndj_pool.py resample()
+// (int() truncates toward zero; round() is round-half-to-even)
+function pyRound(x) {
+  const f = Math.floor(x);
+  const d = x - f;
+  if (d < 0.5) return f;
+  if (d > 0.5) return f + 1;
+  return f % 2 === 0 ? f : f + 1;
+}
+
+function sf2Resample(samples, srcRate, dstRate) {
+  if (srcRate === dstRate) return Array.from(samples);
+  const ratio = srcRate / dstRate;
+  const n = Math.trunc(samples.length / ratio);
+  const out = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const p = i * ratio;
+    const i0 = Math.trunc(p);
+    const fr = p - i0;
+    const a = samples[i0];
+    const b = i0 + 1 < samples.length ? samples[i0 + 1] : a;
+    out[i] = Math.trunc(a + (b - a) * fr);
+  }
+  return out;
+}
+
+// looped melodic prep: exact-loop resample with the root key baked in.
+// Returns { pcm, loopBlock, tuneSemis, tuneFine } (python parity).
+function sf2Melodic(s, trim) {
+  trim = trim || 0;
+  if (!s.loop) throw new Error(s.name + ' has no loop');
+  let rootEff = (s.root || 60) - (s.corr || 0) / 100;
+  if (!(rootEff >= 24 && rootEff <= 108)) rootEff = 60;
+  const shift = 61 - rootEff + trim;
+  const scale = Math.pow(2, -shift / 12);
+  const ideal = scale * 32000 / s.rate;
+  const [ls, le] = s.loop;
+  const loopLen = le - ls;
+  const target = Math.max(16, pyRound(loopLen * ideal / 16) * 16);
+  const factor = target / loopLen;
+  let pcm = sf2Resample(s.pcm, s.rate, s.rate * factor);
+  let lsOut = pyRound(ls * factor);
+  const cut = lsOut % 16;
+  pcm = pcm.slice(cut);
+  lsOut -= cut;
+  const end = lsOut + target;
+  while (pcm.length < end) pcm.push(pcm[pcm.length - target]);
+  pcm = pcm.slice(0, end);
+  const cents = 1200 * Math.log2(factor / ideal);
+  const semis = pyRound(cents / 100);
+  const fine = Math.max(-128, Math.min(127, pyRound((cents - semis * 100) * 2.56)));
+  return { pcm, loopBlock: lsOut / 16, tuneSemis: semis, tuneFine: fine };
+}
+
+// one-shot prep at 8 kHz (kit slots tune -24), python parity
+function sf2Oneshot(s, capMs) {
+  let src = Array.from(s.pcm);
+  let end = src.length;
+  while (end > 16 && Math.abs(src[end - 1]) < 300) end--;
+  src = src.slice(0, end);
+  let pcm = sf2Resample(src, s.rate, 8000);
+  pcm = pcm.slice(0, Math.trunc(8 * (capMs || 160)));
+  const fadeN = Math.min(256, pcm.length);
+  for (let i = 0; i < fadeN; i++) {
+    const k = pcm.length - fadeN + i;
+    pcm[k] = Math.floor(pcm[k] * (fadeN - i) / fadeN);
+  }
+  pcm = pcm.slice(0, Math.trunc(pcm.length / 16) * 16);
+  if (pcm.length < 16) pcm = new Array(16).fill(0);
+  return { pcm, loopBlock: null, tuneSemis: 0, tuneFine: 0 };
+}
+
 // ------------------------------------------------------------- SRAM (.srm)
 const SRM_SIZE = 0x8000;
 const SRM_REGIONS = 5;
@@ -496,6 +661,7 @@ function selftest() {
 }
 
 const SNDJ = {
+  sf2Parse, sf2Melodic, sf2Oneshot, sf2Resample,
   SRM_SIZE, SRM_REGION_SZ, SRM_SLOTS,
   srmNew, srmParse, srmExtract, srmInsert, srmErase, srmFreeRegion,
   sndjFileBuild, sndjFileParse,

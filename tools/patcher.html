@@ -32,9 +32,10 @@
 <body>
 <h1>sndj patcher <small>— samples &amp; palettes</small></h1>
 <p>Drop a built <code>sndj.sfc</code>, replace pool samples with your own
-WAVs (auto-resampled to 32 kHz, BRR-encoded with the reference codec),
-audition the decoded BRR, recolour the 8 palette schemes, and export a
-patched ROM. Everything runs locally.</p>
+WAVs or straight from an <code>.sf2</code> soundfont (same in-tune
+pipeline the factory pool uses: root keys baked, loops landed on BRR
+blocks), audition the decoded BRR, recolour the 8 palette schemes, and
+export a patched ROM. Everything runs locally.</p>
 <div class="drop" id="drop">drop sndj.sfc here (or click)</div>
 <input type="file" id="file" hidden>
 <div id="status"></div>
@@ -50,7 +51,23 @@ patched ROM. Everything runs locally.</p>
 <div id="exportview" hidden>
   <button class="primary" id="export">export patched ROM</button>
 </div>
-<input type="file" id="wavfile" hidden accept=".wav">
+<input type="file" id="wavfile" hidden accept=".wav,.sf2">
+<div id="sf2view" hidden>
+  <h1><small>import from soundfont</small></h1>
+  <div class="row" style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">
+    <select id="sfpick"></select>
+    <select id="sfmode">
+      <option value="melodic">melodic (looped, in tune)</option>
+      <option value="oneshot">one-shot (8 kHz kit drum)</option>
+    </select>
+    <label id="sftrimlab">trim semis <input type="number" id="sftrim" value="0"
+      min="-24" max="24" style="width:3.5rem"></label>
+    <label id="sfcaplab" hidden>cap ms <input type="number" id="sfcap" value="160"
+      min="20" max="500" style="width:4rem"></label>
+    <button class="primary" id="sfimport">import into slot</button>
+    <button id="sfcancel">cancel</button>
+  </div>
+</div>
 
 <script>
 'use strict';
@@ -125,10 +142,33 @@ function render() {
   $('poolview').hidden = false;
 }
 
+let sf2samples = null;
+
 $('wavfile').onchange = async e => {
   const f = e.target.files[0];
   e.target.value = '';
   if (!f || replacing < 0) return;
+  if (/\.sf2$/i.test(f.name)) {
+    try {
+      sf2samples = S.sf2Parse(new Uint8Array(await f.arrayBuffer()));
+    } catch (err) {
+      status('sf2 parse failed: ' + err.message, 1);
+      return;
+    }
+    const sel = $('sfpick');
+    sel.innerHTML = '';
+    sf2samples.forEach((s, i) => {
+      const o = document.createElement('option');
+      o.value = i;
+      o.textContent = (s.preset || s.name) + ' — ' + s.name +
+        (s.loop ? ' (looped)' : ' (one-shot)') +
+        ', root ' + s.root + ', ' + s.pcm.length + ' smp';
+      sel.appendChild(o);
+    });
+    $('sf2view').hidden = false;
+    status(f.name + ': pick a preset for slot #' + replacing);
+    return;
+  }
   try {
     const samples = await wavTo32k(f);
     const trimmed = samples.slice(0, Math.floor(samples.length / 16) * 16);
@@ -224,6 +264,39 @@ $('pal').oninput = e => {
   rom[off] = c & 0xFF;
   rom[off + 1] = c >> 8;
   status('palette edited (snapped to 15-bit BGR) — export to keep it');
+};
+
+$('sfmode').onchange = () => {
+  const one = $('sfmode').value === 'oneshot';
+  $('sfcaplab').hidden = !one;
+  $('sftrimlab').hidden = one;
+};
+$('sfcancel').onclick = () => { $('sf2view').hidden = true; };
+$('sfimport').onclick = () => {
+  if (!sf2samples || replacing < 0) return;
+  const s = sf2samples[+$('sfpick').value];
+  try {
+    let prep;
+    if ($('sfmode').value === 'melodic') {
+      prep = S.sf2Melodic(s, +$('sftrim').value || 0);
+    } else {
+      prep = S.sf2Oneshot(s, +$('sfcap').value || 160);
+    }
+    const brr = S.brrEncode(prep.pcm, prep.loopBlock);
+    const name = (s.preset || s.name).toUpperCase().replace(/[^A-Z0-9 ]/g, '')
+      .slice(0, 8) || 'SF2';
+    entries[replacing] = {
+      name, loopBlock: prep.loopBlock,
+      tuneSemis: prep.tuneSemis, tuneFine: prep.tuneFine, brr,
+    };
+    $('sf2view').hidden = true;
+    status('imported ' + name + ' into slot #' + replacing +
+      ' (' + brr.length + ' B, tune ' + prep.tuneSemis + ':' + prep.tuneFine +
+      ($('sfmode').value === 'oneshot' ? ', 8 kHz — kit slots want tune -24' : '') + ')');
+    render();
+  } catch (err) {
+    status('sf2 import failed: ' + err.message, 1);
+  }
 };
 
 $('export').onclick = () => {
