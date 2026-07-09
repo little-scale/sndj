@@ -10,6 +10,7 @@ local frames = 0
 local _booted = false
 local fails = 0
 local tick_sample = -1
+local pad = {}
 
 local function wram(addr)
   return emu.read(addr, emu.memType.snesWorkRam)
@@ -58,6 +59,10 @@ local function onFrame()
     check(hb > 0, "heartbeat counter running (hb=" .. hb .. ")")
     check(mv == hb, "SCB path: heartbeat landed in DSP reg $1D (" ..
       mv .. " == " .. hb .. ")")
+  elseif frames == 104 then
+    pad = { start = true }     -- leave the splash: chrome draws off-splash
+  elseif frames == 107 then
+    pad = {}
   elseif frames == 110 then
     -- kill the APU: fill the driver region with SLEEP opcodes ($EF).
     -- The next heartbeat must time out visibly, not hang.
@@ -68,9 +73,9 @@ local function onFrame()
   elseif frames == 250 then
     -- next heartbeat hits the dead mailbox; timeout is ~0.4s (~25 frames)
     check(wram(0x000D) == 1, "apu_status flags the timeout")
-    -- "APU?" drawn accent at (27,0): 'A' tile 33, attr $2400
-    check(cell(27, 0) == (string.byte("A") - 32 | 0x2400), "UI shows APU? warning")
-    check(cell(30, 0) == (string.byte("?") - 32 | 0x2400), "UI shows APU? question mark")
+    -- "APU?" drawn accent at (27,1): 'A' tile 33, attr $2400
+    check(cell(27, 1) == (string.byte("A") - 32 | 0x2400), "UI shows APU? warning")
+    check(cell(30, 1) == (string.byte("?") - 32 | 0x2400), "UI shows APU? question mark")
     -- and the machine is still alive:
     local fc = wram(0x0002) + wram(0x0003) * 256
     check(fc > 200, "CPU survived the APU death (frames=" .. fc .. ")")
@@ -84,4 +89,5 @@ local function onFrame()
   end
 end
 
+emu.addEventCallback(function() emu.setInput(pad, 0) end, emu.eventType.inputPolled)
 emu.addEventCallback(onFrame, emu.eventType.endFrame)

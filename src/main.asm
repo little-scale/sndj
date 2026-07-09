@@ -63,17 +63,45 @@ main_loop:
     jsr input_update
     jsr apu_update
     jsr engine_update
-    jsr draw_apu_status
-    jsr draw_minimap
+    jsr tick_track
 
     jsr screen_update
+    ; chrome draws after the screen so it overlays on every screen
+    jsr draw_status
+    jsr draw_minimap
     jmp main_loop
 
-; top-right APU health widget: dim "APU" when alive, accent "APU?" on timeout
-draw_apu_status:
+; fold the streamed APU tick byte into a free-running 16-bit counter
+tick_track:
+    lda apu_tick
+    sec
+    sbc tick_last8
+    beq @done
+    rep #$30
+.ACCU 16
+    and #$00FF
+    clc
+    adc tick_ctr
+    sta tick_ctr
+    sep #$20
+.ACCU 8
+    lda apu_tick
+    sta tick_last8
+@done:
+    rts
+
+; right-column chrome, sibling-style (top-right, top to bottom):
+; tick counter / blank / PLAY-STOP / blank / mini map (draw_minimap)
+draw_status:
+    lda ui_mode
+    bne @go                 ; not on the splash
+    rts
+@go:
+    ; y1: 4-hex tick counter, or APU? on a mailbox fault
     lda #27
     sta text_x
-    stz text_y
+    lda #1
+    sta text_y
     lda apu_status
     bne @bad
     rep #$20
@@ -82,8 +110,11 @@ draw_apu_status:
     sta text_attr
     sep #$20
 .ACCU 8
-    ldx #str_apu_ok
-    jmp text_puts
+    lda tick_ctr + 1
+    jsr text_hex8
+    lda tick_ctr
+    jsr text_hex8
+    bra @transport
 @bad:
     rep #$20
 .ACCU 16
@@ -92,20 +123,48 @@ draw_apu_status:
     sep #$20
 .ACCU 8
     ldx #str_apu_bad
+    jsr text_puts
+@transport:
+    ; y3: PLAY / STOP (sync state joins this line with M12)
+    lda #27
+    sta text_x
+    lda #3
+    sta text_y
+    lda eng_playing
+    beq @stopped
+    rep #$20
+.ACCU 16
+    lda #ATTR_ACCENT
+    sta text_attr
+    sep #$20
+.ACCU 8
+    ldx #str_play
+    jmp text_puts
+@stopped:
+    rep #$20
+.ACCU 16
+    lda #ATTR_TEXT
+    sta text_attr
+    sep #$20
+.ACCU 8
+    ldx #str_stop
     jmp text_puts
 
-str_apu_ok:  .DB "APU ", 0
 str_apu_bad: .DB "APU?", 0
+str_play:    .DB "PLAY", 0
+str_stop:    .DB "STOP", 0
 
-; the mini map (sibling chrome): the 3x5 screen layout, bottom-right,
-; current screen accented, built screens bright, future screens dim
-;   [O][P][M][W][K]
-;   [S][C][H][I][T]
-;   [F][G][L][E][R]
-minimap_chars: .DB "OPMWKSCHITFGLER"
-minimap_impl:  .DB 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0
-; ui_mode -> minimap cell index ($FF = no highlight, e.g. splash)
-minimap_pos:   .DB $FF, 7, 6, 5, 8, 10, 13, 3, 12, 4
+; the mini map (sibling chrome, smsggdj letters): 3x5 at the top right,
+; current screen accented, built screens bright, future screens dim.
+; PHRASE and PROJECT share P; FILES and FIR share F (as on smsggdj).
+;   [O][P][ ][W][K]      OPTIONS PROJECT  -   WAVE  KIT
+;   [S][C][P][I][T]      SONG    CHAIN  PHRASE INSTR TABLE
+;   [F][G][ ][E][F]      FILES   GROOVE   -   ECHO  FIR
+minimap_chars: .DB "OP WKSCPITFG EF"
+minimap_impl:  .DB 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 0
+; ui_mode -> minimap cell index ($FF = no highlight; LIVE is a mode of
+; SONG so it highlights S)
+minimap_pos:   .DB $FF, 7, 6, 5, 8, 10, 13, 3, 5, 4
 
 draw_minimap:
     lda ui_mode
@@ -138,7 +197,7 @@ draw_minimap:
 @d_done:
     tya
     clc
-    adc #25
+    adc #5
     sta text_y
     ; attr: accent if current, text if built, dim otherwise
     lda ui_mode

@@ -8,6 +8,9 @@
   insert, as before).
 - SONG/CHAIN/PHRASE grids sit four rows lower (headers at row 7,
   grids at row 8) and PHRASE cells line up under the NOTE/IN/CMD ruler.
+- Right-column chrome moved to the top right, smsggdj-style: 16-bit
+  tick counter (APU? on fault), PLAY/STOP, then the mini map with the
+  sibling letters (PHRASE = P, FIR = F); MIDI and LIVE left the map.
 - FILES is genmddj-style: slot list with names and sizes, (EMPTY)
   slots, live renaming (B-hold + d-pad), A+B action menu with
   SAVE / LOAD / CLEAR, a used-slots readout; playback stops on entry.

@@ -166,6 +166,8 @@ np_frac      dw
 fl_menu      db      ; FILES action menu open
 fl_mitem     db      ; menu cursor (0 save, 1 load, 2 clear)
 fl_ncur      db      ; name-edit character cursor 0-7
+tick_ctr     dw      ; free-running 16-bit APU tick counter (top-right)
+tick_last8   db      ; last apu_tick byte folded into tick_ctr
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

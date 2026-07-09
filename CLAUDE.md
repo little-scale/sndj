@@ -448,13 +448,15 @@ remains complete and sibling-identical.
 
 ## 8. Screens
 
-Thirteen screens on the genmddj-style 2-D map, navigated with A (held) +
-d-pad:
+Eleven screens on the genmddj-style 2-D map, navigated with A (held) +
+d-pad (smsggdj letters — PHRASE and PROJECT share P, FILES and FIR
+share F; MIDI takeover is a SYNC option in OPTIONS, not a screen; LIVE
+is a MODE menu item, not a screen — Select still toggles the live view):
 
 ```
-[O][P][M][W][K]      OPTIONS  PROJECT  MIDI   WAVE   KIT
-[S][C][H][I][T]      SONG     CHAIN    PHRASE INSTR  TABLE
-[F][G][L][E][R]      FILES    GROOVE   LIVE   ECHO   FIR
+[O][P][ ][W][K]      OPTIONS  PROJECT   -    WAVE   KIT
+[S][C][P][I][T]      SONG     CHAIN   PHRASE INSTR  TABLE
+[F][G][ ][E][F]      FILES    GROOVE    -    ECHO   FIR
 ```
 
 Middle row is the composing spine (identical to the siblings). The column
