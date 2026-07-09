@@ -208,6 +208,7 @@ cl_cdst      db
 cl_e         db
 cl_s         db
 cl_p         db
+video_pal    db      ; STAT78 bit 4 at boot: 1 = PAL console
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

@@ -2,6 +2,14 @@
 
 ## 0.1.0-dev (unreleased)
 
+- OPTIONS: VIDEO now reads the detected console standard (NTSC 60HZ /
+  PAL 50HZ via STAT78) — the SNES can't switch standards in software,
+  and tempo/pitch ride the region-free APU crystal either way; the
+  redundant CLOCK row is gone.
+- Map: OPTIONS<->PROJECT and FILES<->GROOVE link left/right; KIT sits
+  above TABLE (A+Up/Down); the WAVE->KIT hop is removed so A+Right on
+  WAVE is purely bank select.
+
 - Minting and cloning (genmddj §4): B double-tap on an empty SONG/
   CHAIN reference cell mints the next free blank chain/phrase; on a
   populated cell it clones into a fresh slot and repoints. OPTIONS

@@ -4,14 +4,14 @@
 ;   PALETTE  — B-hold + left/right cycles the 8 schemes (applies
 ;              instantly, persists in SRAM)
 ;
-; VIDEO/SYNC arrive with their subsystems; CLOCK proudly reads APU XTAL
-; because pitch and tempo are region-free on the SNES (CLAUDE.md §2).
+; VIDEO shows the detected console standard (display only — pitch and
+; tempo ride the region-free APU crystal); SYNC arrives with M12.
 ; Reached with A+Up from SONG.
 
 .ACCU 8
 .INDEX 16
 
-.DEFINE OPT_FIELDS 5
+.DEFINE OPT_FIELDS 4
 
 options_init:
     lda #SCREEN_OPTIONS
@@ -207,6 +207,26 @@ options_draw:
     jmp @next
 @not_clone_v:
     lda ui_cnt
+    cmp #$02
+    bne @not_video
+    ; VIDEO: the detected console standard (tempo is region-free)
+    rep #$20
+.ACCU 16
+    lda #ATTR_TEXT
+    sta text_attr
+    sep #$20
+.ACCU 8
+    lda video_pal
+    beq @ntsc
+    ldx #str_o_pal50
+    jsr text_puts
+    jmp @next
+@ntsc:
+    ldx #str_o_ntsc
+    jsr text_puts
+    jmp @next
+@not_video:
+    lda ui_cnt
     bne @fixed
     ; PALETTE: index + 4-char name (text attr)
     rep #$20
@@ -275,8 +295,8 @@ options_draw:
 @rows_far:
     jmp @rows
 
-opt_labels: .DW str_o_pal, str_o_clone, str_o_vid, str_o_sync, str_o_clk
-opt_values: .DW str_o_pal, str_o_pal, str_o_v60, str_o_soff, str_o_xtal
+opt_labels: .DW str_o_pal, str_o_clone, str_o_vid, str_o_sync
+opt_values: .DW str_o_pal, str_o_pal, str_o_v60, str_o_soff
 
 str_options: .DB "OPTIONS", 0
 str_o_pal:   .DB "PALETTE", 0
@@ -285,7 +305,7 @@ str_o_slim:  .DB "SLIM", 0
 str_o_deep:  .DB "DEEP", 0
 str_o_vid:   .DB "VIDEO", 0
 str_o_sync:  .DB "SYNC", 0
-str_o_clk:   .DB "CLOCK", 0
 str_o_v60:   .DB "60HZ", 0
+str_o_ntsc:  .DB "NTSC 60HZ", 0
+str_o_pal50: .DB "PAL 50HZ ", 0
 str_o_soff:  .DB "OFF", 0
-str_o_xtal:  .DB "N/A (APU XTAL)", 0

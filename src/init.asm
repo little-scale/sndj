@@ -188,6 +188,15 @@ init_video:
     lda #$01
     sta MDMAEN
 
+    ; which console are we on? (display only — tempo/pitch ride the
+    ; region-free APU crystal)
+    lda $213F               ; STAT78
+    and #$10
+    beq +
+    lda #$01
++
+    sta video_pal
+
     ; palette: build CGRAM + the gradient from the persisted scheme
     jsr palette_boot
 

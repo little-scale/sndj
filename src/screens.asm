@@ -154,12 +154,12 @@ nav_update:
     cmp #SCREEN_SONG
     bne @down_not_song
     jsr files_init
-    bra @eat_far
+    jmp @eat_far
 @down_not_song:
     cmp #SCREEN_OPTIONS
     bne @down_not_opt
     jsr song_init_screen
-    bra @eat_far
+    jmp @eat_far
 @down_not_opt:
     cmp #SCREEN_CHAIN
     bne @down_not_chain
@@ -169,8 +169,13 @@ nav_update:
     cmp #SCREEN_PROJECT
     bne @down_not_proj
     jsr chain_init
-    bra @eat_far
+    jmp @eat_far
 @down_not_proj:
+    cmp #SCREEN_KIT
+    bne @down_not_kit
+    jsr table_init
+    jmp @eat_far
+@down_not_kit:
     cmp #SCREEN_INSTR
     bne @down_not_instr
     jsr echo_init
@@ -215,8 +220,13 @@ nav_update:
     bra @eat_far
 @up_not_groove:
     cmp #SCREEN_CHAIN
-    bne @not_up
+    bne @up_not_chain2
     jsr project_init
+    bra @eat_far
+@up_not_chain2:
+    cmp #SCREEN_TABLE
+    bne @not_up
+    jsr kit_init
 @eat_far:
     rep #$20
 .ACCU 16
@@ -244,16 +254,21 @@ nav_update:
     beq @to_phrase
     cmp #SCREEN_PHRASE
     beq @to_instr
-    cmp #SCREEN_WAVE
-    bne @right_not_wave
-    jsr kit_init
-    bra @eat_right
-@right_not_wave:
     cmp #SCREEN_ECHO
     bne @right_not_echo
     jsr fir_init
     bra @eat_right
 @right_not_echo:
+    cmp #SCREEN_OPTIONS
+    bne @right_not_opt
+    jsr project_init
+    bra @eat_right
+@right_not_opt:
+    cmp #SCREEN_FILES
+    bne @right_not_files
+    jsr groove_init
+    bra @eat_right
+@right_not_files:
     cmp #SCREEN_INSTR
     bne @no_right
     ; follow the instrument's TABLE field
@@ -348,11 +363,16 @@ nav_update:
     beq @to_song
     cmp #SCREEN_INSTR
     beq @to_phrase2
-    cmp #SCREEN_KIT
-    bne @left_not_kit
-    jsr wave_init
+    cmp #SCREEN_PROJECT
+    bne @left_not_proj
+    jsr options_init
     bra @eat_left2
-@left_not_kit:
+@left_not_proj:
+    cmp #SCREEN_GROOVE
+    bne @left_not_grv
+    jsr files_init
+    bra @eat_left2
+@left_not_grv:
     cmp #SCREEN_FIR
     bne @left_not_fir
     jsr echo_init
