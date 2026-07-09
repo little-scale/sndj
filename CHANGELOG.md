@@ -7,6 +7,12 @@
   slots. Saves append and flip the entry; overwrites and clears close
   their holes by sliding the tail (per-song CRCs guard a power cut
   mid-slide). Old v1 saves reformat on first boot.
+- sndj.js gained a sample-accurate S-DSP model (ported from blargg's
+  snes_spc): BRR through the real Gaussian interpolator, hardware
+  ADSR/GAIN with the rate-counter table, noise LFSR, pitch modulation,
+  and the full echo/FIR/feedback path with the chip's truncation
+  quirks — the keystone that lets the browser tools play actual
+  console sound. Plus a WAV builder for offline renders.
 - FILES looks like genmddj now: SRAM/FREE readout, a divider carrying
   the song count, names with decimal sizes (N.NKB), block cursor on
   the name, and the rename ring runs blank-A..Z-specials one way and
