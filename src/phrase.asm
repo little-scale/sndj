@@ -35,7 +35,7 @@ phrase_init:
     ; column titles
     lda #4
     sta text_x
-    lda #3
+    lda #7
     sta text_y
     rep #$20
 .ACCU 16
@@ -821,7 +821,7 @@ phrase_draw:
 @rows:
     lda tmp0 + 1
     clc
-    adc #4
+    adc #8
     sta text_y
     ; row label
     lda #1
@@ -895,7 +895,7 @@ phrase_draw:
 
     ; INSTR cell
     inc tmp0
-    lda #8
+    lda #9
     sta text_x
     jsr cell_attr
     lda str_buf + 33
@@ -909,7 +909,7 @@ phrase_draw:
 
     ; CMD cell
     inc tmp0
-    lda #11
+    lda #13
     sta text_x
     jsr cell_attr
     lda str_buf + 34
@@ -925,7 +925,7 @@ phrase_draw:
 
     ; VAL cell (contiguous with the command letter)
     inc tmp0
-    lda #12
+    lda #14
     sta text_x
     jsr cell_attr
     lda str_buf + 34        ; empty cmd draws val dimmed as --

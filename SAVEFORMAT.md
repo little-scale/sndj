@@ -18,7 +18,7 @@ phrase growth moves nothing else. Save/load is a straight copy.
 | $1000  | $0100 | 16 grooves x 16 ticks-per-row entries |
 | $1100  | $0100 | 8 wave banks x 32 samples |
 | $1200  | $0400 | 16 kits x 16 slots x 4 bytes (sample, tune, vol, flags; a slot with vol 0 is empty) |
-| $1600  | $0100 | song header: groove, transpose, magic $D7 at +2, echo block at +3 (EDL, feedback, EVOL L/R, EON mask, FIR preset) |
+| $1600  | $0100 | song header: groove, transpose, magic $D7 at +2, echo block at +3 (EDL, feedback, EVOL L/R, EON mask, FIR preset), song name at +9 (8 ASCII chars, space padded — stamped into the slot entry on SAVE, taken from it on LOAD) |
 | $1700  | $0C00 | 96 chains x 16 entries x 2 bytes (phrase, transpose) |
 | $2300  | $3000 | 192 phrases x 16 rows x 4 bytes (note, instr, cmd, val) |
 

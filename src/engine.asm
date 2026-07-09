@@ -11,6 +11,7 @@
 .ACCU 8
 .INDEX 16
 
+str_defname: .DB "SONG    "
 factory_instr_type: .DB 0, 0, 0, 0, 0, 2, 3, 1
 factory_instr_smp:  .DB 0, 1, 2, 3, 4, 0, 0, 0
 
@@ -222,7 +223,14 @@ song_init:
     inx
     cpx #$0020                      ; 32 slots = kits 0 and 1
     bne @fkits
-    ; header
+    ; header: name "SONG    " then settings
+    ldx #$0000
+@sname:
+    lda.w str_defname,x
+    sta.l $7E0000 + SB_HEADER + SH_NAME,x
+    inx
+    cpx #$0008
+    bne @sname
     lda #$00
     sta.l $7E0000 + SB_HEADER + SH_GROOVE
     sta.l $7E0000 + SB_HEADER + SH_EDL

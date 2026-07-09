@@ -544,25 +544,49 @@ save_slot:
     sta.l SRAM_TABLE + 4,x
     lda sv_crc + 1
     sta.l SRAM_TABLE + 5,x
-    ; name: "SONG" + slot digit + spaces
-    lda #'S'
+    ; name travels from the song header
+    ldy #$0000
+@name_cp:
+    phx
+    rep #$30
+.ACCU 16
+    tyx
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_HEADER + SH_NAME,x
+    plx
     sta.l SRAM_TABLE + 6,x
-    lda #'O'
-    sta.l SRAM_TABLE + 7,x
-    lda #'N'
-    sta.l SRAM_TABLE + 8,x
-    lda #'G'
-    sta.l SRAM_TABLE + 9,x
-    lda sv_slot
-    clc
-    adc #'0'
-    sta.l SRAM_TABLE + 10,x
-    lda #' '
-    sta.l SRAM_TABLE + 11,x
-    sta.l SRAM_TABLE + 12,x
-    sta.l SRAM_TABLE + 13,x
+    inx
+    iny
+    cpy #$0008
+    bne @name_cp
+    rep #$30
+.ACCU 16
+    txa
+    sec
+    sbc #$0008
+    tax
+    sep #$20
+.ACCU 8
     lda #$A5
     sta.l SRAM_TABLE,x      ; the atomic flip
+    lda #SV_OK
+    rts
+
+; --- clear slot A (0-3): a single status-byte write, journal-safe ------------------
+slot_clear:
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda #$FF
+    sta.l SRAM_TABLE,x
     lda #SV_OK
     rts
 

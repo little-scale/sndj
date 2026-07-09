@@ -34,7 +34,7 @@ song_init_screen:
     adc ui_cnt
     adc #4
     sta text_x
-    lda #3
+    lda #7
     sta text_y
     lda #'V' - 32
     jsr text_puttile
@@ -381,7 +381,7 @@ song_draw:
 @rows:
     lda tmp0 + 1
     clc
-    adc #4
+    adc #8
     sta text_y
     ; row label = song_top + i
     lda #1

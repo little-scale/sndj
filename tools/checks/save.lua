@@ -138,15 +138,20 @@ emu.addEventCallback(function()
     t0 = frames + 4
   elseif stage == "on_files" and frames == t0 then
     check(wram(0x0C) == 5, "A+Down opened FILES")
-    pad = { right = true }     -- SAVE column
-    stage = "col"
+    pad = { a = true }         -- A+B opens the action menu
+    stage = "menu_a"
     t0 = frames + 2
-  elseif stage == "col" and frames == t0 then
+  elseif stage == "menu_a" and frames == t0 then
+    pad = { a = true, b = true }
+    stage = "menu_ab"
+    t0 = frames + 2
+  elseif stage == "menu_ab" and frames == t0 then
     pad = {}
     stage = "do_save"
     t0 = frames + 4
   elseif stage == "do_save" and frames == t0 then
-    pad = { b = true }
+    check(wram(0x1CE) == 1, "action menu open")
+    pad = { b = true }         -- item 0 = SAVE
     stage = "saving"
     t0 = frames + 2
   elseif stage == "saving" and frames == t0 then
@@ -166,13 +171,25 @@ emu.addEventCallback(function()
     for a = SB, SB + 0x200 do poke(a, 0x11) end
     poke(0x3000, 9)
     check(not block_equal(snapshot), "song block corrupted for the test")
-    pad = { left = true }      -- LOAD column
-    stage = "col2"
+    pad = { a = true }
+    stage = "lmenu_a"
     t0 = frames + 2
-  elseif stage == "col2" and frames == t0 then
+  elseif stage == "lmenu_a" and frames == t0 then
+    pad = { a = true, b = true }
+    stage = "lmenu_ab"
+    t0 = frames + 2
+  elseif stage == "lmenu_ab" and frames == t0 then
+    pad = {}
+    stage = "lmenu_dn"
+    t0 = frames + 4
+  elseif stage == "lmenu_dn" and frames == t0 then
+    pad = { down = true }      -- item 1 = LOAD
+    stage = "lmenu_dn2"
+    t0 = frames + 2
+  elseif stage == "lmenu_dn2" and frames == t0 then
     pad = {}
     stage = "do_load"
-    t0 = frames + 4
+    t0 = frames + 2
   elseif stage == "do_load" and frames == t0 then
     pad = { b = true }
     stage = "loading"
@@ -208,7 +225,27 @@ emu.addEventCallback(function()
   elseif stage == "reboot_load" and frames == t0 then
     check(wram(0x0C) == 5, "FILES reachable after reset")
     check(sram(0x10) == 0xA5, "slot survived the reset")
-    pad = { b = true }         -- cursor defaults to LOAD/slot 0
+    pad = { a = true }
+    stage = "rmenu_a"
+    t0 = frames + 2
+  elseif stage == "rmenu_a" and frames == t0 then
+    pad = { a = true, b = true }
+    stage = "rmenu_ab"
+    t0 = frames + 2
+  elseif stage == "rmenu_ab" and frames == t0 then
+    pad = {}
+    stage = "rmenu_dn"
+    t0 = frames + 4
+  elseif stage == "rmenu_dn" and frames == t0 then
+    pad = { down = true }      -- item 1 = LOAD
+    stage = "rmenu_dn2"
+    t0 = frames + 2
+  elseif stage == "rmenu_dn2" and frames == t0 then
+    pad = {}
+    stage = "rmenu_b"
+    t0 = frames + 2
+  elseif stage == "rmenu_b" and frames == t0 then
+    pad = { b = true }
     stage = "reboot_loading"
     t0 = frames + 4
   elseif stage == "reboot_loading" and frames == t0 then

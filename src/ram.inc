@@ -163,6 +163,9 @@ np_fine      db
 np_base      dw
 np_delta     dw
 np_frac      dw
+fl_menu      db      ; FILES action menu open
+fl_mitem     db      ; menu cursor (0 save, 1 load, 2 clear)
+fl_ncur      db      ; name-edit character cursor 0-7
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

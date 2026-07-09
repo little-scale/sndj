@@ -6,6 +6,12 @@
   B double-tap paste) on PHRASE, CHAIN and SONG.
 - Single-cell cut is B held + A tap (the cut value feeds the next
   insert, as before).
+- SONG/CHAIN/PHRASE grids sit four rows lower (headers at row 7,
+  grids at row 8) and PHRASE cells line up under the NOTE/IN/CMD ruler.
+- FILES is genmddj-style: slot list with names and sizes, (EMPTY)
+  slots, live renaming (B-hold + d-pad), A+B action menu with
+  SAVE / LOAD / CLEAR, a used-slots readout; playback stops on entry.
+  Songs carry an 8-character name in the song header.
 - Channel switching: L/R shoulders (or Y+left/right) hop tracks on SONG,
   CHAIN and PHRASE.
 - Per-instrument echo send (ECHO field) and fine-tune (FINE field,
