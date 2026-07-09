@@ -32,8 +32,7 @@ echo_init:
     sta ui_mode
     stz if_cur              ; reuse the INSTR field cursor
     jsr text_clear
-    lda #1
-    sta text_x
+    stz text_x
     lda #1
     sta text_y
     rep #$20

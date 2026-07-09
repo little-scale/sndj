@@ -17,8 +17,7 @@ live_init:
     lda #SCREEN_LIVE
     sta ui_mode
     jsr text_clear
-    lda #1
-    sta text_x
+    stz text_x
     lda #1
     sta text_y
     rep #$20

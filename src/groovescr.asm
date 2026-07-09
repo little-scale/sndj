@@ -23,8 +23,7 @@ groove_init:
     sta ed_lastgroove       ; sensible first insert
 +
     jsr text_clear
-    lda #1
-    sta text_x
+    stz text_x
     lda #1
     sta text_y
     rep #$20

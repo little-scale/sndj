@@ -17,8 +17,7 @@ song_init_screen:
     lda #SCREEN_SONG
     sta ui_mode
     jsr text_clear
-    lda #1
-    sta text_x
+    stz text_x
     lda #1
     sta text_y
     rep #$20
@@ -37,9 +36,9 @@ song_init_screen:
     asl
     clc
     adc ui_cnt
-    adc #4
+    adc #3
     sta text_x
-    lda #4
+    lda #3
     sta text_y
     lda ui_cnt
     clc
@@ -404,8 +403,7 @@ song_draw:
     adc #5
     sta text_y
     ; row label = song_top + i
-    lda #1
-    sta text_x
+    stz text_x
     rep #$20
 .ACCU 16
     lda #ATTR_DIM
@@ -423,7 +421,7 @@ song_draw:
     asl
     clc
     adc tmp0
-    adc #4                  ; x = 4 + track*3
+    adc #3                  ; x = 3 + track*3
     sta text_x
     jsr song_cell_attr
     ; cell value

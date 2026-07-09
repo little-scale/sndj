@@ -12,8 +12,7 @@ kit_init:
     stz kt_row
     stz kt_col
     jsr text_clear
-    lda #1
-    sta text_x
+    stz text_x
     lda #1
     sta text_y
     rep #$20

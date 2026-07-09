@@ -18,8 +18,7 @@ options_init:
     sta ui_mode
     stz opt_cur
     jsr text_clear
-    lda #1
-    sta text_x
+    stz text_x
     lda #1
     sta text_y
     rep #$20

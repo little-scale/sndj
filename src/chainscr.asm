@@ -11,8 +11,7 @@ chain_init:
     lda #SCREEN_CHAIN
     sta ui_mode
     jsr text_clear
-    lda #1
-    sta text_x
+    stz text_x
     lda #1
     sta text_y
     rep #$20
@@ -26,7 +25,7 @@ chain_init:
     lda ed_chain
     jsr text_hex8
     ; column ruler
-    lda #4
+    lda #3
     sta text_x
     lda #4
     sta text_y
@@ -702,8 +701,7 @@ chain_draw:
     clc
     adc #5
     sta text_y
-    lda #1
-    sta text_x
+    stz text_x
     rep #$20
 .ACCU 16
     lda #ATTR_DIM
@@ -737,7 +735,7 @@ chain_draw:
     sta str_buf + 33
     ; PHRASE cell
     stz tmp0
-    lda #4
+    lda #3
     sta text_x
     jsr chain_cell_attr
     lda str_buf + 32
@@ -752,7 +750,7 @@ chain_draw:
     jsr text_hex8
 @tsp_cell:
     inc tmp0
-    lda #8
+    lda #7
     sta text_x
     jsr chain_cell_attr
     lda str_buf + 33

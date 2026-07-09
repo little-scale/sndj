@@ -18,8 +18,7 @@ phrase_init:
     stz cur_y
     stz b_down
     jsr text_clear
-    lda #1
-    sta text_x
+    stz text_x
     lda #1
     sta text_y
     rep #$20
@@ -33,7 +32,7 @@ phrase_init:
     lda ed_phrase
     jsr text_hex8
     ; column titles
-    lda #4
+    lda #3
     sta text_x
     lda #4
     sta text_y
@@ -857,8 +856,7 @@ phrase_draw:
     adc #5
     sta text_y
     ; row label
-    lda #1
-    sta text_x
+    stz text_x
     rep #$20
 .ACCU 16
     lda #ATTR_DIM
@@ -868,7 +866,7 @@ phrase_draw:
     lda tmp0 + 1
     jsr text_hex8
     ; playhead
-    lda #3
+    lda #2
     sta text_x
     lda eng_playing
     beq @nohead
@@ -920,7 +918,7 @@ phrase_draw:
 
     ; NOTE cell
     stz tmp0                ; column counter
-    lda #4
+    lda #3
     sta text_x
     jsr cell_attr
     lda str_buf + 32
@@ -928,7 +926,7 @@ phrase_draw:
 
     ; INSTR cell
     inc tmp0
-    lda #9
+    lda #8
     sta text_x
     jsr cell_attr
     lda str_buf + 33
@@ -942,7 +940,7 @@ phrase_draw:
 
     ; CMD cell
     inc tmp0
-    lda #13
+    lda #12
     sta text_x
     jsr cell_attr
     lda str_buf + 34
@@ -958,7 +956,7 @@ phrase_draw:
 
     ; VAL cell (contiguous with the command letter)
     inc tmp0
-    lda #14
+    lda #13
     sta text_x
     jsr cell_attr
     lda str_buf + 34        ; empty cmd draws val dimmed as --

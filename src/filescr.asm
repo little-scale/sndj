@@ -29,8 +29,7 @@ files_init:
     sta fl_msg              ; no message
     jsr engine_stop         ; playback stops while managing files
     jsr text_clear
-    lda #1
-    sta text_x
+    stz text_x
     lda #1
     sta text_y
     rep #$20
