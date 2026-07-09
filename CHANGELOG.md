@@ -5,6 +5,12 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- Command reshuffle to match the family: **`X` is now volume/accent**
+  (as in genmddj) — `X xy` sets the voice's level (both sides, 00-7F),
+  persisting like `P` until the instrument reloads. **The echo send
+  moved to `E`** (`E01` in, `E00` out). Accent, pan (`P`), surround
+  (`U`) and tremolo now compose: they all act on one live per-voice
+  level instead of fighting over the DSP registers. 24 letters live.
 - Instruments gained **VIB** and **TRM** (smsggdj-style): vibrato and
   tremolo as instrument settings, speed·depth nibbles each. VIB is the
   familiar triangle pitch wobble on every note; TRM dips VOL L/R below

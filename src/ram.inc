@@ -222,6 +222,9 @@ trk_vib      ds 8    ; live vibrato speed/depth (instr VIB at trigger; V overrid
 trk_trm      ds 8    ; live tremolo speed/depth (instr TRM at trigger)
 trk_trm_ph   ds 8    ; tremolo phase
 tg_vibtrm    dw      ; trigger scratch: instr VIB/TRM bytes (es3 is the tick loop's)
+trk_voll     ds 8    ; live volume L (signed): record at load, X/P/U retarget,
+trk_volr     ds 8    ; TRM dips from it              live volume R
+ap_vol       dw      ; apply_instrument scratch: record VOL L/R pair
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

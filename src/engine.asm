@@ -18,6 +18,7 @@ str_defname: .DB "SONG    "
 .DEFINE CMDID_B 2
 .DEFINE CMDID_C 3
 .DEFINE CMDID_D 4
+.DEFINE CMDID_E 5
 .DEFINE CMDID_F 6
 .DEFINE CMDID_G 7
 .DEFINE CMDID_H 8
@@ -517,6 +518,8 @@ engine_go:
     sta.w trk_vib,x
     sta.w trk_trm,x
     sta.w trk_trm_ph,x
+    sta.w trk_voll,x
+    sta.w trk_volr,x
     sta.w trk_fine,x
     sta.w trk_chord,x
     sta.w trk_playcnt,x
@@ -1015,8 +1018,9 @@ track_trigger_note:
     sta kon_mask
     jmp grp_fanout
 
-; --- post-trigger commands (X = track): P overrides the instrument volume,
-; V overrides the instrument VIB (both last until the next trigger) -------------
+; --- post-trigger commands (X = track): X/P retarget the voice's live
+; volume, V overrides the instrument VIB (all last until the voice
+; reloads its instrument / the next trigger) ------------------------------------
 row_cmd_post:
     lda.w trk_cmd,x
     cmp #CMDID_V
@@ -1025,6 +1029,16 @@ row_cmd_post:
     sta.w trk_vib,x
     rts
 @not_v:
+    cmp #CMDID_X
+    bne @not_x
+    ; X: volume/accent — this voice's level, both sides (the family
+    ; accent command, as in genmddj)
+    lda.w trk_cval,x
+    and #$7F
+    sta.w trk_voll,x
+    sta.w trk_volr,x
+    jmp track_vol_write
+@not_x:
     cmp #CMDID_P
     beq @pan
     rts
@@ -1036,6 +1050,15 @@ row_cmd_post:
     sec
     sbc es0
     lsr
+    sta.w trk_voll,x
+    lda es0
+    lsr
+    sta.w trk_volr,x
+    ; fall through to the writer
+
+; write trk_voll/volr to voice X's DSP volume registers; preserves X
+track_vol_write:
+    lda.w trk_voll,x
     tay
     txa
     asl
@@ -1046,8 +1069,7 @@ row_cmd_post:
     phx
     jsr apu_dsp_write
     plx
-    lda es0
-    lsr
+    lda.w trk_volr,x
     tay
     txa
     asl
@@ -1103,9 +1125,9 @@ row_cmd_pre:
     plx
     rts
 @not_t:
-    cmp #CMDID_X
-    bne @not_x
-    ; X: echo send on/off for this voice (val 0 = off, else on)
+    cmp #CMDID_E
+    bne @not_e
+    ; E: echo send on/off for this voice (val 0 = off, else on)
     lda.w trk_cval,x
     beq @eon_off
     lda.w bit_for_track,x
@@ -1123,7 +1145,7 @@ row_cmd_pre:
     jsr apu_dsp_write
     plx
     rts
-@not_x:
+@not_e:
     cmp #CMDID_Y
     bne @not_y
     ; Y: FIR preset select (global)
@@ -1477,68 +1499,45 @@ cmd_gain:
     rts
 
 ; --- U xy: surround — invert L (x) / R (y) phase via signed volumes ------------
+; Sets the SIGN of the voice's live level (magnitude — record, X or P —
+; is untouched), so U00 is always both-upright. The instrument shadow is
+; invalidated so the next trigger restores the record's own signs.
 cmd_surround:
-    lda.w trk_instr,x
-    cmp #$FF
-    beq @out
-    phx
-    rep #$30
-.ACCU 16
-    and #$00FF
-    asl
-    asl
-    asl
-    asl
-    tax
-    sep #$20
-.ACCU 8
-    lda.l $7E0000 + SB_INSTR + 4,x
+    lda.w trk_voll,x
+    bpl @l_mag
+    eor #$FF
+    inc a
+@l_mag:
     sta es0
-    lda.l $7E0000 + SB_INSTR + 5,x
-    sta es0 + 1
-    plx
     lda.w trk_cval,x
     and #$F0
-    beq @l_ok
+    beq @l_up
     lda es0
     eor #$FF
     inc a
     sta es0
-@l_ok:
-    lda.w trk_cval,x
-    and #$0F
-    beq @r_ok
-    lda es0 + 1
+@l_up:
+    lda es0
+    sta.w trk_voll,x
+    lda.w trk_volr,x
+    bpl @r_mag
     eor #$FF
     inc a
-    sta es0 + 1
-@r_ok:
+@r_mag:
+    sta es0
+    lda.w trk_cval,x
+    and #$0F
+    beq @r_up
     lda es0
-    tay
-    txa
-    asl
-    asl
-    asl
-    asl
-    ora #DSP_V0VOLL
-    phx
-    jsr apu_dsp_write
-    plx
-    lda es0 + 1
-    tay
-    txa
-    asl
-    asl
-    asl
-    asl
-    ora #DSP_V0VOLR
-    phx
-    jsr apu_dsp_write
-    plx
+    eor #$FF
+    inc a
+    sta es0
+@r_up:
+    lda es0
+    sta.w trk_volr,x
     lda #$FF
     sta.w trk_instr_active,x
-@out:
-    rts
+    jmp track_vol_write
 
 ; --- GRP: instrument on track X drives voices X+1..X+span with offsets --------
 ; trig_note = the (transposed) base note index. Preserves X.
@@ -2212,35 +2211,10 @@ fx_trm:
     bne @mul
 @dip_have:
     lsr es1                 ; dip 0..112
-    ; volumes from the instrument record (VIB/TRM require an instrument)
-    lda.w trk_instr,x
-    cmp #INSTR_NONE
-    bne @have_instr
-    rts
-@have_instr:
-    phx
-    rep #$30
-.ACCU 16
-    and #$00FF
-    asl
-    asl
-    asl
-    asl
-    tax
-    sep #$20
-.ACCU 8
-    lda.l $7E0000 + SB_INSTR + 4,x  ; VOL L
-    sta es0
-    lda.l $7E0000 + SB_INSTR + 5,x  ; VOL R
-    plx
-    sta es0 + 1
-    ; L
-    lda es0
-    sec
-    sbc es1
-    bcs @l_ok
-    lda #$00
-@l_ok:
+    ; dip the live level (record / X / P), sign-preserved: a negative
+    ; (surround) side moves toward zero, never through it
+    lda.w trk_voll,x
+    jsr @dip_side
     tay
     txa
     asl
@@ -2251,13 +2225,8 @@ fx_trm:
     phx
     jsr apu_dsp_write
     plx
-    ; R
-    lda es0 + 1
-    sec
-    sbc es1
-    bcs @r_ok
-    lda #$00
-@r_ok:
+    lda.w trk_volr,x
+    jsr @dip_side
     tay
     txa
     asl
@@ -2268,4 +2237,24 @@ fx_trm:
     phx
     jsr apu_dsp_write
     plx
+    rts
+@dip_side:
+    ; A = signed level -> A = level dipped by es1, clamped at zero
+    bpl @pos
+    eor #$FF
+    inc a                   ; magnitude
+    sec
+    sbc es1
+    bcs @renegate
+    lda #$00
+@renegate:
+    eor #$FF
+    inc a
+    rts
+@pos:
+    sec
+    sbc es1
+    bcs @done
+    lda #$00
+@done:
     rts

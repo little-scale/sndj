@@ -840,7 +840,25 @@ apply_instrument:
     phx
     jsr apu_dsp_write
     plx
-    ; VOL L/R
+    ; VOL L/R — also latched as the voice's live level (the X/P/U
+    ; commands retarget it, TRM dips from it)
+    lda.l $7E0000 + SB_INSTR + 4,x
+    sta ap_vol
+    lda.l $7E0000 + SB_INSTR + 5,x
+    sta ap_vol + 1
+    phx
+    lda trig_voice
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda ap_vol
+    sta.w trk_voll,x
+    lda ap_vol + 1
+    sta.w trk_volr,x
+    plx
     lda.l $7E0000 + SB_INSTR + 4,x
     tay
     lda trig_voice

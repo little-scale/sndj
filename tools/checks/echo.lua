@@ -112,14 +112,14 @@ emu.addEventCallback(function()
   if frames == 26 then
     poke(0x2000, 0)          -- V1r0 = chain 0
     poke(0x3700, 0)          -- chain0 e0 = phrase 0
-    -- phrase 0: row0 = note + Y03 (FIR comb), row4 = note + X00 (EON off)
+    -- phrase 0: row0 = note + Y03 (FIR comb), row4 = note + E00 (EON off)
     poke(0x4300, 49)
     poke(0x4301, 0)
     poke(0x4302, 25)         -- Y
     poke(0x4303, 3)
     poke(0x4310, 49)
     poke(0x4311, 0xFF)
-    poke(0x4312, 24)         -- X
+    poke(0x4312, 5)          -- E
     poke(0x4313, 0)
     aram_snap = snap_aram()
   elseif frames == at_echo then
@@ -145,7 +145,7 @@ emu.addEventCallback(function()
   elseif frames == cmds_done then
     check(dsp(0x0F) == 0x40 and dsp(0x3F) == 0x40,
       "Y03 selected the COMB FIR preset mid-song")
-    check(dsp(0x4D) == 0x00, "X00 cleared the voice's echo send")
+    check(dsp(0x4D) == 0x00, "E00 cleared the voice's echo send")
     check(aram_intact(aram_snap), "samples intact after command playback")
     if fails == 0 then
       print("ALL PASS echo.lua")

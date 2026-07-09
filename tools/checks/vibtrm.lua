@@ -61,6 +61,7 @@ emu.addEventCallback(function()
     row(0, 49, 0, 0, 0)      -- C-4, no command: instrument LFOs alone
     row(4, 49, 0, 22, 0)     -- C-4 + V00: vibrato off for this note
     row(8, 49, 0, 0, 0)      -- C-4 plain: instrument VIB reloads
+    row(12, 49, 0, 24, 0x20) -- C-4 + X20: accent — TRM dips from $20
   elseif frames == 44 then
     pad = { start = true }
   elseif frames == 46 then
@@ -92,6 +93,13 @@ emu.addEventCallback(function()
     check(p_lo < 0x0800 and p_hi > 0x0800,
       "the next plain note reloaded the instrument VIB ($" ..
       string.format("%04X-$%04X", p_lo, p_hi) .. ")")
+    reset_window()
+  elseif frames >= 124 and frames <= 140 then
+    collect()
+  elseif frames == 142 then
+    check(v_hi <= 0x20 and v_lo < 0x20,
+      "X20 accent retargets the level; TRM dips from it (" ..
+      string.format("%02X-%02X", v_lo, v_hi) .. ")")
     if fails == 0 then
       print("ALL PASS vibtrm.lua")
       emu.stop(0)

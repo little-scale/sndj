@@ -217,7 +217,7 @@ phrase. Both columns use the exact same command letters as PHRASE.
 `H` inside a table hops to a table row, making loops:
 
 ```
-row 0  P00 | X01     hard left, echo on
+row 0  P00 | E01     hard left, echo on
 row 1  M30 |         duck the master
 row 2  H01 |         loop rows 1-2
 ```
@@ -261,7 +261,7 @@ Values are hex (`xy` = two nibbles).
 | `T xy` | tempo | set BPM (hex; `96` = 150) |
 | `U xy` | surround | invert L (x≠0) / R (y≠0) phase for width |
 | `V xy` | vibrato | override the instrument's VIB for this note: speed x, depth y (`V00` = off) |
-| `X 0x` | echo send | this voice into the room: `X01` on, `X00` off |
+| `X xy` | volume | accent: set this voice's level (both sides, `00`-`7F`); persists like `P` until the voice reloads its instrument |
 | `Y 0x` | FIR preset | switch the echo filter curve (global) |
 | `Z 0x` | pitch-mod | enable (`Z01`) / disable modulation by the left voice |
 
@@ -289,7 +289,7 @@ instrument:
   recall with Y+↑/↓; B+d-pad hand-tweaks a tap (the readout shows
   `--` for a custom curve). The song *owns* its taps — they save
   with it.
-- **Per row** — `X` throws a voice into or out of the room, `Y`
+- **Per row** — `E` throws a voice into or out of the room, `Y`
   flips the filter curve on the drop.
 
 Recipes: long dark hall = EDL 12+, DARK curve, moderate feedback.

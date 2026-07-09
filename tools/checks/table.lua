@@ -3,7 +3,7 @@
 -- columns run the shared executor, and H hops the table's own rows.
 --
 -- Table 0 (all factory instruments point at it; empty = no-op):
---   row 0: P00 | X01   pan hard left + echo send, same tick
+--   row 0: P00 | E01   pan hard left + echo send, same tick
 --   row 1: M30         master volume $30
 --   row 2: H01         hop -> rows 1-2 loop forever
 --
@@ -67,7 +67,7 @@ emu.addEventCallback(function()
     -- table 0
     poke(0x2800, 16)         -- P
     poke(0x2801, 0x00)
-    poke(0x2802, 24)         -- X (column 2, same tick)
+    poke(0x2802, 5)          -- E (column 2, same tick)
     poke(0x2803, 0x01)
     poke(0x2804, 13)         -- M
     poke(0x2805, 0x30)
@@ -82,7 +82,7 @@ emu.addEventCallback(function()
     check(dsp(0x00) == 0x7F and dsp(0x01) == 0x00,
       "row 0 col 1: P00 panned hard left")
     check(dsp(0x4D) ~= 0 and (dsp(0x4D) % 2) == 1,
-      "row 0 col 2: X01 raised the echo send the same tick")
+      "row 0 col 2: E01 raised the echo send the same tick")
   elseif frames == 58 then
     check(dsp(0x0C) == 0x30 and dsp(0x1C) == 0x30,
       "row 1: M30 set master volume")
