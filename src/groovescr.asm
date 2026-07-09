@@ -229,8 +229,6 @@ groove_draw:
 .ACCU 8
     lda ed_groove
     jsr text_hex8
-    lda ed_groove
-    jsr groove_bpm          ; -> tmp0
     lda #12
     sta text_x
     lda #1
@@ -243,6 +241,8 @@ groove_draw:
 .ACCU 8
     ldx #str_bpm
     jsr text_puts
+    lda ed_groove
+    jsr groove_bpm          ; -> tmp0 (text_puts clobbers tmp0: compute after)
     jsr text_dec3
     ; 16 step rows
     stz ui_cnt
