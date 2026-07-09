@@ -58,6 +58,10 @@
   #firsum { color: #606888; }
   #firsum.hot { color: #ff6060; }
   .fold { color: #ffb020; cursor: pointer; }
+  #tabsbar { gap: .3rem; margin: 1rem 0 .3rem; }
+  .tab { border-radius: 6px 6px 0 0; opacity: .65; }
+  .tab.active { border-color: #40d0c8; color: #40d0c8; opacity: 1; }
+  .tab:disabled { opacity: .25; cursor: default; }
 </style>
 </head>
 <body>
@@ -71,6 +75,12 @@ export a patched ROM. Everything runs locally.</p>
 <div class="cols">
 <div>
 <div class="drop small" id="drop">drop sndj.sfc here (or click)</div>
+<div class="row" id="tabsbar" hidden>
+  <button class="tab active" data-tab="poolview">SAMPLES</button>
+  <button class="tab" data-tab="kitview">KITS</button>
+  <button class="tab" data-tab="firview">FIR</button>
+  <button class="tab" data-tab="palview">PALETTES</button>
+</div>
 <div id="poolview" hidden>
   <div class="bar"><div id="budget" style="width:0"></div></div>
   <p id="budgettext"></p>
@@ -90,33 +100,9 @@ export a patched ROM. Everything runs locally.</p>
   song; drop a one-shot soundfont slot straight onto a kit slot)</span></h1>
   <table id="kits"></table>
 </div>
-<div id="exportview" hidden>
-  <button class="primary" id="export">export patched ROM</button>
-</div>
-</div>
-<div>
-<div class="drop small" id="sf2drop">drop an .sf2 soundfont here (or click)</div>
-<input type="file" id="sf2file" hidden accept=".sf2">
-<div id="sf2view" hidden>
-  <h1><small id="sf2name">soundfont</small></h1>
-  <div class="row">
-    <select id="sfmode">
-      <option value="auto">auto (loop &rarr; melodic, else one-shot)</option>
-      <option value="melodic">melodic (looped, in tune)</option>
-      <option value="oneshot">one-shot (8 kHz kit drum)</option>
-    </select>
-    <label id="sftrimlab">trim semis <input type="number" id="sftrim" value="0"
-      min="-24" max="24" style="width:3.5rem"></label>
-    <label id="sfcaplab">cap ms <input type="number" id="sfcap" value="160"
-      min="20" max="500" style="width:4rem"></label>
-  </div>
-  <p class="hint">play auditions through the real BRR pipeline with the
-  settings above; drag a row onto a pool slot to import it there.</p>
-  <table id="sf2list"></table>
-</div>
 <div id="firview" hidden>
   <h1><small class="fold" id="firfold">&#9656; FIR designer — the room's tone control</small></h1>
-  <div id="firbody" hidden>
+  <div id="firbody">
     <p class="hint">the 8-tap FIR runs on every sample read back from the
     echo delay line, inside the feedback loop — each repeat filters again.
     Audition through the real loop shape, then write a ROM preset slot;
@@ -142,11 +128,35 @@ export a patched ROM. Everything runs locally.</p>
     </div>
   </div>
 </div>
-</div>
-</div>
 <div id="palview" hidden>
   <h1><small>palettes</small></h1>
   <table id="pal"></table>
+</div>
+<div id="exportview" hidden>
+  <button class="primary" id="export">export patched ROM</button>
+</div>
+</div>
+<div>
+<div class="drop small" id="sf2drop">drop an .sf2 soundfont here (or click)</div>
+<input type="file" id="sf2file" hidden accept=".sf2">
+<div id="sf2view" hidden>
+  <h1><small id="sf2name">soundfont</small></h1>
+  <div class="row">
+    <select id="sfmode">
+      <option value="auto">auto (loop &rarr; melodic, else one-shot)</option>
+      <option value="melodic">melodic (looped, in tune)</option>
+      <option value="oneshot">one-shot (8 kHz kit drum)</option>
+    </select>
+    <label id="sftrimlab">trim semis <input type="number" id="sftrim" value="0"
+      min="-24" max="24" style="width:3.5rem"></label>
+    <label id="sfcaplab">cap ms <input type="number" id="sfcap" value="160"
+      min="20" max="500" style="width:4rem"></label>
+  </div>
+  <p class="hint">play auditions through the real BRR pipeline with the
+  settings above; drag a row onto a pool slot to import it there.</p>
+  <table id="sf2list"></table>
+</div>
+</div>
 </div>
 <input type="file" id="wavfile" hidden accept=".wav,.sf2">
 
@@ -164,6 +174,26 @@ const status = (msg, warn) => {
   $('status').textContent = msg;
   $('status').className = warn ? 'warn' : '';
 };
+
+// ------------------------------------------------------------------ tabs
+const TABS = ['poolview', 'kitview', 'firview', 'palview'];
+function tabAvail(id) {
+  if (id === 'kitview') return kitOff >= 0;
+  if (id === 'firview') return firOff >= 0;
+  if (id === 'palview') return palOff >= 0;
+  return true;
+}
+function selectTab(name) {
+  document.querySelectorAll('#tabsbar .tab').forEach(b => {
+    b.disabled = !tabAvail(b.dataset.tab);
+    b.classList.toggle('active', b.dataset.tab === name);
+  });
+  TABS.forEach(id => { $(id).hidden = id !== name || !tabAvail(id); });
+  if (name === 'firview') firSync();
+}
+document.querySelectorAll('#tabsbar .tab').forEach(b => {
+  b.onclick = () => { if (tabAvail(b.dataset.tab)) selectTab(b.dataset.tab); };
+});
 
 const fileInput = document.createElement('input');
 fileInput.type = 'file';
@@ -196,12 +226,13 @@ async function loadRom(f) {
   kitOff = S.findMarker(rom, 'SNKIT0');
   defOff = S.findMarker(rom, 'SNDEF0');
   firOff = S.findMarker(rom, 'SNFIR0');
-  $('firview').hidden = firOff < 0;
   if (firOff >= 0) {
     firTaps = Array.from(rom.slice(firOff + 40, firOff + 48)).map(s8);
     firSync();          // start on preset 5 (DKC HALL)
   }
   kitExpand[0] = true;
+  $('tabsbar').hidden = false;
+  selectTab('poolview');
   status(`loaded ${f.name}: ${entries.length} samples in the pool`);
   render();
   renderPal();
@@ -332,7 +363,6 @@ function render() {
         : `EDL ${a.maxEdl} (${a.maxMs} ms)`) +
       '; other samples load on demand';
   }
-  $('poolview').hidden = false;
   renderBoot();
   renderKits();
 }
@@ -407,7 +437,7 @@ const s8 = v => (v > 127 ? v - 256 : v);
 function kitSlotOff(k, sl) { return kitOff + k * 64 + sl * 4; }
 
 function renderKits() {
-  if (kitOff < 0) { $('kitview').hidden = true; return; }
+  if (kitOff < 0) return;
   const t = $('kits');
   t.innerHTML = '';
   for (let k = 0; k < 16; k++) {
@@ -515,7 +545,6 @@ function renderKits() {
       };
     }
   }
-  $('kitview').hidden = false;
 }
 
 // --------------------------------------------------------- FIR designer
@@ -548,14 +577,6 @@ for (let e = 0; e <= 15; e++) {
   $('firedl').appendChild(o);
 }
 $('firedl').value = 6;
-
-$('firfold').onclick = () => {
-  const b = $('firbody');
-  b.hidden = !b.hidden;
-  $('firfold').innerHTML = (b.hidden ? '\u25B8' : '\u25BE') +
-    ' FIR designer \u2014 the room\u2019s tone control';
-  if (!b.hidden) firSync();
-};
 
 function firSync() {
   document.querySelectorAll('#firtaps [data-i]').forEach(r => {
@@ -890,7 +911,7 @@ function hexToBgr15(hex) {
 }
 
 function renderPal() {
-  if (palOff < 0) { $('palview').hidden = true; return; }
+  if (palOff < 0) return;
   const tb = $('pal');
   tb.innerHTML = '<tr><th></th>' +
     PAL_SLOTS.map(s => '<th>' + s + '</th>').join('') + '</tr>';
@@ -905,7 +926,6 @@ function renderPal() {
     tr.innerHTML = cells;
     tb.appendChild(tr);
   }
-  $('palview').hidden = false;
 }
 
 $('pal').oninput = e => {

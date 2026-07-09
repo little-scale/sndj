@@ -5,6 +5,9 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- The patcher's left half is **tabbed** now — SAMPLES / KITS / FIR /
+  PALETTES — with the soundfont panel persistent on the right (drags
+  land on whichever tab is open). No more scroll marathon.
 - The **FIR designer merged into the patcher** (firdesign.html
   retired): a collapsible section in the soundfont column with the
   live frequency-response plot, tap sliders/hex, and the echo-loop
