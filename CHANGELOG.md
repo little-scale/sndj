@@ -11,6 +11,11 @@
   the song count, names with decimal sizes (N.NKB), block cursor on
   the name, and the rename ring runs blank-A..Z-specials one way and
   digits the other. savetool.html/.py and sndj.js speak v2.
+- Fixed: renaming in FILES (B-hold + Up/Down on a name character) —
+  the character-ring search clobbered the name index, so the new
+  letter landed at the ring position instead of the name (silently
+  overwriting header bytes up to the FIR taps). Works on both the
+  working song's name and saved slots; regression checks added.
 
 - Instrument tables grow up: TBL has a real nil state (-- ; factory
   instruments ship with no table) and a TBS field clocks the table —

@@ -323,7 +323,9 @@ fl_char_cycle:
     sep #$20
 .ACCU 8
     lda.l $7E0000 + SB_HEADER + SH_NAME,x
-    jsr fl_next_char
+    phx
+    jsr fl_next_char        ; the ring search clobbers X
+    plx
     sta.l $7E0000 + SB_HEADER + SH_NAME,x
     rts
 @sram:
@@ -341,7 +343,9 @@ fl_char_cycle:
     sep #$20
 .ACCU 8
     lda.l SRAM_TABLE,x
-    jsr fl_next_char
+    phx
+    jsr fl_next_char        ; the ring search clobbers X
+    plx
     sta.l SRAM_TABLE,x
     rts
 

@@ -49,6 +49,12 @@ at(420, { up = true }); at(422, {})    -- back to slot 0
 menu_run(430, 2)                     -- CLEAR slot 0 (list compacts)
 at(470, { down = true }); at(472, {})  -- to the (EMPTY) row (now row 1)
 menu_run(480, 1)                     -- LOAD on empty = fresh song
+-- rename gestures: still on the (EMPTY) row after the fresh start
+at(620, { b = true }); at(622, { b = true, up = true }); at(624, { b = true }); at(626, {})
+at(646, { b = true }); at(648, { b = true, down = true }); at(650, { b = true }); at(652, {})
+-- up to the saved slot (row 0) and rename it
+at(666, { up = true }); at(668, {})
+at(672, { b = true }); at(674, { b = true, up = true }); at(676, { b = true }); at(678, {})
 
 emu.addEventCallback(function() emu.setInput(pad, 0) end, emu.eventType.inputPolled)
 
@@ -88,6 +94,20 @@ emu.addEventCallback(function()
   elseif frames == 580 then
     check(wram(0x4300) == 0, "LOAD on (EMPTY) blanked the working song")
     check(wram(0x3602) == 0xD7, "fresh song re-seeded (magic)")
+  elseif frames == 640 then
+    -- rename: B-hold + Up on the working song's name (empty row);
+    -- S -> T (ring: blank, A-Z, specials, digits)
+    check(wram(0x3609) == string.byte("T"),
+      "B+Up cycled the song name S -> T")
+  elseif frames == 660 then
+    check(wram(0x3609) == string.byte("S"),
+      "B+Down cycled it back to S")
+  elseif frames == 690 then
+    -- on the saved slot (row 0), rename its SRAM entry char 0
+    check(sram(0x18) ~= string.byte("S") or true, "prep")
+    local c0 = sram(0x18)
+    check(c0 == string.byte("T"),
+      "B+Up renamed the saved file (char = " .. string.char(c0) .. ")")
     if fails == 0 then
       print("ALL PASS files.lua")
       emu.stop(0)
