@@ -201,15 +201,25 @@ chain_update:
     clc
     adc #$80
     sta tap_timer           ; close the window
-    jsr chain_paste         ; B double-tap = paste
+    jsr chain_dtap          ; paste / mint / clone
     bra @draw
 @single:
     lda frame_cnt
     sta tap_timer
-    ; tap: insert
+    ; tap: remember the pre-tap state (the phrase column is a reference)
     jsr chain_cell_addr_p
     lda chain_cx
     bne @tap_tsp
+    lda.l $7E0000 + SB_CHAINS,x
+    sta mint_prev
+    cmp #$FF
+    beq @was_empty
+    stz mint_empty
+    bra @ins
+@was_empty:
+    lda #$01
+    sta mint_empty
+@ins:
     lda ed_lastphrid
     sta.l $7E0000 + SB_CHAINS,x
     bra @draw
@@ -491,6 +501,33 @@ chain_paste:
     sep #$20
 .ACCU 8
 @done:
+    rts
+
+; B double-tap on the phrase column: paste, mint or clone (always deep)
+chain_dtap:
+    lda clip_kind
+    cmp #$02
+    bne @not_paste
+    jmp chain_paste
+@not_paste:
+    lda chain_cx
+    bne @out                ; the transpose column isn't a reference
+    lda mint_empty
+    beq @clone
+    jsr find_free_phrase
+    bcs @out
+    bra @point
+@clone:
+    lda mint_prev
+    jsr clone_phrase
+    bcs @out
+@point:
+    pha
+    jsr chain_cell_addr_p
+    pla
+    sta.l $7E0000 + SB_CHAINS,x
+    sta ed_lastphrid
+@out:
     rts
 
 ; B+A: cut the cursor cell (phrase id feeds the next insert; tsp -> 0)

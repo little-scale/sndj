@@ -195,6 +195,19 @@ trk_tbl_row  ds 8    ; table step 0-15
 ed_table     db      ; TABLE screen: edited table id
 tb_x         db      ; TABLE screen cursor col (0-3)
 tb_y         db      ; TABLE screen cursor row
+opt_clone    db      ; OPTIONS CLONE: 0 = SLIM, 1 = DEEP (SRAM $0008)
+mint_prev    db      ; reference cell value before the arming tap
+mint_empty   db      ; that cell was empty pre-tap
+cl_i         dw      ; clone/mint scratch
+cl_j         dw
+cl_n         dw
+cl_src       db
+cl_dst       db
+cl_csrc      db
+cl_cdst      db
+cl_e         db
+cl_s         db
+cl_p         db
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

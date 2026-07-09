@@ -53,6 +53,7 @@
 .INCLUDE "projectscr.asm"
 .INCLUDE "firscr.asm"
 .INCLUDE "tablescr.asm"
+.INCLUDE "clone.asm"
 .INCLUDE "palette.asm"
 .INCLUDE "splash.asm"
 

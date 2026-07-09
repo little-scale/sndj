@@ -2,6 +2,14 @@
 
 ## 0.1.0-dev (unreleased)
 
+- Minting and cloning (genmddj §4): B double-tap on an empty SONG/
+  CHAIN reference cell mints the next free blank chain/phrase; on a
+  populated cell it clones into a fresh slot and repoints. OPTIONS
+  gains CLONE SLIM/DEEP (persisted): SLIM chain clones share phrases,
+  DEEP copies them (duplicate entries stay consistent; falls back to
+  SLIM when phrases run out). Phrase clones are always independent.
+  A matching-kind clipboard still pastes.
+
 - TABLE screen + runtime: 32 tables of 16 rows x two (command, value)
   columns run per tick through the shared executor; the instrument's
   new TABLE field starts its table at every trigger, and H inside a

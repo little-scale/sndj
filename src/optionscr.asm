@@ -11,7 +11,7 @@
 .ACCU 8
 .INDEX 16
 
-.DEFINE OPT_FIELDS 4
+.DEFINE OPT_FIELDS 5
 
 options_init:
     lda #SCREEN_OPTIONS
@@ -59,7 +59,31 @@ options_update:
     stz b_down
     bra @cursor
 @b_held:
-    ; only PALETTE (field 0) edits for now
+    lda opt_cur
+    cmp #$01
+    bne @not_clone
+    ; CLONE: any left/right toggles SLIM <-> DEEP and persists
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #(PAD_LEFT | PAD_RIGHT)
+    sep #$20
+.ACCU 8
+    beq @b_done_far
+    lda #$01
+    sta b_used
+    lda opt_clone
+    eor #$01
+    sta opt_clone
+    lda.l $700000
+    cmp #'S'
+    bne @b_done_far
+    lda opt_clone
+    sta.l $700008
+@b_done_far:
+    jmp options_draw
+@not_clone:
+    ; PALETTE (field 0) edits
     lda opt_cur
     bne @b_done
     rep #$20
@@ -164,6 +188,25 @@ options_draw:
     lda #12
     sta text_x
     lda ui_cnt
+    cmp #$01
+    bne @not_clone_v
+    rep #$20
+.ACCU 16
+    lda #ATTR_TEXT
+    sta text_attr
+    sep #$20
+.ACCU 8
+    lda opt_clone
+    beq @slim
+    ldx #str_o_deep
+    jsr text_puts
+    jmp @next
+@slim:
+    ldx #str_o_slim
+    jsr text_puts
+    jmp @next
+@not_clone_v:
+    lda ui_cnt
     bne @fixed
     ; PALETTE: index + 4-char name (text attr)
     rep #$20
@@ -232,11 +275,14 @@ options_draw:
 @rows_far:
     jmp @rows
 
-opt_labels: .DW str_o_pal, str_o_vid, str_o_sync, str_o_clk
-opt_values: .DW str_o_pal, str_o_v60, str_o_soff, str_o_xtal
+opt_labels: .DW str_o_pal, str_o_clone, str_o_vid, str_o_sync, str_o_clk
+opt_values: .DW str_o_pal, str_o_pal, str_o_v60, str_o_soff, str_o_xtal
 
 str_options: .DB "OPTIONS", 0
 str_o_pal:   .DB "PALETTE", 0
+str_o_clone: .DB "CLONE", 0
+str_o_slim:  .DB "SLIM", 0
+str_o_deep:  .DB "DEEP", 0
 str_o_vid:   .DB "VIDEO", 0
 str_o_sync:  .DB "SYNC", 0
 str_o_clk:   .DB "CLOCK", 0

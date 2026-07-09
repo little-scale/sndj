@@ -214,12 +214,23 @@ song_update:
     clc
     adc #$80
     sta tap_timer           ; close the window
-    jsr song_paste          ; B double-tap = paste
+    jsr song_dtap           ; paste / mint / clone
     bra @draw
 @single:
     lda frame_cnt
     sta tap_timer
-    ; tap: insert last chain
+    ; tap: remember the pre-tap state (mint/clone decides from it),
+    ; then insert the last chain
+    jsr song_cursor_cell
+    sta mint_prev
+    cmp #$FF
+    beq @was_empty
+    stz mint_empty
+    bra @ins
+@was_empty:
+    lda #$01
+    sta mint_empty
+@ins:
     jsr song_cell_addr
     lda ed_lastchain
     sta.l $7E0000 + SB_SONG,x
@@ -456,6 +467,32 @@ song_draw:
     beq @done
     jmp @rows
 @done:
+    rts
+
+; B double-tap: paste a song clip, or mint/clone the reference cell
+song_dtap:
+    lda clip_kind
+    cmp #$03
+    bne @not_paste
+    jmp song_paste
+@not_paste:
+    lda mint_empty
+    beq @clone
+    ; empty cell: mint the next free blank chain
+    jsr find_free_chain
+    bcs @out                ; no free slot: nothing happens
+    bra @point
+@clone:
+    lda mint_prev
+    jsr clone_chain
+    bcs @out
+@point:
+    pha
+    jsr song_cell_addr
+    pla
+    sta.l $7E0000 + SB_SONG,x
+    sta ed_lastchain
+@out:
     rts
 
 ; B+A: cut the cursor cell (chain id feeds the next insert)

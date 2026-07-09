@@ -28,10 +28,14 @@ palette_boot:
     lda.l $700004
     cmp #'1'
     bne @default
+    lda.l $700008           ; CLONE: SLIM/DEEP persists next door
+    and #$01
+    sta opt_clone
     lda.l SRAM_OPTPAL
     and #$07
     bra @have
 @default:
+    stz opt_clone
     lda #$00
 @have:
     jsr palette_apply
