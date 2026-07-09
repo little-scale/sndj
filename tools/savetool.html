@@ -31,9 +31,9 @@
 <body>
 <h1>sndj savetool <small>— songs &amp; saves</small></h1>
 <p>Drop a <code>.srm</code> cart save (FXPak / Mesen / ares / snes9x are all
-raw) to view its song slots, extract them as <code>.sndj</code> files, or
-assemble a new cart image from <code>.sndj</code> files. Everything runs
-locally.</p>
+raw) to view its packed song list (up to 16, variable size), extract songs
+as <code>.sndj</code> files, or assemble a new cart image from
+<code>.sndj</code> files. Everything runs locally.</p>
 <div class="drop" id="drop">drop a .srm or .sndj here (or click)</div>
 <input type="file" id="file" hidden multiple>
 <div id="status"></div>
@@ -83,8 +83,9 @@ function songStats(packed) {
 function render() {
   const parsed = S.srmParse(srm);
   if (!parsed.valid) {
-    status('not an SNDJ1 save — use "new empty cart image" to start one', true);
+    status('not an SNDJ1 v2 save — use "new empty cart image" to start one', true);
   }
+  document.title = 'sndj savetool';
   const tb = $('slots');
   tb.innerHTML = '';
   parsed.slots.forEach(s => {
@@ -119,7 +120,7 @@ function ingest(name, bytes) {
   if (lower.endsWith('.sndj')) {
     const parsed = S.srmParse(srm);
     const free = parsed.slots.find(s => s.empty);
-    if (!free) { status('all 4 slots are full — erase one first', true); return; }
+    if (!free) { status('all 16 slots are full — erase one first', true); return; }
     try {
       srm = S.srmInsert(srm, free.index, bytes);
       status(name + ' -> slot ' + free.index);

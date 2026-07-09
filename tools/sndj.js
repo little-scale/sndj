@@ -457,54 +457,103 @@ function sf2Oneshot(s, capMs) {
 }
 
 // ------------------------------------------------------------- SRAM (.srm)
+// SNDJ1 v2: 16-entry directory at $0010 (status, offset16, size16,
+// crc16, rsvd, name8) over one packed heap at $0110. Offline tools can
+// simply re-layout the heap in entry order on every write.
 const SRM_SIZE = 0x8000;
-const SRM_REGIONS = 5;
-const SRM_REGION_SZ = 0x1880;
-const SRM_SLOTS = 4;
+const SRM_SLOTS = 16;
+const SRM_DIR = 0x10;
+const SRM_HEAP = 0x110;
+const SRM_HEAP_SZ = SRM_SIZE - SRM_HEAP;
 
 function srmNew() {
   const srm = new Uint8Array(SRM_SIZE);
   srm.set([...'SNDJ1'].map(c => c.charCodeAt(0)), 0);
-  srm[5] = 1;
-  for (let s = 0; s < SRM_SLOTS; s++) srm[0x10 + s * 16] = 0xFF;
+  srm[5] = 2;
+  for (let s = 0; s < SRM_SLOTS; s++) srm[SRM_DIR + s * 16] = 0xFF;
   return srm;
 }
 
 function srmParse(srm) {
   const magic = String.fromCharCode(...srm.slice(0, 5));
-  const valid = magic === 'SNDJ1' && srm[5] === 1;
+  const valid = magic === 'SNDJ1' && srm[5] === 2;
   const slots = [];
+  let free = SRM_HEAP_SZ;
   for (let s = 0; s < SRM_SLOTS; s++) {
-    const e = 0x10 + s * 16;
-    const status = srm[e];
-    if (status !== 0xA5) {
+    const e = SRM_DIR + s * 16;
+    if (srm[e] !== 0xA5) {
       slots.push({ index: s, empty: true });
       continue;
     }
-    const region = srm[e + 1];
-    const size = srm[e + 2] | (srm[e + 3] << 8);
-    const crc = srm[e + 4] | (srm[e + 5] << 8);
-    const name = String.fromCharCode(...srm.slice(e + 6, e + 14)).trimEnd();
-    const data = srm.slice(0x100 + region * SRM_REGION_SZ,
-                           0x100 + region * SRM_REGION_SZ + size);
+    const off = srm[e + 1] | (srm[e + 2] << 8);
+    const size = srm[e + 3] | (srm[e + 4] << 8);
+    const crc = srm[e + 5] | (srm[e + 6] << 8);
+    const name = String.fromCharCode(...srm.slice(e + 8, e + 16)).trimEnd();
+    const data = srm.slice(SRM_HEAP + off, SRM_HEAP + off + size);
+    free -= size;
     slots.push({
-      index: s, empty: false, region, size, crc, name,
-      ok: region < SRM_REGIONS && size <= SRM_REGION_SZ && crc16(data) === crc,
+      index: s, empty: false, off, size, crc, name,
+      ok: size <= SRM_HEAP_SZ && crc16(data) === crc,
       packed: data,
     });
   }
-  return { valid, slots };
+  return { valid, slots, free };
 }
 
-function srmFreeRegion(srm) {
-  const used = new Set();
-  for (let s = 0; s < SRM_SLOTS; s++) {
-    const e = 0x10 + s * 16;
-    if (srm[e] === 0xA5) used.add(srm[e + 1]);
-  }
-  for (let r = 0; r < SRM_REGIONS; r++) if (!used.has(r)) return r;
-  return null;
+// rebuild the image from a song list (packed heap in entry order)
+function srmLayout(songs) {
+  const srm = srmNew();
+  let off = 0;
+  songs.forEach((song, s) => {
+    if (off + song.packed.length > SRM_HEAP_SZ) {
+      throw new Error('songs exceed the 32 KB save');
+    }
+    const e = SRM_DIR + s * 16;
+    srm[e + 1] = off & 0xFF;
+    srm[e + 2] = off >> 8;
+    srm[e + 3] = song.packed.length & 0xFF;
+    srm[e + 4] = song.packed.length >> 8;
+    const crc = crc16(song.packed);
+    srm[e + 5] = crc & 0xFF;
+    srm[e + 6] = crc >> 8;
+    srm.set([...(song.name || '').padEnd(8).slice(0, 8)]
+      .map(c => c.charCodeAt(0)), e + 8);
+    srm.set(song.packed, SRM_HEAP + off);
+    srm[e] = 0xA5;
+    off += song.packed.length;
+  });
+  return srm;
 }
+
+function srmSongs(srm) {
+  return srmParse(srm).slots.filter(s => !s.empty)
+    .map(s => ({ name: s.name, packed: s.packed }));
+}
+
+function srmInsert(srm, slotIdx, sndjBytes) {
+  const { name, packed } = sndjFileParse(sndjBytes);
+  const songs = srmSongs(srm);
+  if (slotIdx > songs.length || slotIdx >= SRM_SLOTS) {
+    throw new Error('the packed list has no slot ' + slotIdx);
+  }
+  songs[slotIdx] = { name, packed };
+  return srmLayout(songs);
+}
+
+function srmErase(srm, slotIdx) {
+  const songs = srmSongs(srm);
+  songs.splice(slotIdx, 1);
+  return srmLayout(songs);
+}
+
+function srmExtract(srm, slotIdx) {
+  const { slots } = srmParse(srm);
+  const s = slots[slotIdx];
+  if (!s || s.empty) throw new Error('slot ' + slotIdx + ' is empty');
+  return sndjFileBuild(s.name, s.packed);
+}
+
+function srmFreeRegion() { return 0; }  // v1 relic kept for API shape
 
 // .sndj song file: "SNDJ1" ver name[8] packedSize crc16 packedBytes
 function sndjFileBuild(name, packed) {
@@ -531,39 +580,6 @@ function sndjFileParse(bytes) {
   const packed = bytes.slice(18, 18 + size);
   if (crc16(packed) !== crc) throw new Error('.sndj CRC mismatch');
   return { name, packed };
-}
-
-function srmExtract(srm, slotIdx) {
-  const { slots } = srmParse(srm);
-  const s = slots[slotIdx];
-  if (!s || s.empty) throw new Error('slot ' + slotIdx + ' is empty');
-  return sndjFileBuild(s.name, s.packed);
-}
-
-function srmInsert(srm, slotIdx, sndjBytes) {
-  const { name, packed } = sndjFileParse(sndjBytes);
-  if (packed.length > SRM_REGION_SZ) throw new Error('song too big for a slot');
-  const out = new Uint8Array(srm);
-  const e = 0x10 + slotIdx * 16;
-  out[e] = 0;                       // release this slot's region first
-  const region = srmFreeRegion(out);
-  if (region === null) throw new Error('no free region');
-  out.set(packed, 0x100 + region * SRM_REGION_SZ);
-  out[e + 1] = region;
-  out[e + 2] = packed.length & 0xFF;
-  out[e + 3] = packed.length >> 8;
-  const crc = crc16(packed);
-  out[e + 4] = crc & 0xFF;
-  out[e + 5] = crc >> 8;
-  out.set([...(name || '').padEnd(8).slice(0, 8)].map(c => c.charCodeAt(0)), e + 6);
-  out[e] = 0xA5;                    // status byte last (journal order)
-  return out;
-}
-
-function srmErase(srm, slotIdx) {
-  const out = new Uint8Array(srm);
-  out[0x10 + slotIdx * 16] = 0xFF;
-  return out;
 }
 
 function pitchForNote(note) {  // note 0-95 (C-0..B-7)
@@ -633,13 +649,18 @@ function selftest() {
   blk2[0] = 7; blk2[0x2300] = 49;
   const packed2 = rlePack(toImage(blk2));
   let srm = srmNew();
-  srm = srmInsert(srm, 2, sndjFileBuild('SELFTEST', packed2));
+  srm = srmInsert(srm, 0, sndjFileBuild('SELFTEST', packed2));
+  srm = srmInsert(srm, 1, sndjFileBuild('SECOND', packed2));
   const parsed = srmParse(srm);
-  assert(parsed.valid && parsed.slots[2].ok &&
-    parsed.slots[2].name === 'SELFTEST', 'srm insert/parse');
-  const rt = fromImage(rleUnpack(sndjFileParse(srmExtract(srm, 2)).packed, BLOCK_SZ));
+  assert(parsed.valid && parsed.slots[0].ok && parsed.slots[1].ok &&
+    parsed.slots[1].name === 'SECOND' &&
+    parsed.slots[1].off === parsed.slots[0].size, 'srm v2 packed layout');
+  const rt = fromImage(rleUnpack(sndjFileParse(srmExtract(srm, 1)).packed, BLOCK_SZ));
   assert(rt[0] === 7 && rt[0x2300] === 49, 'srm song round trip');
-  assert(srmParse(srmErase(srm, 2)).slots[2].empty, 'srm erase');
+  const erased = srmParse(srmErase(srm, 0));
+  assert(!erased.slots[0].empty && erased.slots[0].name === 'SECOND' &&
+    erased.slots[0].off === 0 && erased.slots[1].empty,
+    'srm erase compacts the list');
   // RLE + CRC + image
   const blk = new Uint8Array(BLOCK_SZ);
   for (let i = PHRASES_OFF + 1; i < PHRASES_OFF + PHRASES_LEN; i += 4) blk[i] = 0xFF;
@@ -662,8 +683,8 @@ function selftest() {
 
 const SNDJ = {
   sf2Parse, sf2Melodic, sf2Oneshot, sf2Resample,
-  SRM_SIZE, SRM_REGION_SZ, SRM_SLOTS,
-  srmNew, srmParse, srmExtract, srmInsert, srmErase, srmFreeRegion,
+  SRM_SIZE, SRM_SLOTS, SRM_HEAP_SZ,
+  srmNew, srmParse, srmExtract, srmInsert, srmErase, srmLayout,
   sndjFileBuild, sndjFileParse,
   brrEncode, brrDecode, poolParse, poolBuild,
   rlePack, rleUnpack, crc16, toImage, fromImage,

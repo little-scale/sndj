@@ -2,6 +2,16 @@
 
 ## 0.1.0-dev (unreleased)
 
+- SNDJ1 v2 saves: genmddj-style variable packing — a 16-entry
+  directory over one dense ~31.7 KB heap replaces the four fixed
+  slots. Saves append and flip the entry; overwrites and clears close
+  their holes by sliding the tail (per-song CRCs guard a power cut
+  mid-slide). Old v1 saves reformat on first boot.
+- FILES looks like genmddj now: SRAM/FREE readout, a divider carrying
+  the song count, names with decimal sizes (N.NKB), block cursor on
+  the name, and the rename ring runs blank-A..Z-specials one way and
+  digits the other. savetool.html/.py and sndj.js speak v2.
+
 - Instrument tables grow up: TBL has a real nil state (-- ; factory
   instruments ship with no table) and a TBS field clocks the table —
   n ticks per row, or 0 to advance one row per note with the position

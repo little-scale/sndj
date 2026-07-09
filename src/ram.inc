@@ -211,6 +211,10 @@ cl_e         db
 cl_s         db
 cl_p         db
 video_pal    db      ; STAT78 bit 4 at boot: 1 = PAL console
+sv_limit     dw      ; pack budget: free heap bytes for this save
+sv_hole      dw      ; compaction: hole offset in the heap
+sv_hsize     dw      ; compaction: hole size
+sv_mlen      dw      ; compaction: bytes left to move
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

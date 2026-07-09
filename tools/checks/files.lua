@@ -62,7 +62,7 @@ emu.addEventCallback(function()
 
   if frames == 20 then
     -- the emulator persists .sav across runs: empty all slots first
-    for s = 0, 3 do emu.write(0x10 + s * 16, 0xFF, emu.memType.snesSaveRam) end
+    for s = 0, 15 do emu.write(0x10 + s * 16, 0xFF, emu.memType.snesSaveRam) end
   elseif frames == 30 then
     check(wram(0x0C) == 5, "on FILES")
     -- reachable: song row0 -> chain 0 -> phrase 0 (with a note)

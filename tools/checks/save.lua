@@ -42,8 +42,8 @@ end
 -- 2 chain planes, then the rest), compare to snapshot
 local BLOCK, PH_OFF, PH_LEN = 0x5300, 0x2300, 0x3000
 local CH_OFF, CH_LEN = 0x1700, 0x0C00
-local function verify_packed(region, size, t)
-  local base = 0x100 + region * 0x1880
+local function verify_packed(off, size, t)
+  local base = 0x110 + off
   local img = {}
   local i = base
   while #img < BLOCK do
@@ -160,11 +160,11 @@ emu.addEventCallback(function()
     t0 = frames + 90           -- packing blocks the main loop ~0.5 s
   elseif stage == "saved" and frames == t0 then
     check(sram(0x10) == 0xA5, "slot 0 table entry valid")
-    local region = sram(0x11)
-    local size = sram(0x12) + sram(0x13) * 256
-    check(region < 5, "slot 0 region sane (" .. region .. ")")
-    check(size > 0 and size < 0x1880, "packed size sane (" .. size .. ")")
-    local ok, why = verify_packed(region, size, snapshot)
+    local off = sram(0x11) + sram(0x12) * 256
+    local size = sram(0x13) + sram(0x14) * 256
+    check(off == 0, "first save packs at the heap start (off=" .. off .. ")")
+    check(size > 0 and size < 0x7EF0, "packed size sane (" .. size .. ")")
+    local ok, why = verify_packed(off, size, snapshot)
     check(ok, "Lua RLE mirror: packed bytes decode to the exact song block" ..
       (ok and "" or (" [" .. tostring(why) .. "]")))
     -- corrupt the live song

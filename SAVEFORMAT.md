@@ -38,38 +38,38 @@ the instrument's FINE byte (record byte 6) at trigger time; kit slots
 add it to their own semitone tune. Factory melodics bake their SF2 root
 key into the resample and carry 0/0 here.
 
-## SRAM image (32 KB at $70:0000)
+## SRAM image (32 KB at $70:0000) — SNDJ1 v2, variable packing
 
 ```
 $0000  5   magic "SNDJ1"
-$0005  1   format version (1)
-$0006  1   free-region hint (recomputed at boot if wrong)
-$0007  9   reserved
-$0010  64  slot table: 4 entries x 16 bytes
-$0050  176 reserved
-$0100  5 x $1880 data regions (0..4)
+$0005  1   format version (2)
+$0006  1   reserved
+$0007  1   device option: palette scheme
+$0008  1   device option: CLONE (0 SLIM / 1 DEEP)
+$0009  7   reserved
+$0010  256 directory: 16 entries x 16 bytes
+$0110  ... heap: RLE-packed songs, densely packed (~31.7 KB)
 ```
 
-Slot table entry (16 bytes):
+Directory entry (16 bytes):
 
 | offset | size | contents |
 |--------|------|----------|
 | 0      | 1    | status: $FF empty, $A5 valid |
-| 1      | 1    | data region index (0-4) |
-| 2      | 2    | packed size (little endian) |
-| 4      | 2    | CRC-16/CCITT of the packed bytes ($FFFF seed) |
-| 6      | 8    | name (ASCII, space padded) |
-| 14     | 2    | reserved |
+| 1      | 2    | heap offset (little endian) |
+| 3      | 2    | packed size |
+| 5      | 2    | CRC-16/CCITT of the packed bytes ($FFFF seed) |
+| 7      | 1    | reserved |
+| 8      | 8    | name (ASCII, space padded) |
 
-**Journalling:** 4 logical slots share 5 physical regions; at least one
-region is always unreferenced. A save packs into that free region first
-and flips the table entry (status byte last) only after the write
-completed and fit. A power cut mid-write never touches the previous good
-save. (The 16-byte entry flip itself is the only unprotected window; the
-CRC catches a torn entry.)
-
-A save that packs larger than a region ($1880) is refused — the UI shows
-`FULL` and SRAM is untouched.
+Valid entries are packed (0..used-1) and the heap is dense: no holes.
+Heap order may differ from entry order after overwrites. SAVE packs at
+the free end, flips the entry (status byte last), then closes the old
+block's hole by sliding everything above it down; CLEAR drops the
+entry, slides the directory down one slot and closes the hole the same
+way. A power cut mid-slide can tear at most the songs above the hole —
+their CRCs catch it — and never touches songs below it. A save that
+doesn't fit the remaining heap is refused (`FULL`).
 
 ## Save image (what actually gets packed)
 

@@ -16,16 +16,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sndj_rle
 
 SRM_SIZE = 0x8000
-REGIONS = 5
-REGION_SZ = 0x1880
-SLOTS = 4
+SLOTS = 16
+HEAP = 0x110
+HEAP_SZ = SRM_SIZE - HEAP
 BLOCK_SZ = 0x5300
 
 
 def srm_new():
     srm = bytearray(SRM_SIZE)
     srm[0:5] = b'SNDJ1'
-    srm[5] = 1
+    srm[5] = 2
     for s in range(SLOTS):
         srm[0x10 + s * 16] = 0xFF
     return srm
@@ -35,22 +35,37 @@ def slot_info(srm, s):
     e = 0x10 + s * 16
     if srm[e] != 0xA5:
         return None
-    region = srm[e + 1]
-    size, crc = struct.unpack('<HH', srm[e + 2:e + 6])
-    name = srm[e + 6:e + 14].decode('latin1').rstrip()
-    data = bytes(srm[0x100 + region * REGION_SZ:0x100 + region * REGION_SZ + size])
-    ok = region < REGIONS and size <= REGION_SZ and sndj_rle.crc16(data) == crc
-    return {'region': region, 'size': size, 'crc': crc, 'name': name,
+    off, size, crc = struct.unpack('<HHH', srm[e + 1:e + 7])
+    name = srm[e + 8:e + 16].decode('latin1').rstrip()
+    data = bytes(srm[HEAP + off:HEAP + off + size])
+    ok = size <= HEAP_SZ and sndj_rle.crc16(data) == crc
+    return {'off': off, 'size': size, 'crc': crc, 'name': name,
             'data': data, 'ok': ok}
 
 
-def free_region(srm):
-    used = {srm[0x10 + s * 16 + 1] for s in range(SLOTS)
-            if srm[0x10 + s * 16] == 0xA5}
-    for r in range(REGIONS):
-        if r not in used:
-            return r
-    raise SystemExit('no free region')
+def songs_of(srm):
+    out = []
+    for s in range(SLOTS):
+        info = slot_info(srm, s)
+        if info:
+            out.append(info)
+    return out
+
+
+def layout(songs):
+    srm = srm_new()
+    off = 0
+    for s, song in enumerate(songs):
+        if off + len(song['data']) > HEAP_SZ:
+            raise SystemExit('songs exceed the 32 KB save')
+        e = 0x10 + s * 16
+        srm[e + 1:e + 7] = struct.pack('<HHH', off, len(song['data']),
+                                       sndj_rle.crc16(song['data']))
+        srm[e + 8:e + 16] = song['name'].ljust(8)[:8].encode('latin1')
+        srm[HEAP + off:HEAP + off + len(song['data'])] = song['data']
+        srm[e] = 0xA5
+        off += len(song['data'])
+    return srm
 
 
 def sndj_build(name, packed):
@@ -78,16 +93,18 @@ def main():
         return
     srm = bytearray(open(path, 'rb').read()[:SRM_SIZE].ljust(SRM_SIZE, b'\0'))
     if cmd == 'list':
-        ok = srm[:5] == b'SNDJ1'
-        print(f'{path}: magic {"SNDJ1" if ok else "MISSING"}')
+        ok = srm[:5] == b'SNDJ1' and srm[5] == 2
+        print(f'{path}: magic {"SNDJ1 v2" if ok else "MISSING/WRONG VERSION"}')
+        free = HEAP_SZ
         for s in range(SLOTS):
             info = slot_info(srm, s)
             if info is None:
-                print(f'  slot {s}: - empty -')
-            else:
-                state = 'ok' if info['ok'] else 'BAD CRC'
-                print(f"  slot {s}: {info['name']:8s} {info['size']:5d} B "
-                      f"region {info['region']} crc ${info['crc']:04X} {state}")
+                continue
+            free -= info['size']
+            state = 'ok' if info['ok'] else 'BAD CRC'
+            print(f"  {s:2d}: {info['name']:8s} {info['size']:5d} B "
+                  f"@{info['off']:04X} crc ${info['crc']:04X} {state}")
+        print(f'  free: {free} bytes')
         return
     slot = int(sys.argv[3])
     if cmd == 'extract':
@@ -100,22 +117,20 @@ def main():
         name, packed = sndj_parse(open(sys.argv[4], 'rb').read())
         if len(sys.argv) > 5:
             name = sys.argv[5]
-        if len(packed) > REGION_SZ:
-            raise SystemExit('song too big for a slot')
-        e = 0x10 + slot * 16
-        srm[e] = 0
-        region = free_region(srm)
-        srm[0x100 + region * REGION_SZ:0x100 + region * REGION_SZ + len(packed)] = packed
-        srm[e + 1] = region
-        srm[e + 2:e + 6] = struct.pack('<HH', len(packed), sndj_rle.crc16(packed))
-        srm[e + 6:e + 14] = name.ljust(8)[:8].encode('latin1')
-        srm[e] = 0xA5
-        open(path, 'wb').write(srm)
-        print(f'{sys.argv[4]} -> slot {slot} (region {region})')
+        songs = songs_of(srm)
+        entry = {'name': name, 'data': packed}
+        if slot < len(songs):
+            songs[slot] = entry
+        else:
+            songs.append(entry)
+        open(path, 'wb').write(layout(songs))
+        print(f'{sys.argv[4]} -> slot {min(slot, len(songs) - 1)}')
     elif cmd == 'erase':
-        srm[0x10 + slot * 16] = 0xFF
-        open(path, 'wb').write(srm)
-        print(f'slot {slot} erased')
+        songs = songs_of(srm)
+        if slot < len(songs):
+            del songs[slot]
+        open(path, 'wb').write(layout(songs))
+        print(f'slot {slot} erased (list compacted)')
     else:
         raise SystemExit(__doc__)
 

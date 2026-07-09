@@ -40,18 +40,28 @@ files_init:
 .ACCU 8
     ldx #str_files
     jsr text_puts
-    ; ruler
-    lda #5
-    sta text_x
-    lda #7
-    sta text_y
+    ; info block (genmddj-style)
     rep #$20
 .ACCU 16
     lda #ATTR_DIM
     sta text_attr
     sep #$20
 .ACCU 8
-    ldx #str_fruler
+    stz text_x
+    lda #3
+    sta text_y
+    ldx #str_fsram
+    jsr text_puts
+    stz text_x
+    lda #4
+    sta text_y
+    ldx #str_ffree
+    jsr text_puts
+    ; divider with the song count, overdrawn each frame
+    lda #6
+    sta text_y
+    stz text_x
+    ldx #str_fdiv
     jsr text_puts
     rts
 
@@ -265,9 +275,9 @@ files_menu:
     bra @m_draw
 @do_clear:
     lda fl_slot
-    jsr slot_clear
-    jsr slots_compact       ; the list stays packed, genmddj-style
+    jsr slot_clear          ; the save layer packs directory + heap
     jsr fl_clamp
+    lda #SV_OK
     sta fl_msg
     bra @m_draw
 @do_save:
@@ -321,7 +331,7 @@ fl_char_cycle:
 .ACCU 16
     txa
     clc
-    adc #$0006
+    adc #$0008
     sta tmp0                ; entry name base
     lda fl_ncur
     and #$00FF
@@ -393,7 +403,7 @@ fl_used:
     tax
     sep #$20
 .ACCU 8
-    cpx #$0040
+    cpx #(SLOT_COUNT * 16)
     bne @u
     lda tmp2
     rts
@@ -401,108 +411,14 @@ fl_used:
 ; keep the cursor on a saved slot or the single (EMPTY) row
 fl_clamp:
     jsr fl_used
-    cmp #$04
+    cmp #SLOT_COUNT
     bcc +
-    lda #$03
+    lda #(SLOT_COUNT - 1)
 +
     cmp fl_slot
     bcs +
     sta fl_slot
 +
-    rts
-
-; close the gap after a CLEAR: valid entries slide up (three bubble
-; passes over the 4-entry table; the status byte moves last)
-slots_compact:
-    lda #$03
-    sta fl_usedv            ; pass counter (scratch)
-@pass:
-    rep #$30
-.ACCU 16
-    lda #$0000
-    sta pg_i                ; entry base offset (slots 0-2)
-    sep #$20
-.ACCU 8
-@pair:
-    rep #$30
-.ACCU 16
-    lda pg_i
-    tax
-    sep #$20
-.ACCU 8
-    lda.l SRAM_TABLE,x
-    cmp #$A5
-    beq @next
-    rep #$30
-.ACCU 16
-    lda pg_i
-    clc
-    adc #$0010
-    tax
-    sep #$20
-.ACCU 8
-    lda.l SRAM_TABLE,x
-    cmp #$A5
-    bne @next
-    ; copy entry down, bytes 15..1 then the status byte, and blank
-    ; the source status so the entry moves rather than duplicates
-    lda #$0F
-    sta tmp2
-@cp:
-    rep #$30
-.ACCU 16
-    lda tmp2
-    and #$00FF
-    clc
-    adc pg_i
-    clc
-    adc #$0010
-    tax
-    sep #$20
-.ACCU 8
-    lda.l SRAM_TABLE,x      ; source byte (slot i+1)
-    pha
-    rep #$30
-.ACCU 16
-    lda tmp2
-    and #$00FF
-    clc
-    adc pg_i
-    tax
-    sep #$20
-.ACCU 8
-    pla
-    sta.l SRAM_TABLE,x      ; dest byte (slot i)
-    dec tmp2
-    bpl @cp
-    ; release the source slot
-    rep #$30
-.ACCU 16
-    lda pg_i
-    clc
-    adc #$0010
-    tax
-    sep #$20
-.ACCU 8
-    lda #$FF
-    sta.l SRAM_TABLE,x
-@next:
-    rep #$30
-.ACCU 16
-    lda pg_i
-    clc
-    adc #$0010
-    sta pg_i
-    cmp #$0030
-    sep #$20
-.ACCU 8
-    bcc @pair_far
-    dec fl_usedv
-    beq @done
-    jmp @pass
-@pair_far:
-    jmp @pair
-@done:
     rts
 
 ; --- PURGE: blank phrases/chains not reachable from the SONG grid ------------------
@@ -755,42 +671,63 @@ purge_phrases:
     bcc @each
     rts
 
-; --- draw --------------------------------------------------------------------------
+; --- draw (genmddj-style) ----------------------------------------------------------
+; SRAM/FREE info block, a divider carrying the song count, then the
+; packed list: NAME + decimal size, one (EMPTY) row, blanks below.
 files_draw:
     jsr fl_used
-    sta fl_usedv            ; the (EMPTY) row index; rows below stay blank
-    stz ui_cnt              ; slot counter
-@slots:
-    lda ui_cnt
-    clc
-    adc #8
-    sta text_y
-    ; slot number (accent on the cursor row)
-    lda #2
+    sta fl_usedv
+    ; SRAM total (static-ish) + FREE value
+    lda #6
     sta text_x
-    lda ui_cnt
-    cmp fl_slot
-    bne @num_dim
+    lda #3
+    sta text_y
     rep #$20
 .ACCU 16
-    lda #ATTR_ACCENT
+    lda #ATTR_TEXT
     sta text_attr
     sep #$20
 .ACCU 8
-    bra @num_put
-@num_dim:
+    ldx #str_f32k
+    jsr text_puts
+    lda #6
+    sta text_x
+    lda #4
+    sta text_y
+    jsr heap_free
+    rep #$30
+.ACCU 16
+    lda #HEAP_SZ
+    sec
+    sbc sv_i
+    sta tmp0
+    sep #$20
+.ACCU 8
+    jsr fl_kb               ; prints xx.xK from tmp0
+    ; song count on the divider
+    lda #12
+    sta text_x
+    lda #6
+    sta text_y
     rep #$20
 .ACCU 16
     lda #ATTR_DIM
     sta text_attr
     sep #$20
 .ACCU 8
-@num_put:
+    ldx #str_fsongs
+    jsr text_puts
+    lda fl_usedv
+    jsr text_hex8
+    lda #' ' - 32
+    jsr text_puttile
+    ; the list
+    stz ui_cnt
+@slots:
     lda ui_cnt
     clc
-    adc #'0' - 32
-    jsr text_puttile
-    ; entry
+    adc #8
+    sta text_y
     lda ui_cnt
     rep #$30
 .ACCU 16
@@ -807,12 +744,11 @@ files_draw:
     bne +
     jmp @named
 +
-    ; the table is packed: only the first free row is the (EMPTY) slot,
-    ; anything below it stays blank
+    ; first free row shows (EMPTY) / the working song's name preview
     lda ui_cnt
     cmp fl_usedv
     beq @first_free
-    lda #5
+    lda #2
     sta text_x
     rep #$20
 .ACCU 16
@@ -829,7 +765,7 @@ files_draw:
     lda ui_cnt
     cmp fl_slot
     beq @empty_named
-    lda #5
+    lda #2
     sta text_x
     rep #$20
 .ACCU 16
@@ -843,11 +779,11 @@ files_draw:
     plx
     jmp @next
 @empty_named:
-    stz sv_run              ; char counter
+    stz sv_run
 @ename:
     lda sv_run
     clc
-    adc #5
+    adc #2
     sta text_x
     jsr fl_name_attr
     lda sv_run
@@ -867,7 +803,7 @@ files_draw:
     lda sv_run
     cmp #$08
     bne @ename
-    lda #15
+    lda #12
     sta text_x
     rep #$20
 .ACCU 16
@@ -881,15 +817,15 @@ files_draw:
     plx
     jmp @next
 @named:
-    stz sv_run              ; char counter
+    stz sv_run
 @name:
     lda sv_run
     clc
-    adc #5
+    adc #2
     sta text_x
     jsr fl_name_attr
     phx
-    lda.l SRAM_TABLE + 6,x
+    lda.l SRAM_TABLE + 8,x
     sec
     sbc #32
     jsr text_puttile
@@ -903,12 +839,12 @@ files_draw:
 .ACCU 16
     txa
     sec
-    sbc #$0008              ; back to the entry base
+    sbc #$0008
     tax
     sep #$20
 .ACCU 8
-    ; packed size in hex bytes
-    lda #15
+    ; decimal size
+    lda #12
     sta text_x
     rep #$20
 .ACCU 16
@@ -917,16 +853,13 @@ files_draw:
     sep #$20
 .ACCU 8
     phx
+    rep #$30
+.ACCU 16
     lda.l SRAM_TABLE + 3,x
-    jsr text_hex8
-    plx
-    phx
-    lda.l SRAM_TABLE + 2,x
-    jsr text_hex8
-    plx
-    phx
-    ldx #str_bytes
-    jsr text_puts
+    sta tmp0
+    sep #$20
+.ACCU 8
+    jsr fl_kb
     plx
 @next:
     inc ui_cnt
@@ -942,7 +875,7 @@ files_draw:
     clc
     adc #8
     sta text_y
-    lda #23
+    lda #21
     sta text_x
     lda fl_menu
     beq @m_blank
@@ -990,54 +923,10 @@ files_draw:
     lda ui_cnt
     cmp #$05
     bne @mrow
-    ; used-slots readout
-    lda #2
-    sta text_x
-    lda #14
-    sta text_y
-    rep #$20
-.ACCU 16
-    lda #ATTR_DIM
-    sta text_attr
-    sep #$20
-.ACCU 8
-    ldx #str_fused
-    jsr text_puts
-    stz ui_cnt
-    stz sv_run              ; used counter
-@count:
-    lda ui_cnt
-    rep #$30
-.ACCU 16
-    and #$00FF
-    asl
-    asl
-    asl
-    asl
-    tax
-    sep #$20
-.ACCU 8
-    lda.l SRAM_TABLE,x
-    cmp #$A5
-    bne @c_next
-    inc sv_run
-@c_next:
-    inc ui_cnt
-    lda ui_cnt
-    cmp #SLOT_COUNT
-    bne @count
-    lda sv_run
-    clc
-    adc #'0' - 32
-    jsr text_puttile
-    lda #'/' - 32
-    jsr text_puttile
-    lda #'4' - 32
-    jsr text_puttile
     ; status line
     lda #2
     sta text_x
-    lda #20
+    lda #25
     sta text_y
     rep #$20
 .ACCU 16
@@ -1088,6 +977,90 @@ files_draw:
     ldx #str_fbadcrc
     jmp text_puts
 
+; print tmp0 (bytes, 16-bit) as "NN.NK" at text_x/y
+fl_kb:
+    rep #$30
+.ACCU 16
+    lda tmp0
+    and #$03FF
+    sta tmp2                ; fraction source
+    lda tmp0
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr                     ; whole KB (0-31)
+    sta tmp0
+    sep #$20
+.ACCU 8
+    ; tens digit (blank below 10)
+    lda tmp0
+    ldy #$0000
+@tens:
+    cmp #10
+    bcc @tens_done
+    sec
+    sbc #10
+    iny
+    bra @tens
+@tens_done:
+    pha
+    rep #$30
+.ACCU 16
+    tya
+    sep #$20
+.ACCU 8
+    beq @no_tens
+    clc
+    adc #'0' - 32
+    jsr text_puttile
+    bra @unit
+@no_tens:
+    lda #' ' - 32
+    jsr text_puttile
+@unit:
+    pla
+    clc
+    adc #'0' - 32
+    jsr text_puttile
+    lda #'.' - 32
+    jsr text_puttile
+    ; decimal = (rem * 10) >> 10
+    rep #$30
+.ACCU 16
+    lda tmp2
+    asl
+    asl
+    asl
+    clc
+    adc tmp2
+    clc
+    adc tmp2                ; * 10
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    sep #$20
+.ACCU 8
+    clc
+    adc #'0' - 32
+    jsr text_puttile
+    lda #'K' - 32
+    jsr text_puttile
+    lda #'B' - 32
+    jmp text_puttile
+
 ; name char attr: accent under the name cursor of the cursor slot while
 ; B is held (naming), text otherwise
 fl_name_attr:
@@ -1095,8 +1068,6 @@ fl_name_attr:
     lda ui_cnt
     cmp fl_slot
     bne @plain
-    lda b_down
-    beq @plain
     lda sv_run
     cmp fl_ncur
     bne @plain
@@ -1119,16 +1090,19 @@ fl_name_attr:
     rts
 
 .DEFINE FL_CHARSET_N 39
-fl_charset:  .DB " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.", 0
+fl_charset:  .DB " ABCDEFGHIJKLMNOPQRSTUVWXYZ-.0123456789", 0
 
 fl_menu_tab: .DW str_fsave, str_fload, str_fclear, str_fpurgep, str_fpurgec
 
 str_files:   .DB "FILES", 0
-str_fruler:  .DB "NAME      SIZE", 0
+str_fsram:   .DB "SRAM", 0
+str_f32k:    .DB "32K LIN", 0
+str_fdiv:    .DB "--------------------------------", 0
+str_fsongs:  .DB " SONGS ", 0
 str_fempty:  .DB "(EMPTY)   ", 0
 str_fnew:    .DB " NEW", 0
 str_bytes:   .DB "B", 0
-str_fused:   .DB "SLOTS USED ", 0
+str_ffree:   .DB "FREE ", 0
 str_fsave:   .DB "SAVE ", 0
 str_fload:   .DB "LOAD ", 0
 str_fclear:  .DB "CLEAR", 0
