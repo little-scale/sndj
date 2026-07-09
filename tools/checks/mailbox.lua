@@ -73,9 +73,9 @@ local function onFrame()
   elseif frames == 250 then
     -- next heartbeat hits the dead mailbox; timeout is ~0.4s (~25 frames)
     check(wram(0x000D) == 1, "apu_status flags the timeout")
-    -- "APU?" drawn accent at (27,1): 'A' tile 33, attr $2400
-    check(cell(27, 1) == (string.byte("A") - 32 | 0x2400), "UI shows APU? warning")
-    check(cell(30, 1) == (string.byte("?") - 32 | 0x2400), "UI shows APU? question mark")
+    -- "APU?" drawn accent at (27,1): inverted 'A' (tile 33+96), attr $2400
+    check(cell(27, 1) == (string.byte("A") - 32 + 96 | 0x2400), "UI shows APU? warning")
+    check(cell(30, 1) == (string.byte("?") - 32 + 96 | 0x2400), "UI shows APU? question mark")
     -- and the machine is still alive:
     local fc = wram(0x0002) + wram(0x0003) * 256
     check(fc > 200, "CPU survived the APU death (frames=" .. fc .. ")")

@@ -77,7 +77,7 @@ emu.addEventCallback(function()
     check(wram(0x1D4) == 1, "B+Right selected scheme 1 (WHT)")
     check(palbuf(0) == 0x7FFF and palbuf(2) == 0x0000,
       "pal_buf holds white bg / black text")
-    check(cgram(6) == 0x0159, "NMI drained the scheme into CGRAM (accent)")
+    check(cgram(1) == 0x7FFF, "NMI drained the scheme into CGRAM (negative ink = bg)")
     check(sram(0x0007) == 1, "scheme persisted in SRAM $0007")
     emu.reset()
     _booted = false
@@ -85,7 +85,7 @@ emu.addEventCallback(function()
     frames = 0
   elseif stage == "reboot" and frames == 30 then
     check(wram(0x1D4) == 1, "scheme 1 restored from SRAM after reset")
-    check(cgram(6) == 0x0159, "CGRAM rebuilt from the persisted scheme")
+    check(cgram(1) == 0x7FFF, "CGRAM rebuilt from the persisted scheme")
     if fails == 0 then
       print("ALL PASS palette.lua")
       emu.stop(0)

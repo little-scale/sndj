@@ -59,7 +59,7 @@ const RESERVED = 0x27FFA;
 let rom = null, poolOff = -1, entries = [], replacing = -1, romName = 'sndj.sfc';
 let palOff = -1;
 const PAL_NAMES = ['BLK', 'WHT', 'KIDD', 'AMBR', 'CYAN', 'PINK', 'NEON', 'MINT'];
-const PAL_SLOTS = ['bg', 'text', 'dim', 'accent', 'hilite'];
+const PAL_SLOTS = ['bg', 'text'];
 
 const $ = id => document.getElementById(id);
 const status = (msg, warn) => {
@@ -206,7 +206,7 @@ function renderPal() {
   for (let i = 0; i < 8; i++) {
     const tr = document.createElement('tr');
     let cells = '<td>' + i + ' ' + PAL_NAMES[i] + '</td>';
-    for (let k = 0; k < 5; k++) {
+    for (let k = 0; k < 2; k++) {
       const off = palOff + i * 16 + k * 2;
       cells += '<td><input type="color" data-pal="' + off +
         '" value="' + bgr15ToHex(off) + '"></td>';

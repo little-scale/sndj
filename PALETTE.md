@@ -1,27 +1,29 @@
 # sndj palettes
 
-The UI is drawn from a **palette scheme**: five 15-bit BGR colours with
-semantic roles (solid backdrop — no gradient), from which the engine
-builds CGRAM at apply time. Eight factory schemes ship in the ROM's
-marker-wrapped `SNPAL0` block (16 bytes each — see the layout below),
-so tools can repaint a built ROM without a toolchain.
+The UI is drawn from a **two-colour palette scheme** (background and
+text), genmddj-style: cursors, playheads and titles render as palette
+*negatives* (an inverted copy of the glyph set), and the dim shade
+(rulers, empty cells) derives automatically as the channel average of
+the pair. Eight factory schemes ship in the ROM's marker-wrapped
+`SNPAL0` block (16 bytes each — see the layout below), so tools can
+repaint a built ROM without a toolchain.
 
 Select a scheme on **OPTIONS → PALETTE** (B-hold + left/right). The
 choice applies instantly and persists in the cartridge save (reserved
 SRAM header byte `$0007`).
 
-## Semantic slots
+## Rendering roles (derived from the two colours)
 
-| slot | role |
-|------|------|
+| role | rendering |
+|------|-----------|
 | bg | backdrop (colour 0) |
 | text | normal cells |
-| dim | rulers, empty cells, labels |
-| accent | cursor and selections |
-| hilite | playheads, meters, screen titles |
+| dim | rulers, empty cells — the bg/text channel average |
+| cursor / selection | palette negative (inverted glyphs) |
+| playheads, titles, meters | palette negative |
 
-These are the same roles as smsggdj/genmddj, so a scheme is conceptually
-portable across the family.
+Same model as smsggdj/genmddj, so schemes are portable across the
+family.
 
 ## Factory schemes
 
@@ -49,7 +51,7 @@ and rebuild, or patch the `SNPAL0` block in a built ROM.
 scheme, little-endian 15-bit BGR words:
 
 ```
-+0 bg   +2 text   +4 dim   +6 accent   +8 hilite   +10..15 pad
++0 bg   +2 text   +4..15 pad
 ```
 
 `patcher.html` gains a palette tab against this block (planned); until

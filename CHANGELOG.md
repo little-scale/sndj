@@ -2,6 +2,12 @@
 
 ## 0.1.0-dev (unreleased)
 
+- Palettes are two colours (bg + text), genmddj-style: cursors,
+  playheads and titles render as palette negatives via an inverted
+  glyph set; dim derives as the channel average. Deleting a note also
+  deletes its instrument; B-hold + d-pad on an empty note cell inserts
+  immediately; auditions only sound while the transport is stopped.
+
 - GROOVE screen (A+Down from CHAIN): edit each groove's 16 ticks-per-
   row steps live (B+d-pad, clamped 1-15; B tap repeats; Y+up/down
   pages grooves) with a derived BPM readout and a playing-step marker.

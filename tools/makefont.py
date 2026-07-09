@@ -116,15 +116,33 @@ def glyph_rows(ch):
     return ['.' + r + '..' for r in rows] + ['........']
 
 
+def invert_tile(t):
+    """Inverted rendering: ink -> colour 1 (the bg colour), empty ->
+    colour 3 (the ink colour) — a negative cell for cursors/playheads."""
+    out = bytearray()
+    for r in range(8):
+        b1 = t[r * 2 + 1]           # plane 1 = the ink mask (colour 3)
+        out += bytes((0xFF, (~b1) & 0xFF))
+    return bytes(out)
+
+
 def main(out_path):
-    data = bytearray()
+    tiles = []
     for code in range(32, 96):
-        data += tile_2bpp(glyph_rows(chr(code)))
+        tiles.append(tile_2bpp(glyph_rows(chr(code))))
     for _name, rows in EXTRA:
-        data += tile_2bpp(rows)
+        tiles.append(tile_2bpp(rows))
+    while len(tiles) < 96:          # pad so the inverted set sits at +96
+        tiles.append(bytes(16))
+    tiles = tiles[:96]
+    data = bytearray()
+    for t in tiles:
+        data += t
+    for t in tiles:
+        data += invert_tile(t)
     with open(out_path, 'wb') as f:
         f.write(data)
-    print(f"makefont: {len(G)} ascii + {len(EXTRA)} extra glyphs -> {out_path} ({len(data)} bytes)")
+    print(f"makefont: 96 + 96 inverted tiles -> {out_path} ({len(data)} bytes)")
 
 
 if __name__ == '__main__':

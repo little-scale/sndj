@@ -826,6 +826,13 @@ apply_instrument:
 ; --- audition: immediate note on voice 0 (editor insert/nudge) ----------------
 ; Uses the last-inserted instrument so what you hear is what the row plays.
 audition_note:
+    pha
+    lda eng_playing         ; auditions stay quiet while the transport runs
+    beq @quiet_ok
+    pla
+    rts
+@quiet_ok:
+    pla
     sta trig_note
     stz trig_voice
     lda ed_lastinstr

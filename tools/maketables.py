@@ -26,26 +26,26 @@ def bgr15(r, g, b):
 # levels mapped through the MD DAC ramp to 8-bit).
 
 SCHEMES = [
-    # genmddj's 8 schemes, same order/indices (MD DAC levels -> 8-bit)
-    # name   bg            text            dim            accent         hilite
-    ('BLK ', (0, 0, 0),    (255, 255, 255), (116, 116, 116), (255, 176, 32), (64, 208, 200)),
-    ('WHT ', (255, 255, 255), (0, 0, 0),    (136, 136, 136), (206, 87, 0),  (0, 116, 144)),
-    ('KIDD', (0, 87, 206), (255, 255, 0),   (144, 172, 240), (255, 255, 255), (144, 255, 230)),
-    ('AMBR', (52, 0, 0),   (255, 172, 0),   (144, 87, 20),  (255, 255, 116), (255, 116, 52)),
-    ('CYAN', (0, 0, 87),   (0, 255, 255),   (52, 116, 144), (255, 255, 255), (116, 255, 200)),
-    ('PINK', (87, 0, 87),  (255, 0, 255),   (150, 87, 150), (255, 206, 226), (255, 144, 255)),
-    ('NEON', (87, 172, 255), (255, 0, 172), (130, 140, 200), (255, 255, 255), (255, 230, 87)),
-    ('MINT', (0, 87, 87),  (87, 255, 172),  (52, 144, 120), (255, 255, 160), (255, 180, 87)),
+    # genmddj's 8 schemes: two colours each (bg, text). The cursor and
+    # playheads render as palette negatives; dim derives from the pair.
+    ('BLK ', (0, 0, 0),       (255, 255, 255)),
+    ('WHT ', (255, 255, 255), (0, 0, 0)),
+    ('KIDD', (0, 87, 206),    (255, 255, 0)),
+    ('AMBR', (52, 0, 0),      (255, 172, 0)),
+    ('CYAN', (0, 0, 87),      (0, 255, 255)),
+    ('PINK', (87, 0, 87),     (255, 0, 255)),
+    ('NEON', (87, 172, 255),  (255, 0, 172)),
+    ('MINT', (0, 87, 87),     (87, 255, 172)),
 ]
 
 
 def schemes_bin():
     out = bytearray()
-    for name, bg, text, dim, accent, hilite in SCHEMES:
-        for c in (bg, text, dim, accent, hilite):
+    for name, bg, text in SCHEMES:
+        for c in (bg, text):
             w = bgr15(*c)
             out += bytes((w & 0xFF, w >> 8))
-        out += bytes(6)  # pad to 16
+        out += bytes(12)  # pad to 16
     return bytes(out)
 
 

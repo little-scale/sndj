@@ -205,8 +205,12 @@ kit_update:
 @draw:
     jmp kit_draw
 
-; audition the cursor slot on voice 0
+; audition the cursor slot on voice 0 (only while stopped)
 kit_audition:
+    lda eng_playing
+    beq +
+    rts
++
     stz trig_voice
     lda kt_col
     pha

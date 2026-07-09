@@ -450,9 +450,14 @@ cell_clear:
     lda ed_col
     bne @not_note
     lda tmp1
-    beq @wr
+    beq @note_gone
     sta ed_lastnote
-    bra @wr
+@note_gone:
+    ; a deleted note takes its instrument with it
+    lda #INSTR_NONE
+    sta.l $7E0000 + SB_PHRASES + 1,x
+    lda #$00
+    bra @wr2
 @not_note:
     cmp #2
     bne @is_val
@@ -465,6 +470,7 @@ cell_clear:
     sta ed_lastval
 @wr:
     lda #$00
+@wr2:
     sta.l $7E0000 + SB_PHRASES,x
     rts
 
@@ -545,7 +551,17 @@ cell_nudge:
     rts
 @note:
     lda tmp1
-    beq @done               ; nudge on empty does nothing
+    bne @note_live
+    ; empty cell: B+d-pad inserts the last note (and its instrument)
+    ; straight away — no separate tap needed
+    lda ed_lastnote
+    sta.l $7E0000 + SB_PHRASES,x
+    lda ed_lastinstr
+    sta.l $7E0000 + SB_PHRASES + 1,x
+    lda ed_lastnote
+    dec a
+    jmp audition_note
+@note_live:
     cmp #NOTE_OFF
     beq @done
     clc

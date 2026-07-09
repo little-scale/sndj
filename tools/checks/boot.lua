@@ -33,7 +33,11 @@ local function cell(x, y)
 end
 
 local function word(ch, attr)
-  return (string.byte(ch) - 32) | attr
+  local tile = string.byte(ch) - 32
+  if attr == 0x2400 or attr == 0x2800 then
+    tile = tile + 96          -- accent/hilite use the inverted glyph set
+  end
+  return tile | attr
 end
 
 local ATTR_ACCENT = 0x2400

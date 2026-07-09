@@ -60,6 +60,20 @@ text_puts:
     rep #$20
 .ACCU 16
     and #$00FF
+    ; accent + hilite draw as negatives (inverted glyph set at +96)
+    pha
+    lda text_attr
+    cmp #ATTR_ACCENT
+    beq @inv
+    cmp #ATTR_HILITE
+    beq @inv
+    pla
+    bra @pl
+@inv:
+    pla
+    clc
+    adc #96
+@pl:
     ora text_attr
     sta.w SHADOW_BG3,y
     sep #$20
@@ -81,6 +95,20 @@ text_puttile:
     rep #$20
 .ACCU 16
     and #$00FF
+    ; accent + hilite draw as negatives (inverted glyph set at +96)
+    pha
+    lda text_attr
+    cmp #ATTR_ACCENT
+    beq @invert
+    cmp #ATTR_HILITE
+    beq @invert
+    pla
+    bra @plain
+@invert:
+    pla
+    clc
+    adc #96
+@plain:
     ora text_attr
     sta.w SHADOW_BG3,x
     sep #$20

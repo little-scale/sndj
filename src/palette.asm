@@ -2,7 +2,9 @@
 ;
 ; 8 schemes live in the marker-wrapped SNPAL0 block (built by
 ; maketables.py, patchable in the ROM): 16 bytes each, little-endian
-; 15-bit BGR words bg, text, dim, accent, hilite (rest padding).
+; 15-bit BGR words bg, text (rest padding). Two colours per scheme,
+; genmddj-style: cursors/playheads render as palette negatives (the
+; inverted glyph set) and dim derives from the pair.
 ;
 ; palette_apply builds the 16-colour CGRAM image in pal_buf; the NMI
 ; drains it next VBlank (invariant #6). Solid backdrop, no gradient.
@@ -16,9 +18,6 @@
 ; scheme word offsets
 .DEFINE PS_BG      0
 .DEFINE PS_TEXT    2
-.DEFINE PS_DIM     4
-.DEFINE PS_ACCENT  6
-.DEFINE PS_HILITE  8
 
 ; --- boot: pick the persisted scheme and build everything -----------------------
 ; Called under force-blank; writes CGRAM directly (no queue needed yet).
@@ -59,7 +58,13 @@ palette_select:
 @done:
     rts
 
-; --- A = scheme 0-7: build pal_buf + the gradient table, set pal_dirty ----------
+; --- A = scheme 0-7: build pal_buf, set pal_dirty ---------------------------------
+; Line layout (normal glyphs ink with colour 3; inverted glyphs ink
+; with colour 1 on a colour-3 field):
+;   line 0 TEXT    1=bg  2=text 3=text
+;   line 1 ACCENT  (negative) same colours as line 0
+;   line 2 HILITE  (negative) same colours as line 0
+;   line 3 DIM     1=bg  2=dim  3=dim   (dim = bg/text channel average)
 palette_apply:
     and #$07
     sta opt_pal
@@ -75,30 +80,37 @@ palette_apply:
     ; colour 0 = bg
     lda.l pal_schemes + PS_BG,x
     sta.w pal_buf + 0
-    ; BG3 palette 0 (text): 1=dim, 2=text, 3=text
-    lda.l pal_schemes + PS_DIM,x
+    ; dim = per-channel average of bg and text (5-bit fields kept apart
+    ; by masking before the add)
+    lda.l pal_schemes + PS_BG,x
+    and #$7BDE              ; drop each channel's low bit
+    lsr
+    sta pal_tmp
+    lda.l pal_schemes + PS_TEXT,x
+    and #$7BDE
+    lsr
+    clc
+    adc pal_tmp
+    sta pal_tmp             ; dim
+    ; lines 0-2: 1=bg, 2=text, 3=text
+    lda.l pal_schemes + PS_BG,x
     sta.w pal_buf + 2
+    sta.w pal_buf + 10
+    sta.w pal_buf + 18
     lda.l pal_schemes + PS_TEXT,x
     sta.w pal_buf + 4
     sta.w pal_buf + 6
-    ; BG3 palette 1 (accent): 5=dim, 6=accent, 7=accent
-    lda.l pal_schemes + PS_DIM,x
-    sta.w pal_buf + 10
-    lda.l pal_schemes + PS_ACCENT,x
     sta.w pal_buf + 12
     sta.w pal_buf + 14
-    ; BG3 palette 2 (hilite): 9=dim, 10=hilite, 11=hilite
-    lda.l pal_schemes + PS_DIM,x
-    sta.w pal_buf + 18
-    lda.l pal_schemes + PS_HILITE,x
     sta.w pal_buf + 20
     sta.w pal_buf + 22
-    ; BG3 palette 3 (dim): 13, 14, 15 = dim
-    lda.l pal_schemes + PS_DIM,x
+    ; line 3: 1=bg, 2=dim, 3=dim
+    lda.l pal_schemes + PS_BG,x
     sta.w pal_buf + 26
+    lda pal_tmp
     sta.w pal_buf + 28
     sta.w pal_buf + 30
-    ; unused entries stay transparent-ish (bg)
+    ; colours 4/8/12 stay at bg
     lda.l pal_schemes + PS_BG,x
     sta.w pal_buf + 8
     sta.w pal_buf + 16

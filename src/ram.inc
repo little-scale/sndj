@@ -180,6 +180,7 @@ gv_row       db      ; GROOVE screen: step cursor
 ed_lastgroove db     ; GROOVE insert buffer
 pj_cur       db      ; PROJECT field cursor
 pj_arm       db      ; PROJECT NEW confirm armed
+pal_tmp      dw      ; palette_apply dim-blend scratch
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;
