@@ -11,6 +11,8 @@
 .ACCU 8
 .INDEX 16
 
+factory_kit_base: .DB 8, 24, 36
+factory_kit_len:  .DB 16, 12, 9
 str_defname: .DB "SONG    "
 factory_instr_type: .DB 0, 0, 0, 0, 0, 2, 3, 1
 factory_instr_smp:  .DB 0, 1, 2, 3, 4, 0, 0, 0
@@ -195,36 +197,65 @@ song_init:
     beq @ai_done
     jmp @autoinstr
 @ai_done:
-    ; factory kits: kit 0 = 808 (pool 8-23), kit 1 = 909 (pool 24-39),
-    ; kit 2 = Mario Paint (pool 40-51, slots 12-15 empty)
-    ldx #$0000
-@fkits:
+    ; factory kits from the base/length tables:
+    ; kit 0 = 808, kit 1 = Mario Paint, kit 2 = SMW percussion
+    stz es2                 ; kit
+@fk_kit:
+    stz es2 + 1             ; slot
+@fk_slot:
+    lda es2
     rep #$30
 .ACCU 16
-    txa
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda es2 + 1
+    cmp.w factory_kit_len,x
+    bcs @fk_next_kit
+    ; record offset = kit*64 + slot*4
+    lda es2
+    rep #$30
+.ACCU 16
+    and #$00FF
+    xba
+    lsr
+    lsr                     ; * 64
+    sta tmp2
+    lda es2 + 1
+    and #$00FF
     asl
-    asl                     ; slot record offset (kit*64 + slot*4 = x*4)
-    tay
+    asl
+    clc
+    adc tmp2
+    tax
     sep #$20
 .ACCU 8
-    txa
-    clc
-    adc #$08                ; 808 starts at pool sample 8; kit 1 follows
+    ; sample = base[kit] + slot (compute before X is the record offset)
     phx
+    lda es2
     rep #$30
 .ACCU 16
-    tyx
+    and #$00FF
+    tax
     sep #$20
 .ACCU 8
+    lda.w factory_kit_base,x
+    clc
+    adc es2 + 1
+    plx
     sta.l $7E0000 + SB_KITS,x       ; sample
     lda #$F4
     sta.l $7E0000 + SB_KITS + 1,x   ; tune -12: factory drums are 16 kHz
     lda #$50
     sta.l $7E0000 + SB_KITS + 2,x   ; vol
-    plx
-    inx
-    cpx #$002C                      ; 44 slots = kits 0, 1 + MP kit 2
-    bne @fkits
+    inc es2 + 1
+    bra @fk_slot
+@fk_next_kit:
+    inc es2
+    lda es2
+    cmp #$03
+    bcc @fk_kit
     ; header: name "SONG    " then settings
     ldx #$0000
 @sname:

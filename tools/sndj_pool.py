@@ -159,10 +159,22 @@ def sf2_samples(path):
 
 
 # ---------------------------------------------------------------- factory set
-DRUM_KITS = [('01 808', '808'), ('02 909', '909')]
+DRUM_KITS = [('01 808', '808')]      # 909 retired for the SMW kit
 DRUM_MS = {'BD': 200, 'SD': 170, 'CP': 170, 'CY': 195, 'HO': 160}  # else 112
 SF2_FONT = 'mario_paint'    # melodics come from this font (drums stay Seb's)
-MP_KIT = [                  # kit 2: Mario Paint one-shots (16 kHz, cap ms)
+SMW_FONT = 'super_mario_world'
+SMW_KIT = [                 # kit 2: SMW percussion, by SAMPLE name (16 kHz)
+    ('kick-1',       'SW KICK', 160),
+    ('snare-1',      'SW SNARE', 200),
+    ('snare2-1',     'SW SNAR2', 200),
+    ('hisnare-1',    'SW HISNR', 160),
+    ('hihat-1',      'SW HAT', 160),
+    ('bongo-1',      'SW BONGO', 160),
+    ('dewL',         'SW DEW', 160),
+    ('orchestrahit', 'SW ORCH', 250),
+    ('2R',           'SW BEEP', 160),
+]
+MP_KIT = [                  # kit 1: Mario Paint one-shots (16 kHz, cap ms)
     ('Kick',        'MP KICK', 160),
     ('Snare',       'MP SNARE', 160),
     ('Snap',        'MP SNAP', 160),
@@ -257,10 +269,28 @@ def build_factory():
             if len(pcm) < 16:
                 pcm = [0] * 16
             entries.append((name, pcm, None))
-    # kit 2: Mario Paint one-shots (pool 40+), 16 kHz like the drums
+    # kit 1: Mario Paint one-shots, 16 kHz like the drums
     if sf2_path:
         for preset, short, cap in MP_KIT:
             hit = next((s for s in allsmp if s.get('preset') == preset), None)
+            if hit is None:
+                continue
+            pcm = prep_oneshot(hit['pcm'], hit['rate'], cap)
+            if len(pcm) < 16:
+                pcm = [0] * 16
+            entries.append((short, pcm, None))
+    # kit 2: the SMW percussion set (selected by sample name; their loop
+    # flags are whole-sample sustains, so treat them as one-shots)
+    smw_path = None
+    if os.path.isdir(sf_dir):
+        for f in sorted(os.listdir(sf_dir)):
+            if SMW_FONT in f.lower() and f.lower().endswith('.sf2'):
+                smw_path = os.path.join(sf_dir, f)
+                break
+    if smw_path:
+        smw = sf2_samples(smw_path)
+        for sname, short, cap in SMW_KIT:
+            hit = next((s for s in smw if s['name'] == sname), None)
             if hit is None:
                 continue
             pcm = prep_oneshot(hit['pcm'], hit['rate'], cap)
