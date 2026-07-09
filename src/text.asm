@@ -60,12 +60,10 @@ text_puts:
     rep #$20
 .ACCU 16
     and #$00FF
-    ; accent + hilite draw as negatives (inverted glyph set at +96)
+    ; accent draws as a negative (inverted glyph set at +96)
     pha
     lda text_attr
     cmp #ATTR_ACCENT
-    beq @inv
-    cmp #ATTR_HILITE
     beq @inv
     pla
     bra @pl
@@ -95,12 +93,10 @@ text_puttile:
     rep #$20
 .ACCU 16
     and #$00FF
-    ; accent + hilite draw as negatives (inverted glyph set at +96)
+    ; accent draws as a negative (inverted glyph set at +96)
     pha
     lda text_attr
     cmp #ATTR_ACCENT
-    beq @invert
-    cmp #ATTR_HILITE
     beq @invert
     pla
     bra @plain

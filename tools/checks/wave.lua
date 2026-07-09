@@ -1,5 +1,5 @@
 -- wave.lua — M10 gate: drawn wavetables compile to looped BRRs in ARAM
--- scratch, WAV instruments play them (SRCN 32+, pitch -2 oct), the B
+-- scratch, WAV instruments play them (SRCN 56+, tuned to true pitch), the B
 -- command wave-sequences per row, NSE drives NON + the global noise
 -- clock, and WAVE-screen edits land in ARAM immediately.
 
@@ -96,8 +96,8 @@ emu.addEventCallback(function()
     poke(0x4331, 1)
   elseif frames == play + 8 then
     check(dsp(0x04) == 57, "WAV instrument routes SRCN to wave slot 57")
-    check(dsp(0x02) + dsp(0x03) * 256 == 0x0200,
-      "WAV pitch dropped 2 octaves ($0200 for C-4)")
+    check(dsp(0x02) + dsp(0x03) * 256 == 0x0430,
+      "WAV C-4 tuned to 261.6 Hz ($0430)")
     check(dsp(0x3D) == 0, "no noise yet")
   elseif frames == play + 32 then
     check(dsp(0x04) == 58, "B02 wave-sequenced to bank 2 (SRCN 58)")

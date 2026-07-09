@@ -21,6 +21,7 @@
 .DEFINE SV_FULL      1
 .DEFINE SV_EMPTY     2
 .DEFINE SV_BADCRC    3
+.DEFINE SV_FREED     4
 
 ; --- boot: format SRAM if the magic is missing ---------------------------------
 sram_check:

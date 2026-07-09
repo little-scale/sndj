@@ -1,8 +1,8 @@
 ; projectscr.asm — the PROJECT screen: song-level settings.
 ;
 ;   NAME    the song's 8-char name (renamed on FILES, shown here)
-;   TMPO    BPM readout derived from the default groove (grooves ARE
-;           the tempo — edit it on GROOVE)
+;   TMPO    the song's tick BPM (B-hold + d-pad, 80-255; applied to
+;           the APU timer immediately and at play start)
 ;   GROOVE  default groove id (B-hold + left/right)
 ;   TSP     song transpose, signed semitones (applied at trigger)
 ;   MODE    SONG or LIVE — in LIVE the S map position opens the
@@ -85,11 +85,7 @@ project_update:
     bra @tap_done
 @do_new:
     stz pj_arm
-    jsr engine_stop
-    jsr song_init
-    jsr wave_sync_all
-    jsr residency_build
-    jsr apu_echo_apply
+    jsr song_renew
 @tap_done:
     jmp project_draw
 @b_held:
@@ -149,6 +145,8 @@ pj_nudge:
 @have:
     sta es3 + 1
     lda pj_cur
+    cmp #$01
+    beq @tmpo
     cmp #$02
     beq @groove
     cmp #$03
@@ -156,6 +154,19 @@ pj_nudge:
     cmp #$04
     beq @mode
     rts
+@tmpo:
+    lda.l $7E0000 + SB_HEADER + SH_BPM
+    bne +
+    lda #150
++
+    clc
+    adc es3 + 1
+    cmp #80
+    bcs +
+    lda #80                 ; the tick divider needs BPM >= 80
++
+    sta.l $7E0000 + SB_HEADER + SH_BPM
+    jmp apu_set_tempo       ; applies immediately
 @groove:
     lda.l $7E0000 + SB_HEADER + SH_GROOVE
     clc
@@ -249,9 +260,17 @@ project_draw:
 @not_name:
     cmp #$01
     bne @not_tmpo
-    ; TMPO readout from the default groove
-    lda.l $7E0000 + SB_HEADER + SH_GROOVE
-    jsr groove_bpm
+    ; TMPO: the song's tick BPM (editable; grooves scale the feel)
+    lda.l $7E0000 + SB_HEADER + SH_BPM
+    bne +
+    lda #150
++
+    rep #$30
+.ACCU 16
+    and #$00FF
+    sta tmp0
+    sep #$20
+.ACCU 8
     jsr text_dec3
     jmp @next
 @not_tmpo:

@@ -35,7 +35,7 @@ phrase_init:
     ; column titles
     lda #4
     sta text_x
-    lda #7
+    lda #8
     sta text_y
     rep #$20
 .ACCU 16
@@ -858,7 +858,7 @@ phrase_draw:
 @rows:
     lda tmp0 + 1
     clc
-    adc #8
+    adc #9
     sta text_y
     ; row label
     lda #1
@@ -997,7 +997,7 @@ cell_attr:
     beq @no_blk_hl
     rep #$20
 .ACCU 16
-    lda #ATTR_HILITE
+    lda #ATTR_ACCENT
     sta text_attr
     sep #$20
 .ACCU 8

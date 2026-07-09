@@ -34,8 +34,8 @@ end
 
 local function word(ch, attr)
   local tile = string.byte(ch) - 32
-  if attr == 0x2400 or attr == 0x2800 then
-    tile = tile + 96          -- accent/hilite use the inverted glyph set
+  if attr == 0x2400 then
+    tile = tile + 96          -- accent uses the inverted glyph set
   end
   return tile | attr
 end

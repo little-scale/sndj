@@ -260,6 +260,8 @@ song_init:
     inx
     cpx #$0008
     bne @sname
+    lda #150
+    sta.l $7E0000 + SB_HEADER + SH_BPM
     lda #$00
     sta.l $7E0000 + SB_HEADER + SH_GROOVE
     sta.l $7E0000 + SB_HEADER + SH_EDL
@@ -456,6 +458,15 @@ engine_halt_all:
     bne @h
     rts
 
+; NEW as an action: wipe + reseed, then rebuild everything downstream
+; (used by PROJECT's NEW and FILES' load-on-empty)
+song_renew:
+    jsr engine_stop
+    jsr song_init
+    jsr wave_sync_all
+    jsr residency_build
+    jmp apu_echo_apply
+
 engine_go:
     ldx #$0000
 @fx_reset:
@@ -478,6 +489,12 @@ engine_go:
     lda.l $7E0000 + SB_HEADER + SH_GROOVE
     and #(GROOVE_COUNT - 1)
     sta eng_groove
+    ; the song's tick BPM drives the APU timer (0 -> the 150 default)
+    lda.l $7E0000 + SB_HEADER + SH_BPM
+    bne +
+    lda #150
++
+    jsr apu_set_tempo
     lda #$0F
     sta eng_row
     stz eng_tickwait
@@ -828,7 +845,7 @@ track_trigger_note:
     sta trig_note
     sta.w trk_note,x
     ; type-aware pitch: NSE sets the global noise clock instead; WAV plays
-    ; a 32-sample loop, two octaves above the sampler's reference
+    ; a 32-sample loop, tuned via the trig tune context + one LSR
     lda trig_type
     cmp #$01
     bne @not_kit
@@ -860,8 +877,7 @@ track_trigger_note:
     jsr note_pitch_calc_only
     rep #$20
 .ACCU 16
-    lsr last_pitch
-    lsr last_pitch          ; -2 octaves for the short loop
+    lsr last_pitch          ; -1 octave; the tune context does the rest
     sep #$20
 .ACCU 8
     jsr voice_pitch_write

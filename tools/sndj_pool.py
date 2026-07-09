@@ -175,7 +175,7 @@ MELODICS = [                # (font, preset, pool name[, semitone trim])
     (SMW_FONT, 'E. Piano',        'SW EPIAN'),
     (SMW_FONT, 'Slap Bass',       'SW SLAP', 1),
     (MP_FONT,  'Square',          'MPSQUARE'),
-    (MP_FONT,  'Recorder',        'MP RECRD', 2),
+    (MP_FONT,  'Recorder',        'MP RECRD'),
     (MP_FONT,  'Acoustic Guitar', 'MP GUITR'),
     (SMW_FONT, 'Trombone',        'SW TBONE'),
     (SMW_FONT, 'Trumpet',         'SW TRMPT'),

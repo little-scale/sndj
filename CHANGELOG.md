@@ -2,6 +2,18 @@
 
 ## 0.1.0-dev (unreleased)
 
+- Screen titles and track headers render plain (only cursors/selection
+  invert); track columns are numbered 1-8; grids sit one row lower.
+- TMPO is editable on PROJECT (80-255, drives the APU timer instantly
+  and at play start); the GROOVE readout scales with it.
+- WAV instruments play in tune (C-4 = 261.6 Hz): the 32-sample loop
+  gets a +1 semi / -52 fine tune context and a single octave drop
+  instead of the flat -2 octaves. Auditions match playback.
+- FILES matches genmddj: the action menu adds PURGE PH / PURGE CH
+  (blank data unreachable from the SONG grid, FREED nn report), CLEAR
+  compacts the packed list, LOAD on the (EMPTY) row blanks the working
+  song for a fresh start.
+
 - Palettes are two colours (bg + text), genmddj-style: cursors,
   playheads and titles render as palette negatives via an inverted
   glyph set; dim derives as the channel average. Deleting a note also

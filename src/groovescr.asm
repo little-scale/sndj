@@ -1,7 +1,7 @@
 ; groovescr.asm — the GROOVE screen: 16 steps of ticks-per-row for the
 ; selected groove. Grooves ARE the tempo (CLAUDE.md §1.5): the header
-; shows the BPM this groove yields at the 60.15 Hz engine tick
-; (BPM = tick*60 / (avg ticks * 4 rows per beat) = 14436 / step sum).
+; shows the BPM this groove yields at the song's tick BPM
+; (effective = 96 * song BPM / step sum; groove 6/6 = the tempo as set).
 ;
 ;   B + d-pad   nudge the step (L/R = 1, U/D = 4), clamped 1-15
 ;   B tap       repeat the last inserted value
@@ -393,9 +393,19 @@ groove_bpm:
     lda tmp1
     cmp #$10
     bne @sum
-    lda #<14436
+    ; effective BPM = 96 * song BPM / step sum (at groove 6/6 the sum
+    ; is 96, so this reads back the PROJECT tempo exactly)
+    lda #96
+    sta.w WRMPYA
+    lda.l $7E0000 + SB_HEADER + SH_BPM
+    bne +
+    lda #150
++
+    sta.w WRMPYB
+    jsr div_wait            ; (multiplier settles in 8 cycles; reuse)
+    lda.w RDMPYL
     sta.w WRDIVL
-    lda #>14436
+    lda.w RDMPYH
     sta.w WRDIVH
     lda tmp2
     sta.w WRDIVB
@@ -403,7 +413,11 @@ groove_bpm:
     rep #$30
 .ACCU 16
     lda.w RDDIVL
-    sta tmp0                ; BPM (<= 902)
+    cmp #1000
+    bcc +
+    lda #999                ; 3-digit display cap
++
+    sta tmp0
     sep #$20
 .ACCU 8
     rts

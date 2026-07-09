@@ -617,8 +617,22 @@ trig_tune_load:
     beq @pool               ; SMP
     cmp #$03
     beq @pool               ; NSE
-    stz trig_semis          ; WAV/KIT: record fine only
+    cmp #$02
+    beq @wav
+    stz trig_semis          ; KIT: per-slot tune overrides at trigger
     lda np_fine
+    sta trig_fine
+    plx
+    rts
+@wav:
+    ; a 32-sample loop at table>>1 sits 0.8 semitones flat of the note;
+    ; +1 semi -52 fine in the tune context lands it exactly (with >>1
+    ; at trigger instead of the old >>2)
+    lda #$01
+    sta trig_semis
+    lda np_fine
+    clc
+    adc #<-52
     sta trig_fine
     plx
     rts
@@ -837,7 +851,10 @@ audition_note:
     stz trig_voice
     lda ed_lastinstr
     cmp #INSTR_NONE
-    beq @no_instr
+    bne @have_instr
+    stz trig_type
+    bra @no_instr
+@have_instr:
     jsr apply_instrument
     lda trig_type
     cmp #$01
@@ -847,7 +864,17 @@ audition_note:
     rts                     ; empty slot: silence
 @no_instr:
     lda trig_note
-    jsr note_pitch
+    jsr note_pitch_calc_only
+    lda trig_type
+    cmp #$02
+    bne @aud_wr
+    rep #$20
+.ACCU 16
+    lsr last_pitch          ; WAV: same -1 octave as the trigger path
+    sep #$20
+.ACCU 8
+@aud_wr:
+    jsr voice_pitch_write
 @kon:
     lda #DSP_KON
     ldy #$0001

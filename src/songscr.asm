@@ -29,7 +29,7 @@ song_init_screen:
 .ACCU 8
     ldx #str_song
     jsr text_puts
-    ; track headers V1..V8 at x = 4 + t*3
+    ; track headers 1..8 at x = 4 + t*3
     ; (counter must survive text_puttile, which clobbers tmp1 via text_dest)
     stz ui_cnt
 @heads:
@@ -39,10 +39,8 @@ song_init_screen:
     adc ui_cnt
     adc #4
     sta text_x
-    lda #7
+    lda #8
     sta text_y
-    lda #'V' - 32
-    jsr text_puttile
     lda ui_cnt
     clc
     adc #'1' - 32
@@ -392,7 +390,7 @@ song_draw:
 @rows:
     lda tmp0 + 1
     clc
-    adc #8
+    adc #9
     sta text_y
     ; row label = song_top + i
     lda #1
@@ -717,7 +715,7 @@ song_cell_attr:
     bcc @no_blk_hl
     rep #$20
 .ACCU 16
-    lda #ATTR_HILITE
+    lda #ATTR_ACCENT
     sta text_attr
     sep #$20
 .ACCU 8

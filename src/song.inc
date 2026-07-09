@@ -60,6 +60,7 @@
 .DEFINE SH_FIR        8                ; FIR preset 0-7
 .DEFINE SH_NAME       9                ; 8-char song name (ASCII, space pad)
 .DEFINE SH_MODE       17               ; 0 = SONG, 1 = LIVE (S shows launcher)
+.DEFINE SH_BPM        18               ; engine tick BPM (80-255; 0 -> 150)
 
 ; phrase row cell values
 .DEFINE NOTE_EMPTY    0                ; note byte: 0=empty, 1-96=C-0..B-7

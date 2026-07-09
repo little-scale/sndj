@@ -28,7 +28,7 @@ chain_init:
     ; column ruler
     lda #4
     sta text_x
-    lda #7
+    lda #8
     sta text_y
     rep #$20
 .ACCU 16
@@ -669,7 +669,7 @@ chain_draw:
 @rows:
     lda tmp0 + 1
     clc
-    adc #8
+    adc #9
     sta text_y
     lda #1
     sta text_x
@@ -744,7 +744,7 @@ chain_cell_attr:
     beq @no_blk_hl
     rep #$20
 .ACCU 16
-    lda #ATTR_HILITE
+    lda #ATTR_ACCENT
     sta text_attr
     sep #$20
 .ACCU 8

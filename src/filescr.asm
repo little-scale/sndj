@@ -6,8 +6,12 @@
 ;   B-hold + Up/Down     cycle the character (saved slot renames the file;
 ;                        an empty slot edits the working song's name,
 ;                        which becomes the file name on SAVE)
-;   A + B              open the action menu: SAVE / LOAD / CLEAR
-;                      (Up/Down choose, B runs and closes, A cancels)
+;   A + B              open the action menu: SAVE / LOAD / CLEAR /
+;                      PURGE PH / PURGE CH (Up/Down choose, B runs and
+;                      closes, A cancels). CLEAR closes the gap; LOAD
+;                      on the (EMPTY) row blanks the working song;
+;                      PURGE blanks phrases/chains not reachable from
+;                      the SONG grid and reports FREED nn.
 ;
 ; Playback stops on entry, like genmddj. Reached with A+Down from SONG.
 
@@ -85,6 +89,7 @@ files_update:
     lda #$01
     sta fl_menu
     stz fl_mitem
+    stz fl_freed
     lda #$01
     sta a_used
 @a_draw:
@@ -175,9 +180,8 @@ files_update:
 .ACCU 8
     beq @nu
     lda fl_slot
-    dec a
-    and #$03
-    sta fl_slot
+    beq @nu
+    dec fl_slot
 @nu:
     rep #$20
 .ACCU 16
@@ -186,10 +190,8 @@ files_update:
     sep #$20
 .ACCU 8
     beq @nd
-    lda fl_slot
-    inc a
-    and #$03
-    sta fl_slot
+    inc fl_slot
+    jsr fl_clamp
 @nd:
     jmp files_draw
 
@@ -218,7 +220,7 @@ files_menu:
     lda fl_mitem
     dec a
     bpl @m_set
-    lda #$02
+    lda #$04
 @m_set:
     sta fl_mitem
 @m_dn:
@@ -231,7 +233,7 @@ files_menu:
     beq @m_b
     lda fl_mitem
     inc a
-    cmp #$03
+    cmp #$05
     bcc @m_set2
     lda #$00
 @m_set2:
@@ -250,8 +252,23 @@ files_menu:
     beq @do_save
     cmp #$01
     beq @do_load
+    cmp #$02
+    beq @do_clear
+    cmp #$03
+    beq @do_purge_ph
+    jsr purge_chains        ; 4: PURGE CH
+    bra @purged
+@do_purge_ph:
+    jsr purge_phrases
+@purged:
+    lda #SV_FREED
+    sta fl_msg
+    bra @m_draw
+@do_clear:
     lda fl_slot
     jsr slot_clear
+    jsr slots_compact       ; the list stays packed, genmddj-style
+    jsr fl_clamp
     sta fl_msg
     bra @m_draw
 @do_save:
@@ -262,6 +279,16 @@ files_menu:
     sta fl_msg
     bra @m_draw
 @do_load:
+    ; LOAD on the empty row blanks the working song (fresh start)
+    jsr fl_entry
+    lda.l SRAM_TABLE,x
+    cmp #$A5
+    beq @load_real
+    jsr song_renew
+    lda #SV_OK
+    sta fl_msg
+    bra @m_draw
+@load_real:
     lda fl_slot
     jsr load_slot
     sta fl_msg
@@ -347,8 +374,392 @@ fl_next_char:
     lda.w fl_charset,x
     rts
 
+; --- packed-list helpers -----------------------------------------------------------
+; A = number of valid slots (the table stays packed, so this is also
+; the index of the (EMPTY) row)
+fl_used:
+    stz tmp2
+    ldx #$0000
+@u:
+    lda.l SRAM_TABLE,x
+    cmp #$A5
+    bne @u_next
+    inc tmp2
+@u_next:
+    rep #$30
+.ACCU 16
+    txa
+    clc
+    adc #$0010
+    tax
+    sep #$20
+.ACCU 8
+    cpx #$0040
+    bne @u
+    lda tmp2
+    rts
+
+; keep the cursor on a saved slot or the single (EMPTY) row
+fl_clamp:
+    jsr fl_used
+    cmp #$04
+    bcc +
+    lda #$03
++
+    cmp fl_slot
+    bcs +
+    sta fl_slot
++
+    rts
+
+; close the gap after a CLEAR: valid entries slide up (three bubble
+; passes over the 4-entry table; the status byte moves last)
+slots_compact:
+    lda #$03
+    sta fl_usedv            ; pass counter (scratch)
+@pass:
+    rep #$30
+.ACCU 16
+    lda #$0000
+    sta pg_i                ; entry base offset (slots 0-2)
+    sep #$20
+.ACCU 8
+@pair:
+    rep #$30
+.ACCU 16
+    lda pg_i
+    tax
+    sep #$20
+.ACCU 8
+    lda.l SRAM_TABLE,x
+    cmp #$A5
+    beq @next
+    rep #$30
+.ACCU 16
+    lda pg_i
+    clc
+    adc #$0010
+    tax
+    sep #$20
+.ACCU 8
+    lda.l SRAM_TABLE,x
+    cmp #$A5
+    bne @next
+    ; copy entry down, bytes 15..1 then the status byte, and blank
+    ; the source status so the entry moves rather than duplicates
+    lda #$0F
+    sta tmp2
+@cp:
+    rep #$30
+.ACCU 16
+    lda tmp2
+    and #$00FF
+    clc
+    adc pg_i
+    clc
+    adc #$0010
+    tax
+    sep #$20
+.ACCU 8
+    lda.l SRAM_TABLE,x      ; source byte (slot i+1)
+    pha
+    rep #$30
+.ACCU 16
+    lda tmp2
+    and #$00FF
+    clc
+    adc pg_i
+    tax
+    sep #$20
+.ACCU 8
+    pla
+    sta.l SRAM_TABLE,x      ; dest byte (slot i)
+    dec tmp2
+    bpl @cp
+    ; release the source slot
+    rep #$30
+.ACCU 16
+    lda pg_i
+    clc
+    adc #$0010
+    tax
+    sep #$20
+.ACCU 8
+    lda #$FF
+    sta.l SRAM_TABLE,x
+@next:
+    rep #$30
+.ACCU 16
+    lda pg_i
+    clc
+    adc #$0010
+    sta pg_i
+    cmp #$0030
+    sep #$20
+.ACCU 8
+    bcc @pair_far
+    dec fl_usedv
+    beq @done
+    jmp @pass
+@pair_far:
+    jmp @pair
+@done:
+    rts
+
+; --- PURGE: blank phrases/chains not reachable from the SONG grid ------------------
+; Reachability marks live in scratch WRAM: chains at $7E:7600 (96),
+; phrases at $7E:7700 (192). fl_freed counts what got blanked.
+purge_scan:
+    ldx #$0000
+    lda #$00
+@z:
+    sta.l $7E7600,x
+    inx
+    cpx #$0200
+    bne @z
+    ; every chain referenced by the song grid
+    ldx #$0000
+@grid:
+    lda.l $7E0000 + SB_SONG,x
+    cmp #CHAIN_COUNT
+    bcs @g_next             ; $FF and out-of-range cells don't mark
+    phx
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda #$01
+    sta.l $7E7600,x
+    plx
+@g_next:
+    inx
+    cpx #(TRACKS * SONG_ROWS)
+    bne @grid
+    ; every phrase referenced by a marked chain
+    rep #$30
+.ACCU 16
+    lda #$0000
+    sta pg_i                ; chain id
+    sep #$20
+.ACCU 8
+@chain:
+    rep #$30
+.ACCU 16
+    lda pg_i
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E7600,x
+    beq @c_next
+    rep #$30
+.ACCU 16
+    lda pg_i
+    asl
+    asl
+    asl
+    asl
+    asl                     ; * 32
+    sta pg_j
+    sep #$20
+.ACCU 8
+    lda #$10
+    sta tmp2                ; 16 entries
+@entry:
+    rep #$30
+.ACCU 16
+    lda pg_j
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_CHAINS,x
+    cmp #PHRASE_COUNT
+    bcs @e_next
+    phx
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda #$01
+    sta.l $7E7700,x
+    plx
+@e_next:
+    rep #$30
+.ACCU 16
+    inc pg_j
+    inc pg_j
+    sep #$20
+.ACCU 8
+    dec tmp2
+    bne @entry
+@c_next:
+    rep #$30
+.ACCU 16
+    inc pg_i
+    lda pg_i
+    cmp #CHAIN_COUNT
+    sep #$20
+.ACCU 8
+    bcc @chain
+    rts
+
+purge_chains:
+    jsr purge_scan
+    stz fl_freed
+    rep #$30
+.ACCU 16
+    lda #$0000
+    sta pg_i
+    sep #$20
+.ACCU 8
+@each:
+    rep #$30
+.ACCU 16
+    lda pg_i
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E7600,x
+    bne @keep
+    ; unreachable: blank it if it holds anything
+    rep #$30
+.ACCU 16
+    lda pg_i
+    asl
+    asl
+    asl
+    asl
+    asl
+    sta pg_j
+    sep #$20
+.ACCU 8
+    lda #$10
+    sta tmp2
+    stz tmp0                ; dirty flag
+@scan:
+    rep #$30
+.ACCU 16
+    lda pg_j
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_CHAINS,x
+    cmp #$FF
+    beq @s_ok
+    lda #$01
+    sta tmp0
+@s_ok:
+    ; wipe as we go (phrase $FF, transpose 0)
+    lda #$FF
+    sta.l $7E0000 + SB_CHAINS,x
+    lda #$00
+    sta.l $7E0000 + SB_CHAINS + 1,x
+    rep #$30
+.ACCU 16
+    inc pg_j
+    inc pg_j
+    sep #$20
+.ACCU 8
+    dec tmp2
+    bne @scan
+    lda tmp0
+    beq @keep
+    inc fl_freed
+@keep:
+    rep #$30
+.ACCU 16
+    inc pg_i
+    lda pg_i
+    cmp #CHAIN_COUNT
+    sep #$20
+.ACCU 8
+    bcc @each
+    rts
+
+purge_phrases:
+    jsr purge_scan
+    stz fl_freed
+    rep #$30
+.ACCU 16
+    lda #$0000
+    sta pg_i
+    sep #$20
+.ACCU 8
+@each:
+    rep #$30
+.ACCU 16
+    lda pg_i
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E7700,x
+    bne @keep
+    rep #$30
+.ACCU 16
+    lda pg_i
+    xba
+    lsr
+    lsr                     ; * 64
+    sta pg_j
+    sep #$20
+.ACCU 8
+    lda #$10
+    sta tmp2                ; 16 rows
+    stz tmp0                ; dirty flag
+@row:
+    rep #$30
+.ACCU 16
+    lda pg_j
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_PHRASES,x       ; note
+    bne @dirty
+    lda.l $7E0000 + SB_PHRASES + 2,x   ; cmd
+    bne @dirty
+    lda.l $7E0000 + SB_PHRASES + 3,x   ; val
+    beq @wipe
+@dirty:
+    lda #$01
+    sta tmp0
+@wipe:
+    lda #$00
+    sta.l $7E0000 + SB_PHRASES,x
+    sta.l $7E0000 + SB_PHRASES + 2,x
+    sta.l $7E0000 + SB_PHRASES + 3,x
+    lda #INSTR_NONE
+    sta.l $7E0000 + SB_PHRASES + 1,x
+    rep #$30
+.ACCU 16
+    lda pg_j
+    clc
+    adc #$0004
+    sta pg_j
+    sep #$20
+.ACCU 8
+    dec tmp2
+    bne @row
+    lda tmp0
+    beq @keep
+    inc fl_freed
+@keep:
+    rep #$30
+.ACCU 16
+    inc pg_i
+    lda pg_i
+    cmp #PHRASE_COUNT
+    sep #$20
+.ACCU 8
+    bcc @each
+    rts
+
 ; --- draw --------------------------------------------------------------------------
 files_draw:
+    jsr fl_used
+    sta fl_usedv            ; the (EMPTY) row index; rows below stay blank
     stz ui_cnt              ; slot counter
 @slots:
     lda ui_cnt
@@ -394,9 +805,28 @@ files_draw:
 .ACCU 8
     lda.l SRAM_TABLE,x
     cmp #$A5
-    beq @named
-    ; empty: show the working song's name dimmed on the cursor row
-    ; (that's the name a SAVE here will use), else (EMPTY)
+    bne +
+    jmp @named
++
+    ; the table is packed: only the first free row is the (EMPTY) slot,
+    ; anything below it stays blank
+    lda ui_cnt
+    cmp fl_usedv
+    beq @first_free
+    lda #5
+    sta text_x
+    rep #$20
+.ACCU 16
+    lda #ATTR_DIM
+    sta text_attr
+    sep #$20
+.ACCU 8
+    phx
+    ldx #str_frowclr
+    jsr text_puts
+    plx
+    jmp @next
+@first_free:
     lda ui_cnt
     cmp fl_slot
     beq @empty_named
@@ -559,7 +989,7 @@ files_draw:
 @m_next:
     inc ui_cnt
     lda ui_cnt
-    cmp #$03
+    cmp #$05
     bne @mrow
     ; used-slots readout
     lda #2
@@ -639,9 +1069,22 @@ files_draw:
     jmp text_puts
 @not_full:
     cmp #SV_EMPTY
-    bne @badcrc
+    bne @not_empty
     ldx #str_fnoempty
     jmp text_puts
+@not_empty:
+    cmp #SV_FREED
+    bne @badcrc
+    ldx #str_ffreed
+    jsr text_puts
+    lda fl_freed
+    rep #$30
+.ACCU 16
+    and #$00FF
+    sta tmp0
+    sep #$20
+.ACCU 8
+    jmp text_dec3
 @badcrc:
     ldx #str_fbadcrc
     jmp text_puts
@@ -679,7 +1122,7 @@ fl_name_attr:
 .DEFINE FL_CHARSET_N 39
 fl_charset:  .DB " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.", 0
 
-fl_menu_tab: .DW str_fsave, str_fload, str_fclear
+fl_menu_tab: .DW str_fsave, str_fload, str_fclear, str_fpurgep, str_fpurgec
 
 str_files:   .DB "FILES", 0
 str_fruler:  .DB "NAME      SIZE", 0
@@ -690,7 +1133,11 @@ str_fused:   .DB "SLOTS USED ", 0
 str_fsave:   .DB "SAVE ", 0
 str_fload:   .DB "LOAD ", 0
 str_fclear:  .DB "CLEAR", 0
-str_fblank:  .DB "     ", 0
+str_fpurgep: .DB "PURGE PH", 0
+str_fpurgec: .DB "PURGE CH", 0
+str_ffreed:  .DB "FREED ", 0
+str_frowclr: .DB "               ", 0
+str_fblank:  .DB "        ", 0
 str_fpad:    .DB "        ", 0
 str_fsaved:  .DB "SAVED   ", 0
 str_floaded: .DB "LOADED  ", 0
