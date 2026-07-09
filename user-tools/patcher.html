@@ -149,12 +149,32 @@ function poolSize() {
 function render() {
   const t = $('pool');
   t.innerHTML = '<tr><th>#</th><th>name</th><th>BRR bytes</th><th>loop</th>' +
-    '<th></th><th></th><th></th></tr>';
+    '<th>tune</th><th></th><th></th><th></th></tr>';
   entries.forEach((e, i) => {
     const row = t.insertRow();
     row.innerHTML =
       `<td>${i}</td><td>${e.name}</td><td>${e.brr.length}</td>` +
       `<td>${e.loopBlock === null ? 'one-shot' : 'block ' + e.loopBlock}</td>`;
+    // default tune (semis : 1/256ths), summed into every console trigger —
+    // the cheap way to fix a wrong sf2 root key (no resample, no bytes)
+    const tune = row.insertCell();
+    const semis = document.createElement('input');
+    semis.type = 'number';
+    semis.min = -48; semis.max = 48;
+    semis.value = e.tuneSemis || 0;
+    semis.title = 'semitones';
+    semis.style.width = '3.2rem';
+    semis.oninput = () => { e.tuneSemis = +semis.value || 0; };
+    const fine = document.createElement('input');
+    fine.type = 'number';
+    fine.min = -128; fine.max = 127;
+    fine.value = e.tuneFine || 0;
+    fine.title = 'fine, 1/256 semitone';
+    fine.style.width = '3.6rem';
+    fine.oninput = () => { e.tuneFine = +fine.value || 0; };
+    tune.appendChild(semis);
+    tune.appendChild(document.createTextNode(':'));
+    tune.appendChild(fine);
     const play = document.createElement('button');
     play.textContent = 'play';
     play.onclick = () => audition(e);
@@ -320,7 +340,8 @@ function auditionSf2(fi, i) {
   try {
     const { prep, rate } = sf2Prep(s);
     const brr = S.brrEncode(prep.pcm, prep.loopBlock);
-    audition({ brr, loopBlock: prep.loopBlock }, rate);
+    audition({ brr, loopBlock: prep.loopBlock,
+               tuneSemis: prep.tuneSemis, tuneFine: prep.tuneFine }, rate);
   } catch (err) {
     status('audition failed: ' + err.message, 1);
   }
@@ -414,6 +435,8 @@ function audition(e, rate) {
   if (playingNode) { try { playingNode.stop(); } catch (_) {} }
   const node = actx.createBufferSource();
   node.buffer = buf;
+  const tune = (e.tuneSemis || 0) + (e.tuneFine || 0) / 256;
+  if (tune) node.playbackRate.value = Math.pow(2, tune / 12);
   node.connect(actx.destination);
   node.start();
   playingNode = node;

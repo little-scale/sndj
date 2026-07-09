@@ -5,6 +5,11 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- patcher.html: pool slots show an editable **tune** column
+  (semitones : 1/256ths — the pool's per-entry default tune, summed
+  into every console trigger), and **audition applies it**, on both
+  halves of the page. The cheap fix for a soundfont with a wrong root
+  key: no resample, no extra bytes.
 - patcher.html: the soundfont mode defaults to **auto** — looped
   samples prep melodic, loop-less ones prep one-shot — and a melodic
   request on a loop-less sample falls through to one-shot instead of
