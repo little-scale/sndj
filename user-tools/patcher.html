@@ -33,8 +33,9 @@
   .hint { color: #606888; font-size: .85rem; }
   #sf2list tr[draggable] { cursor: grab; }
   #sf2list tr[draggable]:active { cursor: grabbing; }
-  #pool tr.target td { background: #16324a; }
-  #pool tr.target td:first-child { box-shadow: inset 3px 0 #40d0c8; }
+  #pool tr.target td, #kits tr.target td { background: #16324a; }
+  #pool tr.target td:first-child, #kits tr.target td:first-child {
+    box-shadow: inset 3px 0 #40d0c8; }
   .row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
   input[type=number] { background: #2a2e48; color: #dee2e8;
                        border: 1px solid #606888; border-radius: 4px;
@@ -60,6 +61,11 @@ export a patched ROM. Everything runs locally.</p>
   <div class="bar"><div id="aram" style="width:0"></div></div>
   <p id="aramtext"></p>
   <table id="pool"></table>
+</div>
+<div id="kitview" hidden>
+  <h1><small>factory kits</small> <span class="hint">(seeded into every NEW
+  song; drop a one-shot soundfont slot straight onto a kit slot)</span></h1>
+  <table id="kits"></table>
 </div>
 <div id="exportview" hidden>
   <button class="primary" id="export">export patched ROM</button>
@@ -136,6 +142,8 @@ async function loadRom(f) {
     entries = S.poolParse(rom.subarray(poolOff));
   } catch (err) { status('pool parse failed: ' + err.message, 1); return; }
   palOff = S.findMarker(rom, 'SNPAL0');
+  kitOff = S.findMarker(rom, 'SNKIT0');
+  kitExpand[0] = true;
   status(`loaded ${f.name}: ${entries.length} samples in the pool`);
   render();
   renderPal();
@@ -146,15 +154,42 @@ function poolSize() {
   return 16 + entries.length * 16 + entries.reduce((a, e) => a + e.brr.length, 0);
 }
 
+const SILENT = () => S.brrEncode(new Array(16).fill(0), null);
+const isFree = e => e.brr.length <= 9;
+
 function render() {
   const t = $('pool');
   t.innerHTML = '<tr><th>#</th><th>name</th><th>BRR bytes</th><th>loop</th>' +
     '<th>tune</th><th></th><th></th><th></th></tr>';
+  const hdr = t.insertRow();
+  const hc = hdr.insertCell();
+  hc.colSpan = 7;
+  const clrAll = document.createElement('button');
+  clrAll.textContent = 'clear ALL slots';
+  clrAll.onclick = () => {
+    if (!confirm('Replace every pool slot with silence?')) return;
+    entries = entries.map(() => ({ name: '-', loopBlock: null, brr: SILENT() }));
+    status('cleared all ' + entries.length + ' slots — a blank canvas');
+    render();
+  };
+  hdr.insertCell().appendChild(clrAll);
   entries.forEach((e, i) => {
     const row = t.insertRow();
     row.innerHTML =
-      `<td>${i}</td><td>${e.name}</td><td>${e.brr.length}</td>` +
+      `<td>${i}</td><td></td><td>${e.brr.length}</td>` +
       `<td>${e.loopBlock === null ? 'one-shot' : 'block ' + e.loopBlock}</td>`;
+    const nameIn = document.createElement('input');
+    nameIn.value = e.name;
+    nameIn.maxLength = 8;
+    nameIn.style.width = '6.5rem';
+    nameIn.title = 'slot name (8 chars)';
+    nameIn.onchange = () => {
+      e.name = nameIn.value.toUpperCase().replace(/[^A-Z0-9 -]/g, '')
+        .slice(0, 8) || '-';
+      nameIn.value = e.name;
+      renderKits();          // kit dropdown labels follow
+    };
+    row.cells[1].appendChild(nameIn);
     // default tune (semis : 1/256ths), summed into every console trigger —
     // the cheap way to fix a wrong sf2 root key (no resample, no bytes)
     const tune = row.insertCell();
@@ -184,8 +219,7 @@ function render() {
     const clr = document.createElement('button');
     clr.textContent = 'clear';
     clr.onclick = () => {
-      entries[i] = { name: '-', loopBlock: null,
-                     brr: S.brrEncode(new Array(16).fill(0), null) };
+      entries[i] = { name: '-', loopBlock: null, brr: SILENT() };
       status('cleared slot #' + i + ' (9 bytes of silence — its budget is freed)');
       render();
     };
@@ -234,6 +268,129 @@ function render() {
         : `EDL ${a.maxEdl} (${a.maxMs} ms)`);
   }
   $('poolview').hidden = false;
+  renderKits();
+}
+
+// ---------------------------------------------------------- factory kits
+// the SNKIT0 ROM block: 16 kits x 16 slots x (sample, tune, vol, flags);
+// vol 0 = an empty slot. Edits write the ROM bytes directly (the pool
+// region is rebuilt separately on export). NEW songs copy this verbatim.
+let kitOff = -1;
+const kitExpand = {};
+const s8 = v => (v > 127 ? v - 256 : v);
+
+function kitSlotOff(k, sl) { return kitOff + k * 64 + sl * 4; }
+
+function renderKits() {
+  if (kitOff < 0) { $('kitview').hidden = true; return; }
+  const t = $('kits');
+  t.innerHTML = '';
+  for (let k = 0; k < 16; k++) {
+    let used = 0;
+    for (let sl = 0; sl < 16; sl++) if (rom[kitSlotOff(k, sl) + 2]) used++;
+    const hdr = t.insertRow();
+    const hc = hdr.insertCell();
+    hc.colSpan = 6;
+    hc.innerHTML = '<b>' + (kitExpand[k] ? '\u25BE' : '\u25B8') +
+      ' KIT ' + k + '</b> <span class="hint">(' + used + ' slots)</span>';
+    hc.style.color = '#ffb020';
+    hc.style.cursor = 'pointer';
+    hc.onclick = () => { kitExpand[k] = !kitExpand[k]; renderKits(); };
+    if (!kitExpand[k]) continue;
+    for (let sl = 0; sl < 16; sl++) {
+      const off = kitSlotOff(k, sl);
+      const row = t.insertRow();
+      row.insertCell().textContent = sl;
+      const pick = document.createElement('select');
+      const none = document.createElement('option');
+      none.value = -1;
+      none.textContent = '--';
+      pick.appendChild(none);
+      entries.forEach((e, i) => {
+        const o = document.createElement('option');
+        o.value = i;
+        o.textContent = i + ' ' + e.name;
+        pick.appendChild(o);
+      });
+      pick.value = rom[off + 2] ? rom[off] : -1;
+      pick.onchange = () => {
+        if (+pick.value < 0) {
+          rom.set([0, 0, 0, 0], off);
+        } else {
+          rom[off] = +pick.value;
+          if (!rom[off + 2]) { rom[off + 1] = 0xE8; rom[off + 2] = 0x50; }
+        }
+        renderKits();
+      };
+      row.insertCell().appendChild(pick);
+      const tuneIn = document.createElement('input');
+      tuneIn.type = 'number';
+      tuneIn.min = -128; tuneIn.max = 127;
+      tuneIn.value = s8(rom[off + 1]);
+      tuneIn.title = 'slot tune, semitones (8 kHz one-shots want -24)';
+      tuneIn.style.width = '3.6rem';
+      tuneIn.oninput = () => { rom[off + 1] = (+tuneIn.value || 0) & 0xFF; };
+      row.insertCell().appendChild(tuneIn);
+      const volIn = document.createElement('input');
+      volIn.type = 'number';
+      volIn.min = 0; volIn.max = 127;
+      volIn.value = rom[off + 2];
+      volIn.title = 'slot volume (0 = empty slot)';
+      volIn.style.width = '3.2rem';
+      volIn.oninput = () => { rom[off + 2] = (+volIn.value || 0) & 0x7F; };
+      row.insertCell().appendChild(volIn);
+      const play = document.createElement('button');
+      play.textContent = 'play';
+      play.onclick = () => {
+        if (!rom[off + 2]) return;
+        const pe = entries[rom[off]];
+        if (!pe) return;
+        audition({ brr: pe.brr, loopBlock: pe.loopBlock,
+          tuneSemis: s8(rom[off + 1]) + (pe.tuneSemis || 0),
+          tuneFine: pe.tuneFine || 0 });
+      };
+      row.insertCell().appendChild(play);
+      const clr = document.createElement('button');
+      clr.textContent = 'clear';
+      clr.onclick = () => { rom.set([0, 0, 0, 0], off); renderKits(); };
+      row.insertCell().appendChild(clr);
+      // an sf2 slot dropped here: one-shot into a free pool slot + assign
+      row.ondragover = ev => {
+        if (!sf2Loaded()) return;
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = 'copy';
+        row.classList.add('target');
+      };
+      row.ondragleave = () => row.classList.remove('target');
+      row.ondrop = ev => {
+        ev.preventDefault();
+        row.classList.remove('target');
+        const [fi, idx] = ev.dataTransfer.getData('text/plain')
+          .split(',').map(Number);
+        if (!(sf2fonts[fi] && sf2fonts[fi].samples[idx])) return;
+        const free = entries.findIndex(isFree);
+        if (free < 0) {
+          status('no free pool slots — clear one first', 1);
+          return;
+        }
+        const sample = sf2fonts[fi].samples[idx];
+        try {
+          const prep = S.sf2Oneshot(sample, +$('sfcap').value || 160);
+          const brr = S.brrEncode(prep.pcm, null);
+          const name = (sample.preset || sample.name).toUpperCase()
+            .replace(/[^A-Z0-9 ]/g, '').slice(0, 8) || 'DRUM';
+          entries[free] = { name, loopBlock: null, brr };
+          rom.set([free, 0xE8, 0x50, 0], off);
+          status('kit ' + k + ' slot ' + sl + ' = ' + name +
+            ' (one-shot into pool #' + free + ', tune -24)');
+          render();
+        } catch (err) {
+          status('kit import failed: ' + err.message, 1);
+        }
+      };
+    }
+  }
+  $('kitview').hidden = false;
 }
 
 // ------------------------------------------------------------ soundfont

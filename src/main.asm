@@ -294,15 +294,13 @@ font_data_end:
 pal_schemes:
     .INCBIN "schemes.bin"
 
-; factory defaults (track instruments + kit layout), marker-wrapped so
-; browser tools can re-voice a built ROM without a toolchain:
-; 8 track instrument types, 8 track samples/banks/kits,
-; 3 kit pool bases, 3 kit slot counts
+; factory defaults (track instruments), marker-wrapped so browser tools
+; can re-voice a built ROM without a toolchain:
+; 8 track instrument types, 8 track samples/banks/kits
     .DB "SNDEF0"
 factory_instr_type: .DB 0, 0, 0, 0, 0, 2, 3, 1
 factory_instr_smp:  .DB 0, 1, 2, 3, 4, 0, 0, 0
-factory_kit_base:   .DB 16, 26, 38
-factory_kit_len:    .DB 10, 12, 10
+
 
 ; 8 factory FIR curves x 8 taps, marker-wrapped so firdesign.html patches
     .DB "SNFIR0"
@@ -354,6 +352,13 @@ pool_data:
 logo_data:
     .INCBIN "logo.bin"
 logo_data_end:
+
+; factory kits: 16 kits x 16 slots x 4 bytes (sample, tune, vol, flags;
+; vol 0 = empty), copied verbatim into the song block by NEW.
+; Marker-wrapped so patcher.html's kit builder edits it in place.
+    .DB "SNKIT0"
+factory_kits:
+    .INCBIN "kits.bin"
 
 .BANK 0 SLOT 0
 ; --- internal header (hand-rolled; checksum fixed by tools/fixsum.py) --------

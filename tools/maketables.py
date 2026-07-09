@@ -102,14 +102,36 @@ def tables_inc():
     return "\n".join(lines) + "\n"
 
 
+# --- factory kits ------------------------------------------------------------
+# 16 kits x 16 slots x 4 bytes (pool sample, tune, vol, flags); vol 0 =
+# empty slot. Marker-wrapped SNKIT0 in ROM; song NEW copies the block
+# verbatim into the song's kit section, and patcher.html edits it.
+# Kit 0 = SMW percussion, 1 = Mario Paint drums, 2 = MP toybox — runs of
+# pool samples at 8 kHz, so tune -24 ($E8), vol $50.
+
+FACTORY_KITS = [(16, 10), (26, 12), (38, 10)]  # (first pool sample, count)
+
+
+def kits_bin():
+    out = bytearray(16 * 16 * 4)
+    for k, (base, count) in enumerate(FACTORY_KITS):
+        for s in range(count):
+            off = k * 64 + s * 4
+            out[off:off + 4] = bytes((base + s, 0xE8, 0x50, 0))
+    return bytes(out)
+
+
 def main(build_dir):
     sch = schemes_bin()
     with open(f'{build_dir}/schemes.bin', 'wb') as f:
         f.write(sch)
+    kits = kits_bin()
+    with open(f'{build_dir}/kits.bin', 'wb') as f:
+        f.write(kits)
     with open(f'{build_dir}/tables.inc', 'w') as f:
         f.write(tables_inc())
         f.write(scheme_names_inc())
-    print(f"maketables: schemes.bin ({len(sch)}), tables.inc")
+    print(f"maketables: schemes.bin ({len(sch)}), kits.bin ({len(kits)}), tables.inc")
 
 
 if __name__ == '__main__':

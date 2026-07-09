@@ -5,6 +5,14 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- patcher.html grew a **kit builder**: the factory kits moved from
+  code into a marker-wrapped `SNKIT0` ROM block (16 kits x 16 slots x
+  sample/tune/vol; NEW copies it verbatim), and the patcher edits it —
+  per-slot sample picker, tune, vol, play, clear, and **dropping a
+  soundfont slot straight onto a kit slot** one-shots it into the
+  first free pool slot and wires it up at tune -24. Pool slots are
+  also **renamable** now, and a **clear ALL** button blanks the whole
+  pool for building a ROM from scratch.
 - patcher.html: pool slots show an editable **tune** column
   (semitones : 1/256ths — the pool's per-entry default tune, summed
   into every console trigger), and **audition applies it**, on both

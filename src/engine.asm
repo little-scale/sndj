@@ -212,65 +212,15 @@ song_init:
     beq @ai_done
     jmp @autoinstr
 @ai_done:
-    ; factory kits from the base/length tables:
-    ; kit 0 = SMW percussion, kit 1 = Mario Paint, kit 2 = MP toybox
-    stz es2                 ; kit
-@fk_kit:
-    stz es2 + 1             ; slot
-@fk_slot:
-    lda es2
-    rep #$30
-.ACCU 16
-    and #$00FF
-    tax
-    sep #$20
-.ACCU 8
-    lda es2 + 1
-    cmp.w factory_kit_len,x
-    bcs @fk_next_kit
-    ; record offset = kit*64 + slot*4
-    lda es2
-    rep #$30
-.ACCU 16
-    and #$00FF
-    xba
-    lsr
-    lsr                     ; * 64
-    sta tmp2
-    lda es2 + 1
-    and #$00FF
-    asl
-    asl
-    clc
-    adc tmp2
-    tax
-    sep #$20
-.ACCU 8
-    ; sample = base[kit] + slot (compute before X is the record offset)
-    phx
-    lda es2
-    rep #$30
-.ACCU 16
-    and #$00FF
-    tax
-    sep #$20
-.ACCU 8
-    lda.w factory_kit_base,x
-    clc
-    adc es2 + 1
-    plx
-    sta.l $7E0000 + SB_KITS,x       ; sample
-    lda #$E8
-    sta.l $7E0000 + SB_KITS + 1,x   ; tune -24: factory drums are 8 kHz
-    lda #$50
-    sta.l $7E0000 + SB_KITS + 2,x   ; vol
-    inc es2 + 1
-    bra @fk_slot
-@fk_next_kit:
-    inc es2
-    lda es2
-    cmp #$03
-    bcc @fk_kit
+    ; factory kits: the marker-wrapped SNKIT0 block, copied verbatim
+    ; (16 kits x 16 slots x 4 bytes; patcher.html edits the ROM block)
+    ldx #$0000
+@fk_copy:
+    lda.l factory_kits,x
+    sta.l $7E0000 + SB_KITS,x
+    inx
+    cpx #$0400
+    bne @fk_copy
     ; header: name "SONG    " then settings
     ldx #$0000
 @sname:
