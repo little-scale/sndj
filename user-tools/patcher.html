@@ -148,7 +148,7 @@ function poolSize() {
 function render() {
   const t = $('pool');
   t.innerHTML = '<tr><th>#</th><th>name</th><th>BRR bytes</th><th>loop</th>' +
-    '<th></th><th></th></tr>';
+    '<th></th><th></th><th></th></tr>';
   entries.forEach((e, i) => {
     const row = t.insertRow();
     row.innerHTML =
@@ -160,11 +160,20 @@ function render() {
     const rep = document.createElement('button');
     rep.textContent = 'replace…';
     rep.onclick = () => { replacing = i; $('wavfile').click(); };
+    const clr = document.createElement('button');
+    clr.textContent = 'clear';
+    clr.onclick = () => {
+      entries[i] = { name: '-', loopBlock: null,
+                     brr: S.brrEncode(new Array(16).fill(0), null) };
+      status('cleared slot #' + i + ' (9 bytes of silence — its budget is freed)');
+      render();
+    };
     row.insertCell().appendChild(play);
     row.insertCell().appendChild(rep);
+    row.insertCell().appendChild(clr);
     // an sf2 slot dragged here imports into this pool slot
     row.ondragover = ev => {
-      if (!sf2samples) return;
+      if (!sf2Loaded()) return;
       ev.preventDefault();
       ev.dataTransfer.dropEffect = 'copy';
       row.classList.add('target');
@@ -173,8 +182,9 @@ function render() {
     row.ondrop = ev => {
       ev.preventDefault();
       row.classList.remove('target');
-      const idx = +ev.dataTransfer.getData('text/plain');
-      if (Number.isInteger(idx) && sf2samples && sf2samples[idx]) sf2Import(idx, i);
+      const [fi, idx] = ev.dataTransfer.getData('text/plain')
+        .split(',').map(Number);
+      if (sf2fonts[fi] && sf2fonts[fi].samples[idx]) sf2Import(fi, idx, i);
     };
   });
   const used = poolSize();
@@ -206,7 +216,10 @@ function render() {
 }
 
 // ------------------------------------------------------------ soundfont
-let sf2samples = null;
+// several fonts stack in the panel: drop one after another and mix and
+// match; each group header carries an unload button
+let sf2fonts = [];
+const sf2Loaded = () => sf2fonts.length > 0;
 
 $('sf2drop').onclick = () => $('sf2file').click();
 $('sf2drop').ondragover = e => { e.preventDefault(); $('sf2drop').classList.add('armed'); };
@@ -224,38 +237,59 @@ $('sf2file').onchange = e => {
 };
 
 async function loadSf2(f) {
+  let samples;
   try {
-    sf2samples = S.sf2Parse(new Uint8Array(await f.arrayBuffer()));
+    samples = S.sf2Parse(new Uint8Array(await f.arrayBuffer()));
   } catch (err) {
     status('sf2 parse failed: ' + err.message, 1);
     return;
   }
-  $('sf2name').textContent = f.name + ' — ' + sf2samples.length + ' samples';
+  const have = sf2fonts.findIndex(x => x.name === f.name);
+  if (have >= 0) sf2fonts[have].samples = samples;  // re-drop refreshes
+  else sf2fonts.push({ name: f.name, samples });
+  $('sf2name').textContent = sf2fonts.length === 1 ? sf2fonts[0].name
+    : sf2fonts.length + ' soundfonts';
   renderSf2();
   $('sf2view').hidden = false;
-  status(f.name + ': ' + sf2samples.length + ' samples — play to audition, ' +
-    'drag onto a pool slot to import');
+  status(f.name + ': ' + samples.length + ' samples — play to audition, ' +
+    'drag onto a pool slot to import; drop more .sf2 files to mix');
 }
 
 function renderSf2() {
   const t = $('sf2list');
   t.innerHTML = '<tr><th>#</th><th>preset / sample</th><th>root</th>' +
     '<th>len</th><th></th></tr>';
-  sf2samples.forEach((s, i) => {
-    const row = t.insertRow();
-    const label = s.preset ? s.preset + ' — ' + s.name : s.name;
-    row.innerHTML =
-      `<td>${i}</td><td>${label}</td><td>${s.root}</td>` +
-      `<td>${s.pcm.length}${s.loop ? ' ↻' : ''}</td>`;
-    const play = document.createElement('button');
-    play.textContent = 'play';
-    play.onclick = () => auditionSf2(i);
-    row.insertCell().appendChild(play);
-    row.draggable = true;
-    row.ondragstart = ev => {
-      ev.dataTransfer.setData('text/plain', String(i));
-      ev.dataTransfer.effectAllowed = 'copy';
+  sf2fonts.forEach((font, fi) => {
+    const hdr = t.insertRow();
+    const hc = hdr.insertCell();
+    hc.colSpan = 4;
+    hc.innerHTML = '<b>' + font.name + '</b>';
+    hc.style.color = '#ffb020';
+    const off = document.createElement('button');
+    off.textContent = '×';
+    off.title = 'unload this soundfont';
+    off.onclick = () => {
+      sf2fonts.splice(fi, 1);
+      if (!sf2fonts.length) $('sf2view').hidden = true;
+      renderSf2();
     };
+    hdr.insertCell().appendChild(off);
+    font.samples.forEach((s, i) => {
+      const row = t.insertRow();
+      const label = s.preset ? s.preset + ' — ' + s.name : s.name;
+      row.innerHTML =
+        `<td>${i}</td><td>${label}</td><td>${s.root}</td>` +
+        `<td>${s.pcm.length}${s.loop ? ' ↻' : ''}</td>`;
+      const play = document.createElement('button');
+      play.textContent = 'play';
+      play.onclick = () => auditionSf2(fi, i);
+      row.insertCell().appendChild(play);
+      row.draggable = true;
+      row.ondragstart = ev => {
+        ev.dataTransfer.setData('text/plain', fi + ',' + i);
+        ev.dataTransfer.effectAllowed = 'copy';
+      };
+    });
   });
 }
 
@@ -267,8 +301,8 @@ function sf2Prep(s) {
   return { prep: S.sf2Oneshot(s, +$('sfcap').value || 160), rate: 8000 };
 }
 
-function auditionSf2(i) {
-  const s = sf2samples[i];
+function auditionSf2(fi, i) {
+  const s = sf2fonts[fi].samples[i];
   try {
     const { prep, rate } = sf2Prep(s);
     const brr = S.brrEncode(prep.pcm, prep.loopBlock);
@@ -280,8 +314,8 @@ function auditionSf2(i) {
   }
 }
 
-function sf2Import(sIdx, slot) {
-  const s = sf2samples[sIdx];
+function sf2Import(fi, sIdx, slot) {
+  const s = sf2fonts[fi].samples[sIdx];
   try {
     const { prep } = sf2Prep(s);
     const brr = S.brrEncode(prep.pcm, prep.loopBlock);

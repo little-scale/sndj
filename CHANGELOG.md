@@ -5,6 +5,11 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- patcher.html: pool slots gained a **clear** button (9 bytes of
+  silence — instantly frees the budget), and the soundfont panel
+  **stacks multiple .sf2 files**: drop them one after another, each
+  gets a group header with an unload ×, and slots from any font drag
+  onto the pool side by side.
 - patcher.html shows the **audio-RAM budget**, not just the ROM one: a
   second bar tracks the pool against the 59.2 KB of ARAM samples share
   with the echo buffer, reporting the echo headroom the console will
