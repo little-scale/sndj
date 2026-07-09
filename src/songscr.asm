@@ -39,7 +39,7 @@ song_init_screen:
     adc ui_cnt
     adc #4
     sta text_x
-    lda #8
+    lda #4
     sta text_y
     lda ui_cnt
     clc
@@ -401,7 +401,7 @@ song_draw:
 @rows:
     lda tmp0 + 1
     clc
-    adc #9
+    adc #5
     sta text_y
     ; row label = song_top + i
     lda #1

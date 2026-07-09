@@ -35,7 +35,7 @@ phrase_init:
     ; column titles
     lda #4
     sta text_x
-    lda #8
+    lda #4
     sta text_y
     rep #$20
 .ACCU 16
@@ -854,7 +854,7 @@ phrase_draw:
 @rows:
     lda tmp0 + 1
     clc
-    adc #9
+    adc #5
     sta text_y
     ; row label
     lda #1
