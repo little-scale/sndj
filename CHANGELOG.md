@@ -2,6 +2,11 @@
 
 ## 0.1.0-dev (unreleased)
 
+- PHRASE editing flow: inserting a note also writes the last-used
+  instrument; tapping B on the IN column auditions that row's note
+  with the inserted instrument; inserting a command brings its last
+  value along with the letter.
+
 - Transport: Start plays/stops the whole song on every screen; A+B is
   the contextual control — stop when playing, else play all tracks
   from the cursor (SONG), just the chain (CHAIN) or just the phrase

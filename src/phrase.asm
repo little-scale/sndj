@@ -361,21 +361,36 @@ cell_tap:
     jsr cell_addr
     lda ed_col
     bne @not_note
+    ; note: insert the note AND the last instrument, then audition
     lda ed_lastnote
     sta.l $7E0000 + SB_PHRASES,x
+    lda ed_lastinstr
+    sta.l $7E0000 + SB_PHRASES + 1,x
+    lda ed_lastnote
     dec a
     jmp audition_note
 @not_note:
     cmp #1
     bne @not_instr
+    ; instrument: insert, then audition this row's note with it
     lda ed_lastinstr
     sta.l $7E0000 + SB_PHRASES,x
+    lda.l $7E0000 + SB_PHRASES - 1,x
+    beq @silent
+    cmp #NOTE_OFF
+    bcs @silent
+    dec a
+    jmp audition_note
+@silent:
     rts
 @not_instr:
     cmp #2
     bne @val
+    ; command: the letter brings its value along
     lda ed_lastcmd
     sta.l $7E0000 + SB_PHRASES,x
+    lda ed_lastval
+    sta.l $7E0000 + SB_PHRASES + 1,x
     rts
 @val:
     lda ed_lastval
