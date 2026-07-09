@@ -14,7 +14,7 @@ phrase growth moves nothing else. Save/load is a straight copy.
 |--------|-------|----------|
 | $0000  | $0400 | song grid: 8 tracks x 128 rows (chain id, $FF empty) |
 | $0400  | $0400 | 64 instruments x 16 bytes (see below) |
-| $0800  | $0800 | 32 tables x 64 bytes (reserved until tables land) |
+| $0800  | $0800 | 32 tables x 64 bytes: 16 rows of two (command, value) pairs, run per tick by the instrument's TABLE field (record byte 12) |
 | $1000  | $0100 | 16 grooves x 16 ticks-per-row entries |
 | $1100  | $0100 | 8 wave banks x 32 samples |
 | $1200  | $0400 | 16 kits x 16 slots x 4 bytes (sample, tune, vol, flags; a slot with vol 0 is empty) |

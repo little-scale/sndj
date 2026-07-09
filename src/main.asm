@@ -52,6 +52,7 @@
 .INCLUDE "groovescr.asm"
 .INCLUDE "projectscr.asm"
 .INCLUDE "firscr.asm"
+.INCLUDE "tablescr.asm"
 .INCLUDE "palette.asm"
 .INCLUDE "splash.asm"
 
@@ -167,10 +168,10 @@ str_stop:    .DB "STOP", 0
 ;   [S][C][P][I][T]      SONG    CHAIN  PHRASE INSTR TABLE
 ;   [F][G][ ][E][F]      FILES   GROOVE   -   ECHO  FIR
 minimap_chars: .DB "OP WKSCPITFG EF"
-minimap_impl:  .DB 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1
+minimap_impl:  .DB 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1
 ; ui_mode -> minimap cell index ($FF = no highlight; LIVE is a mode of
 ; SONG so it highlights S)
-minimap_pos:   .DB $FF, 7, 6, 5, 8, 10, 13, 3, 5, 4, 0, 11, 1, 14
+minimap_pos:   .DB $FF, 7, 6, 5, 8, 10, 13, 3, 5, 4, 0, 11, 1, 14, 9
 
 draw_minimap:
     lda ui_mode
@@ -273,11 +274,6 @@ str_version:
 str_stamp:
     .DB BUILD_STAMP, 0
 
-; the tri-pixel wordmark (art/sndj-logo.png via makelogo.py)
-logo_data:
-    .INCBIN "logo.bin"
-logo_data_end:
-
 ; font, marker-wrapped so patcher.html can locate and replace it
     .DB "SNFONT"
 font_data:
@@ -341,6 +337,14 @@ pool_data:
 .BANK 5 SLOT 0
 .ORG $0000
     .INCBIN "pool.bin" SKIP $1FFFA READ $8000
+
+.BANK 6 SLOT 0
+.ORG $0000
+; the tri-pixel wordmark (art/sndj-logo.png via makelogo.py); DMA-only
+; data, so it lives outside the crowded code bank
+logo_data:
+    .INCBIN "logo.bin"
+logo_data_end:
 
 .BANK 0 SLOT 0
 ; --- internal header (hand-rolled; checksum fixed by tools/fixsum.py) --------

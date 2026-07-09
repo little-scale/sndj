@@ -190,6 +190,11 @@ trk_fine     ds 8    ; per-track F-command fine tune (signed 1/256 semi)
 eng_pmon     db      ; PMON shadow (Z command)
 trk_chord    ds 8    ; C-command chord override (x/y nibble offsets, 0 = off)
 trk_playcnt  ds 8    ; phrase pass counter (I/J play-count schedules)
+trk_tbl      ds 8    ; running table id ($FF = none; set at trigger)
+trk_tbl_row  ds 8    ; table step 0-15
+ed_table     db      ; TABLE screen: edited table id
+tb_x         db      ; TABLE screen cursor col (0-3)
+tb_y         db      ; TABLE screen cursor row
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

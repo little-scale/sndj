@@ -2,6 +2,15 @@
 
 ## 0.1.0-dev (unreleased)
 
+- TABLE screen + runtime: 32 tables of 16 rows x two (command, value)
+  columns run per tick through the shared executor; the instrument's
+  new TABLE field starts its table at every trigger, and H inside a
+  table hops the table's own rows (row-scoped D/I/J are inert there).
+  A+Right from INSTR follows the instrument's table; playhead markers
+  show live positions.
+- Splash lost the pad-echo test row; A+B plays a phrase/chain from its
+  top; the command set is settled at 23 (E/O/W dropped).
+
 - Eight more commands: C chord override (C47 fans a major chord onto
   the two voices to the right of ANY instrument; C00 back to the
   record's GRP), F fine tune, M master volume, N noise clock, S sweep

@@ -495,6 +495,7 @@ engine_go:
     sta.w trk_dly_cnt,x
     sta.w trk_kill_cnt,x
     sta.w trk_pending,x
+    sta.w trk_tbl,x
     lda #$00
     sta.w trk_cmd,x
     sta.w trk_ret_per,x
@@ -618,6 +619,7 @@ engine_tick:
     ldx #$0000
 @fxloop:
     jsr track_fx
+    jsr track_table
     inx
     cpx #TRACKS
     bne @fxloop
@@ -857,6 +859,28 @@ track_trigger_note:
     jsr apply_instrument
     plx
 @no_apply:
+    ; the instrument's table starts from its top on every trigger
+    lda trig_id
+    cmp #INSTR_NONE
+    beq @no_tbl
+    phx
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR + 12,x
+    plx
+    and #$1F
+    sta.w trk_tbl,x
+    lda #$00
+    sta.w trk_tbl_row,x
+@no_tbl:
     ; F command: per-track fine tune folds into the trigger tune context
     lda.w trk_fine,x
     clc
@@ -1700,6 +1724,109 @@ kit_trigger:
     lda #$FF
     sta.w trk_instr_active,x
     sec
+    rts
+
+; --- per-tick table step: run both command columns through the shared
+; executor, then advance (H inside a table hops its own rows) ------------------
+track_table:
+    lda.w trk_tbl,x
+    cmp #$FF
+    bne @run
+    rts
+@run:
+    ; cell base = table*64 + row*4 -> es1
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    asl
+    asl                     ; * 64
+    sta es1
+    sep #$20
+.ACCU 8
+    lda.w trk_tbl_row,x
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    clc
+    adc es1
+    sta es1
+    sep #$20
+.ACCU 8
+    ; column 1
+    phx
+    rep #$30
+.ACCU 16
+    lda es1
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_TABLES + 1,x
+    sta es0                 ; val
+    lda.l $7E0000 + SB_TABLES,x
+    plx
+    jsr table_exec
+    ; column 2
+    phx
+    rep #$30
+.ACCU 16
+    lda es1
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_TABLES + 3,x
+    sta es0
+    lda.l $7E0000 + SB_TABLES + 2,x
+    plx
+    jsr table_exec
+    ; advance
+    lda.w trk_tbl_row,x
+    inc a
+    and #$0F
+    sta.w trk_tbl_row,x
+    rts
+
+; A = command id, es0 = value: run one table cell on track X.
+; Row-scoped commands (D/I/J) are inert here; H hops the table.
+table_exec:
+    cmp #$00
+    beq @skip
+    cmp #CMDID_H
+    beq @hop
+    cmp #CMDID_D
+    beq @skip
+    cmp #CMDID_I
+    beq @skip
+    cmp #CMDID_J
+    beq @skip
+    sta es0 + 1
+    lda.w trk_cmd,x
+    pha
+    lda.w trk_cval,x
+    pha
+    lda es0 + 1
+    sta.w trk_cmd,x
+    lda es0
+    sta.w trk_cval,x
+    jsr row_cmd_pre
+    jsr row_cmd_post
+    pla
+    sta.w trk_cval,x
+    pla
+    sta.w trk_cmd,x
+@skip:
+    rts
+@hop:
+    ; the NEXT tick plays row val (the stepper's advance lands there)
+    lda es0
+    dec a
+    and #$0F
+    sta.w trk_tbl_row,x
     rts
 
 ; --- per-tick effects on track X (delay, kill, retrig, slide, arp, vibrato) ----

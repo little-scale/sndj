@@ -24,6 +24,7 @@
 .DEFINE SCREEN_GROOVE 11
 .DEFINE SCREEN_PROJECT 12
 .DEFINE SCREEN_FIR    13
+.DEFINE SCREEN_TABLE  14
 
 ; called every frame from the main loop
 screen_update:
@@ -72,6 +73,8 @@ screen_update:
     beq @project
     cmp #SCREEN_FIR
     beq @fir
+    cmp #SCREEN_TABLE
+    beq @table
     jmp song_update
 @phrase:
     jmp phrase_update
@@ -93,6 +96,8 @@ screen_update:
     jmp project_update
 @fir:
     jmp fir_update
+@table:
+    jmp table_update
 @chain:
     jmp chain_update
 @instr:
@@ -228,7 +233,9 @@ nav_update:
     and #PAD_RIGHT
     sep #$20
 .ACCU 8
-    beq @try_left
+    bne +
+    jmp @try_left
++
     ; deeper: SONG -> CHAIN -> PHRASE -> INSTR
     lda ui_mode
     cmp #SCREEN_SONG
@@ -243,8 +250,28 @@ nav_update:
     bra @eat_right
 @right_not_wave:
     cmp #SCREEN_ECHO
-    bne @no_right
+    bne @right_not_echo
     jsr fir_init
+    bra @eat_right
+@right_not_echo:
+    cmp #SCREEN_INSTR
+    bne @no_right
+    ; follow the instrument's TABLE field
+    lda ed_instr
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR + 12,x
+    and #(TABLE_COUNT - 1)
+    sta ed_table
+    jsr table_init
 @eat_right:
     rep #$20
 .ACCU 16
@@ -327,8 +354,13 @@ nav_update:
     bra @eat_left2
 @left_not_kit:
     cmp #SCREEN_FIR
-    bne @no_left
+    bne @left_not_fir
     jsr echo_init
+    bra @eat_left2
+@left_not_fir:
+    cmp #SCREEN_TABLE
+    bne @no_left
+    jsr instr_init
 @eat_left2:
     rep #$20
 .ACCU 16
