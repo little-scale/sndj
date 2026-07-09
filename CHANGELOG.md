@@ -2,6 +2,13 @@
 
 ## 0.1.0-dev (unreleased)
 
+- Tuning fixes by ear: SW SLAP +1 semitone, MP RECRD +2 (per-pick trim
+  field in the pool builder for wrong font root keys).
+- The ECHO screen's EDL edit now clamps to the ARAM actually free
+  above the resident samples, so the echo buffer can never grow into
+  (and corrupt) sample data; regression-checked.
+- Kit 0 gains SW ROLL — the riding-Yoshi drum roll from the SMW font.
+
 - PHRASE editing flow: inserting a note also writes the last-used
   instrument; tapping B on the IN column auditions that row's note
   with the inserted instrument; inserting a command brings its last

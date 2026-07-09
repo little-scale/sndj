@@ -70,20 +70,16 @@ gest({ a = true, right = true }, 4)       -- PHRASE
 gest({ a = true, right = true }, 4)       -- INSTR
 gest({ a = true, down = true }, 6)        -- ECHO
 local at_echo = t
--- EDL: 0 -> +4 -> +1 -> +1 = 6 (each walks the safe reconfig)
+-- EDL: 0 -> +4 = 4, the ARAM-derived max with the factory set resident
+-- (the screen clamps so the echo buffer can't reach resident samples)
 nudge("up", 45)
-nudge("right", 45)
-nudge("right", 50)
-local edl6 = t
--- EDL walk: 6 -> 10 -> 14 (long waits: old-delay flush + offset wrap)
+local edl4 = t
+-- further nudges must clamp at the ARAM limit, not walk higher
 nudge("up", 70)
-nudge("up", 80)
-local edl14 = t
--- back down to 3: -4 -4 -4 (clamps at 2) +1
-nudge("down", 80)
-nudge("down", 70)
-nudge("down", 60)
 nudge("right", 60)
+local edl_clamp = t
+-- back down to 3 (left = -1)
+nudge("left", 60)
 local edl3 = t
 -- FIR field (down 5) -> preset 1
 gest({ down = true })
@@ -130,15 +126,13 @@ emu.addEventCallback(function()
     check(wram(0x0C) == 6, "navigated to the ECHO screen")
     check(dsp(0x2C) == 0x30 and dsp(0x0D) == 0x30,
       "echo volume/feedback applied at boot")
-  elseif frames == edl6 then
-    check(dsp(0x7D) == 6, "EDL walked to 6")
-    check(dsp(0x6D) == 0xD0, "ESA tracks EDL (top of ARAM)")
+  elseif frames == edl4 then
+    check(dsp(0x7D) == 4, "EDL walked to the ARAM max (4)")
+    check(dsp(0x6D) == 0xE0, "ESA tracks EDL (top of ARAM)")
     check(dsp(0x6C) == 0x00, "FLG re-enabled after reconfig")
-    check(aram_intact(aram_snap), "samples intact at EDL 6")
-  elseif frames == edl14 then
-    check(dsp(0x7D) == 14, "EDL walked to 14")
-    check(dsp(0x6D) == 0x90, "ESA tracks EDL 14")
-    check(aram_intact(aram_snap), "samples intact at EDL 14")
+    check(aram_intact(aram_snap), "samples intact at EDL 4")
+  elseif frames == edl_clamp then
+    check(dsp(0x7D) == 4, "EDL edits clamp at the resident-set limit")
   elseif frames == edl3 then
     check(dsp(0x7D) == 3, "EDL walked back to 3")
     check(dsp(0x6D) == 0xE8, "ESA tracks EDL 3")

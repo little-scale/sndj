@@ -168,13 +168,14 @@ SMW_FONT = 'super_mario_world'
 # pitched sounds, in pool order. The first four are the SMW classics
 # (tracks 1-5 default to pool 0-4), then three Mario Paint icons, then
 # the option-1 songbook fill from both fonts.
-MELODICS = [                # (font, preset name, 8-char pool name)
+MELODICS = [                # (font, preset, pool name[, semitone trim])
+    # trims correct wrong font root keys, by ear
     (SMW_FONT, 'Xylophone',       'SW XYLO'),
     (SMW_FONT, 'Steel Drums',     'SW STEEL'),
     (SMW_FONT, 'E. Piano',        'SW EPIAN'),
-    (SMW_FONT, 'Slap Bass',       'SW SLAP'),
+    (SMW_FONT, 'Slap Bass',       'SW SLAP', 1),
     (MP_FONT,  'Square',          'MPSQUARE'),
-    (MP_FONT,  'Recorder',        'MP RECRD'),
+    (MP_FONT,  'Recorder',        'MP RECRD', 2),
     (MP_FONT,  'Acoustic Guitar', 'MP GUITR'),
     (SMW_FONT, 'Trombone',        'SW TBONE'),
     (SMW_FONT, 'Trumpet',         'SW TRMPT'),
@@ -196,6 +197,7 @@ SMW_KIT = [                 # kit 0: SMW percussion, by SAMPLE name
     ('dewL',         'SW DEW', 160),
     ('orchestrahit', 'SW ORCH', 250),
     ('2R',           'SW BEEP', 160),
+    ('dddde-1R',     'SW ROLL', 250),   # the riding-yoshi drum roll
 ]
 MP_KIT = [                  # kit 1: Mario Paint percussion (by preset)
     ('Kick',        'MP KICK', 160),
@@ -244,7 +246,9 @@ def build_factory():
 
     # pitched sounds: exact-loop resample (see below), tune residual in
     # the entry fields
-    for font, preset, short in MELODICS:
+    for pick in MELODICS:
+        font, preset, short = pick[:3]
+        trim = pick[3] if len(pick) > 3 else 0
         s = next((x for x in fonts[font]
                   if x['loop'] and x.get('preset') == preset), None)
         if s is None:
@@ -252,7 +256,7 @@ def build_factory():
         root_eff = (s.get('root', 60) or 60) - s.get('corr', 0) / 100.0
         if not 24 <= root_eff <= 108:
             root_eff = 60
-        shift = 61 - root_eff
+        shift = 61 - root_eff + trim
         scale = 2 ** (-shift / 12)
         ideal = scale * 32000 / s['rate']
         ls, le = s['loop']

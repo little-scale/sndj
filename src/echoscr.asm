@@ -165,6 +165,26 @@ ef_nudge:
     lda.w ef_fields + 1,x
     sta es0 + 1             ; max
     lda if_cur
+    bne @max_ok
+    ; EDL: the echo buffer may never reach down into resident samples.
+    ; max = ($10000 - res_cursor) / 2 KB, capped by the field max (15)
+    rep #$30
+.ACCU 16
+    lda res_cursor
+    eor #$FFFF
+    inc a                   ; $10000 - res_cursor
+    xba
+    and #$00FF
+    lsr
+    lsr
+    lsr                     ; >> 11 = free 2 KB steps
+    sep #$20
+.ACCU 8
+    cmp es0 + 1
+    bcs @max_ok
+    sta es0 + 1
+@max_ok:
+    lda if_cur
     jsr ef_addr
     lda.l $7E0000,x
     clc

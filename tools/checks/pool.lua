@@ -54,7 +54,7 @@ emu.addEventCallback(function()
     check(rom(POOL) == string.byte("S") and rom(POOL + 8) == 2,
       "pool v2 magic in ROM bank 1")
     local count = rom(POOL + 9)
-    check(count == 47, "factory pool has 47 samples (" .. count .. ")")
+    check(count == 48, "factory pool has 48 samples (" .. count .. ")")
     check(aram(0x1000) == 0x00 and aram(0x1001) == 0x12,
       "directory slot 0 -> silent stub")
     check(aram(0x1200) == 0x01, "silent stub BRR (END block) uploaded")
@@ -94,12 +94,12 @@ emu.addEventCallback(function()
       "the SMW kit samples made the budget")
     check(wram(0x3200) == 16 and wram(0x3201) == 0xE8 and wram(0x3202) == 0x50,
       "kit 0 slot 0 = SW KICK (pool 16, tune -24)")
-    check(wram(0x3240) == 25 and wram(0x3241) == 0xE8,
-      "kit 1 slot 0 = MP KICK (pool 25, tune -24)")
-    check(wram(0x326C) == 36, "kit 1 slot 11 = MP UNDO")
+    check(wram(0x3240) == 26 and wram(0x3241) == 0xE8,
+      "kit 1 slot 0 = MP KICK (pool 26, tune -24)")
+    check(wram(0x326C) == 37, "kit 1 slot 11 = MP UNDO")
     check(wram(0x3272) == 0, "kit 1 slots 12-15 empty")
-    check(wram(0x3280) == 37, "kit 2 slot 0 = MP BONGO1 (toybox)")
-    check(wram(0x32A4) == 46, "kit 2 slot 9 = MP CHEER")
+    check(wram(0x3280) == 38, "kit 2 slot 0 = MP BONGO1 (toybox)")
+    check(wram(0x32A4) == 47, "kit 2 slot 9 = MP CHEER")
     check(wram(0x32A8) == 0, "kit 2 slots 10-15 empty")
     check(wram(0x27A0) == 1 and wram(0x27A1) == 2, "instrument 58 is KIT 2")
     -- author a kit test: instrument 7 is factory KIT 0 (the 808)
