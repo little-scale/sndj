@@ -340,7 +340,7 @@ sndj/
   src/                65816 sources: main, ppu, input, engine, editor,
                       scb, sync, midi, save  (single .INCLUDE tree)
   src/apu/            SPC700 driver: driver, mailbox, dsp, tick, upload
-  tools/              Python build tools + browser apps + check scripts
+  tools/              Python build tools + check scripts (the toolchain)
     makefont.py  maketables.py  makelogo.py  makedemo.py
     sndj_brr.py       WAV -> BRR encoder (pre-emphasis, loop tools)
     sndj_pool.py      samples/ -> self-describing ROM pool image
@@ -760,7 +760,7 @@ groove, echo defaults (EDL/feedback/EVOL/FIR preset), master vol, NEW
 ## 17. The browser ecosystem
 
 Zero-toolchain, drag-and-drop, all offline-capable single-file HTML apps,
-all importing **`tools/sndj.js`** — the single shared library containing:
+all importing **`user-tools/sndj.js`** — the single shared library containing:
 the `.sndj`/`SNDJ1` format geometry, the RLE codec, the BRR encoder/decoder,
 the ARAM budget calculator, **a reference implementation of the sequencer
 engine**, and **a bit-exact JS model of the S-DSP** (gaussian table, BRR

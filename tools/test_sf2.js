@@ -4,7 +4,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const S = require('./sndj.js');
+const S = require('../user-tools/sndj.js');
 
 const fixture = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const root = path.dirname(__dirname);

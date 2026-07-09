@@ -35,12 +35,12 @@ verified. What works today, all playable in an emulator:
 - **Save/load** — 4 journalled SRAM slots (SNDJ1 format, SAVEFORMAT.md);
   a power cut can't eat the previous good save
 - **LIVE mode** — quantised chain launching, mute/solo, ENVX meters
-- **Browser tools** — zero-toolchain, fully local: `tools/patcher.html`
-  replaces pool samples with your WAVs; `tools/savetool.html` views cart
+- **Browser tools** — zero-toolchain, fully local: `user-tools/patcher.html`
+  replaces pool samples with your WAVs; `user-tools/savetool.html` views cart
   saves, extracts/assembles `.sndj` song files (CLI twin:
-  `tools/savetool.py`); `tools/firdesign.html` designs the echo FIR with a
+  `tools/savetool.py`); `user-tools/firdesign.html` designs the echo FIR with a
   live response plot + audition and patches ROM preset slots. All import
-  `tools/sndj.js` (the shared JS library whose
+  `user-tools/sndj.js` (the shared JS library whose
   BRR codec byte-matches the Python reference)
 
 Still to come: sync (M12) and MIDI takeover (M14) — designed, but their

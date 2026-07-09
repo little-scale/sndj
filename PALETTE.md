@@ -55,5 +55,5 @@ scheme, little-endian 15-bit BGR words:
 ```
 
 `patcher.html` gains a palette tab against this block (planned); until
-then `tools/sndj.js`'s `findMarker(rom, 'SNPAL0')` locates it for any
+then `user-tools/sndj.js`'s `findMarker(rom, 'SNPAL0')` locates it for any
 tool.

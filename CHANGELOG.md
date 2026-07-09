@@ -7,6 +7,11 @@
   slots. Saves append and flip the entry; overwrites and clears close
   their holes by sliding the tail (per-song CRCs guard a power cut
   mid-slide). Old v1 saves reformat on first boot.
+- The repo split into toolchain and musician halves: the browser apps
+  (patcher, savetool, firdesign) and sndj.js moved to `user-tools/` —
+  download that one folder and everything runs locally, no toolchain.
+- MANUAL.md: the player's guide — controls, screens, the full
+  23-command reference, the echo/FIR room chapter, saving, tools.
 - sndj.js gained a sample-accurate S-DSP model (ported from blargg's
   snes_spc): BRR through the real Gaussian interpolator, hardware
   ADSR/GAIN with the rate-counter table, noise LFSR, pitch modulation,
