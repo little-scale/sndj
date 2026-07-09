@@ -11,7 +11,7 @@
 .ACCU 8
 .INDEX 16
 
-.DEFINE IF_COUNT 15
+.DEFINE IF_COUNT 16
 
 ; field table: byte offset in record, shift, value mask (post-shift), max
 if_fields:
@@ -29,11 +29,13 @@ if_fields:
     .DB 11, 0, $FF, 24   ; OFS 3
     .DB 7,  0, $01, 1    ; EON (echo send)
     .DB 6,  0, $FF, 255  ; FINE (signed 1/256 semitone; max 255 = free wrap)
-    .DB 12, 0, $1F, 31   ; TABLE (per-tick automation, runs on trigger)
+    .DB 12, 0, $FF, 255  ; TBL (>= 32 shows -- = no table; free wrap)
+    .DB 13, 0, $0F, 15   ; TBS ticks/row (0 = advance per note)
 
 if_labels:
     .DW if_l0, if_l1, if_l2, if_l3, if_l4, if_l5
     .DW if_l6, if_l7, if_l8, if_l9, if_l10, if_l11, if_l12, if_l13, if_l14
+    .DW if_l15
 if_l0:  .DB "TYPE", 0
 if_l1:  .DB "SAMPLE", 0
 if_l2:  .DB "ATTACK", 0
@@ -48,7 +50,8 @@ if_l10: .DB "OFS 2", 0
 if_l11: .DB "OFS 3", 0
 if_l12: .DB "ECHO", 0
 if_l13: .DB "FINE", 0
-if_l14: .DB "TABLE", 0
+if_l14: .DB "TBL", 0
+if_l15: .DB "TBS", 0
 
 if_types:
     .DB "SMPKITWAVNSE"     ; 3 chars each
@@ -360,6 +363,40 @@ instr_draw:
     pla
     sta if_cur
     lda ui_cnt
+    cmp #$0C
+    bne @not_echo_v
+    ; ECHO: a toggle reads ON/OFF, not 00/01
+    lda str_buf + 33
+    beq @e_off
+    phx
+    ldx #str_if_on
+    jsr text_puts
+    plx
+    jmp @next
+@e_off:
+    phx
+    ldx #str_if_off
+    jsr text_puts
+    plx
+    jmp @next
+@not_echo_v:
+    cmp #$0E
+    bne @not_tbl_v
+    ; TBL: anything past the 32 tables is the nil state
+    lda str_buf + 33
+    cmp #$20
+    bcc @tbl_hex
+    phx
+    ldx #str_if_nil
+    jsr text_puts
+    plx
+    jmp @next
+@tbl_hex:
+    lda str_buf + 33
+    jsr text_hex8
+    jmp @next
+@not_tbl_v:
+    lda ui_cnt
     bne @hex
     ; TYPE: 3-char name (fetch all chars first; text_puttile clobbers X)
     lda str_buf + 33
@@ -404,3 +441,6 @@ instr_draw:
     rts
 
 str_instr: .DB "INSTR ", 0
+str_if_on:  .DB "ON ", 0
+str_if_off: .DB "OFF", 0
+str_if_nil: .DB "-- ", 0

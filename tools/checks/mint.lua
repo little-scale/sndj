@@ -4,7 +4,7 @@
 -- SLIM/DEEP; phrase clones are always independent).
 --
 -- WRAM: grid $2000, chains $3700 (32 ea), phrases $4300 (64 ea),
--- opt_clone $312.
+-- opt_clone $322.
 
 local frames = 0
 local _booted = false
@@ -63,7 +63,7 @@ emu.addEventCallback(function()
   if frames == 18 then
     -- the emulator persists .sav across runs: pin CLONE to SLIM
     emu.write(0x0008, 0, emu.memType.snesSaveRam)
-    poke(0x312, 0)
+    poke(0x322, 0)
   elseif frames == 30 then
     check(wram(0x2000) == 0, "double-tap on empty minted chain 0")
     -- populate chain 0 + phrase 0 so later taps see content
@@ -76,7 +76,7 @@ emu.addEventCallback(function()
   elseif frames == 70 then
     check(wram(0x2000) == 2, "double-tap on populated cell cloned to chain 2")
     check(wram(0x3740) == 0, "SLIM clone shares phrase 0")
-    poke(0x312, 1)           -- OPTIONS CLONE -> DEEP
+    poke(0x322, 1)           -- OPTIONS CLONE -> DEEP
   elseif frames == 86 then
     check(wram(0x2000) == 3, "DEEP clone landed in chain 3")
     check(wram(0x3760) == 2, "DEEP clone repointed at a fresh phrase (2)")

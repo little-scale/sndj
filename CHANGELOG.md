@@ -2,6 +2,11 @@
 
 ## 0.1.0-dev (unreleased)
 
+- Instrument tables grow up: TBL has a real nil state (-- ; factory
+  instruments ship with no table) and a TBS field clocks the table —
+  n ticks per row, or 0 to advance one row per note with the position
+  persisting across triggers. INSTR's ECHO field reads ON/OFF.
+
 - OPTIONS: VIDEO now reads the detected console standard (NTSC 60HZ /
   PAL 50HZ via STAT78) — the SNES can't switch standards in software,
   and tempo/pitch ride the region-free APU crystal either way; the

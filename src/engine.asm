@@ -122,6 +122,10 @@ song_init:
     lda #$50
     sta.l $7E0000 + SB_INSTR + 4,x  ; vol L
     sta.l $7E0000 + SB_INSTR + 5,x  ; vol R
+    lda #$FF
+    sta.l $7E0000 + SB_INSTR + 12,x ; TBL: no table
+    lda #$01
+    sta.l $7E0000 + SB_INSTR + 13,x ; TBS: per tick
     rep #$30
 .ACCU 16
     tyx
@@ -197,6 +201,10 @@ song_init:
     lda #$50
     sta.l $7E0000 + SB_INSTR + 4,x
     sta.l $7E0000 + SB_INSTR + 5,x
+    lda #$FF
+    sta.l $7E0000 + SB_INSTR + 12,x ; TBL: no table
+    lda #$01
+    sta.l $7E0000 + SB_INSTR + 13,x ; TBS: per tick
     plx
     inx
     cpx #INSTR_COUNT
@@ -496,6 +504,10 @@ engine_go:
     sta.w trk_kill_cnt,x
     sta.w trk_pending,x
     sta.w trk_tbl,x
+    lda #$00
+    sta.w trk_tbl_spd,x
+    sta.w trk_tbl_cnt,x
+    lda #$FF
     lda #$00
     sta.w trk_cmd,x
     sta.w trk_ret_per,x
@@ -859,7 +871,9 @@ track_trigger_note:
     jsr apply_instrument
     plx
 @no_apply:
-    ; the instrument's table starts from its top on every trigger
+    ; the instrument's table: TBL >= 32 (shown --) = none; TBS 0 =
+    ; note-sync (each trigger advances one row, position persists),
+    ; TBS n = a row every n ticks from the top
     lda trig_id
     cmp #INSTR_NONE
     beq @no_tbl
@@ -874,12 +888,41 @@ track_trigger_note:
     tax
     sep #$20
 .ACCU 8
+    lda.l $7E0000 + SB_INSTR + 13,x
+    and #$0F
+    sta es2                 ; TBS
     lda.l $7E0000 + SB_INSTR + 12,x
+    sta es2 + 1             ; TBL
     plx
-    and #$1F
+    lda es2 + 1
+    cmp #$20
+    bcc @tbl_on
+    lda #$FF                ; nil: no table on this voice
+    sta.w trk_tbl,x
+    bra @no_tbl
+@tbl_on:
+    lda es2
+    sta.w trk_tbl_spd,x
+    bne @tick_mode
+    ; note-sync: keep the row when re-triggering the same table
+    lda es2 + 1
+    cmp.w trk_tbl,x
+    beq @same
+    lda #$00
+    sta.w trk_tbl_row,x
+@same:
+    lda es2 + 1
+    sta.w trk_tbl,x
+    lda #$01
+    sta.w trk_tbl_cnt,x     ; one pending step for this note
+    bra @no_tbl
+@tick_mode:
+    lda es2 + 1
     sta.w trk_tbl,x
     lda #$00
     sta.w trk_tbl_row,x
+    lda #$01
+    sta.w trk_tbl_cnt,x     ; row 0 executes on the trigger tick
 @no_tbl:
     ; F command: per-track fine tune folds into the trigger tune context
     lda.w trk_fine,x
@@ -1731,8 +1774,31 @@ kit_trigger:
 track_table:
     lda.w trk_tbl,x
     cmp #$FF
-    bne @run
+    bne @live
     rts
+@live:
+    lda.w trk_tbl_spd,x
+    bne @tick
+    ; note-sync: run only when a trigger left a step pending
+    lda.w trk_tbl_cnt,x
+    bne @consume
+    rts
+@consume:
+    lda #$00
+    sta.w trk_tbl_cnt,x
+    lda.w trk_tbl,x
+    bra @run
+@tick:
+    ; a row every TBS ticks
+    lda.w trk_tbl_cnt,x
+    dec a
+    sta.w trk_tbl_cnt,x
+    beq @due
+    rts
+@due:
+    lda.w trk_tbl_spd,x
+    sta.w trk_tbl_cnt,x
+    lda.w trk_tbl,x
 @run:
     ; cell base = table*64 + row*4 -> es1
     rep #$30
