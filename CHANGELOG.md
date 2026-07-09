@@ -5,6 +5,12 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- patcher.html shows the **audio-RAM budget**, not just the ROM one: a
+  second bar tracks the pool against the 59.2 KB of ARAM samples share
+  with the echo buffer, reporting the echo headroom the console will
+  allow (`EDL n = n*16 ms`) — red with a warning when samples overflow
+  and would fall silent. `sndj.js` owns the calculator
+  (`aramBudget`, mirroring `pool.asm`'s residency math, selftested).
 - patcher.html: soundfonts now open in their own **panel beside the
   pool** — drop an `.sf2` (on either drop zone) and every sample
   becomes a slot with its own **play** button, auditioned through the

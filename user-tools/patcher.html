@@ -57,6 +57,8 @@ export a patched ROM. Everything runs locally.</p>
 <div id="poolview" hidden>
   <div class="bar"><div id="budget" style="width:0"></div></div>
   <p id="budgettext"></p>
+  <div class="bar"><div id="aram" style="width:0"></div></div>
+  <p id="aramtext"></p>
   <table id="pool"></table>
 </div>
 <div id="exportview" hidden>
@@ -182,6 +184,24 @@ function render() {
   $('budgettext').textContent =
     `pool ${used} / ${RESERVED} bytes ROM budget` +
     (used > RESERVED ? ' — TOO BIG, replace with smaller samples' : '');
+  // the real constraint: the whole pool resident in 64 KB audio RAM,
+  // sharing it with the echo buffer (mirrors the console's residency)
+  const a = S.aramBudget(entries);
+  const kb = n => (n / 1024).toFixed(1);
+  $('aram').style.width = Math.min(100, a.sampleBytes * 100 / a.capacity) + '%';
+  if (a.maxEdl < 0) {
+    $('aram').className = 'over';
+    $('aramtext').innerHTML = `audio RAM ${kb(a.sampleBytes)} / ` +
+      `${kb(a.capacity)} KB — <span class="warn">over by ${a.overBy} bytes: ` +
+      `samples at the end of the pool will be SILENT on the console, ` +
+      `and no echo fits</span>`;
+  } else {
+    $('aram').className = a.maxEdl === 0 ? 'over' : '';
+    $('aramtext').textContent = `audio RAM ${kb(a.sampleBytes)} / ` +
+      `${kb(a.capacity)} KB samples — echo headroom ` +
+      (a.maxEdl === 0 ? 'NONE (delay time maxes at 0 ms)'
+        : `EDL ${a.maxEdl} (${a.maxMs} ms)`);
+  }
   $('poolview').hidden = false;
 }
 

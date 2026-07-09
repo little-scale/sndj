@@ -456,6 +456,31 @@ function sf2Oneshot(s, capMs) {
   return { pcm, loopBlock: null, tuneSemis: 0, tuneFine: 0 };
 }
 
+// ------------------------------------------------------------ ARAM budget
+// Mirror of src/pool.asm's residency math: samples upload from $1209
+// (after the 9-byte silent stub at ARAM_SAMPLES $1200) and must end on a
+// page BELOW the echo floor (ESA page = $100 - 8*EDL; EDL 0 still
+// reserves the top page). Anything past the floor is mapped to the
+// silent stub on the console — it simply doesn't sound.
+function aramBudget(entries) {
+  const base = 0x1209;
+  const sampleBytes = entries.reduce((a, e) => a + e.brr.length, 0);
+  const end = base + sampleBytes;
+  const endPage = end >> 8;
+  let maxEdl = -1;
+  for (let edl = 15; edl >= 0; edl--) {
+    const ceilPage = edl === 0 ? 0xFF : 0x100 - 8 * edl;
+    if (endPage < ceilPage) { maxEdl = edl; break; }
+  }
+  return {
+    sampleBytes, end,
+    capacity: 0xFF00 - base,            // usable sample bytes at EDL 0
+    maxEdl,                             // -1: samples overflow ARAM
+    maxMs: maxEdl > 0 ? maxEdl * 16 : 0,
+    overBy: Math.max(0, end - 0xFF00),
+  };
+}
+
 // ------------------------------------------------------------- SRAM (.srm)
 // SNDJ1 v2: 16-entry directory at $0010 (status, offset16, size16,
 // crc16, rsvd, name8) over one packed heap at $0110. Offline tools can
@@ -1132,6 +1157,15 @@ function selftest() {
   assert(wav.length === 44 + 512 * 4 &&
     String.fromCharCode(...wav.slice(0, 4)) === 'RIFF', 'wav container');
 
+  // ARAM budget calculator (mirrors pool.asm residency)
+  const mkE = n => ({ brr: new Uint8Array(n) });
+  assert(aramBudget([]).maxEdl === 15, 'empty pool leaves the full echo');
+  assert(aramBudget([mkE(54000)]).maxEdl === 3,
+    '54000 B of samples cap the echo at EDL 3');
+  const over = aramBudget([mkE(61000)]);
+  assert(over.maxEdl === -1 && over.overBy === 337,
+    'overflowing pool reports the silent overrun');
+
   console.log('sndj.js selftest: OK (BRR SNR ' + snr.toFixed(1) + ' dB, ' +
     'empty song ' + packed.length + ' bytes, dsp voice peak ' + peak + ')');
 }
@@ -1141,7 +1175,7 @@ const SNDJ = {
   SRM_SIZE, SRM_SLOTS, SRM_HEAP_SZ,
   srmNew, srmParse, srmExtract, srmInsert, srmErase, srmLayout,
   sndjFileBuild, sndjFileParse,
-  brrEncode, brrDecode, poolParse, poolBuild,
+  brrEncode, brrDecode, poolParse, poolBuild, aramBudget,
   rlePack, rleUnpack, crc16, toImage, fromImage,
   pitchForNote, findMarker, fixChecksum, selftest,
   dspNew, dspWrite, dspRun, wavBuild,
