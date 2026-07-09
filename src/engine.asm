@@ -21,6 +21,8 @@ str_defname: .DB "SONG    "
 .DEFINE CMDID_F 6
 .DEFINE CMDID_G 7
 .DEFINE CMDID_H 8
+.DEFINE CMDID_I 9
+.DEFINE CMDID_J 10
 .DEFINE CMDID_K 11
 .DEFINE CMDID_L 12
 .DEFINE CMDID_M 13
@@ -501,6 +503,7 @@ engine_go:
     sta.w trk_vib_ph,x
     sta.w trk_fine,x
     sta.w trk_chord,x
+    sta.w trk_playcnt,x
     inx
     cpx #TRACKS
     bne @fx_reset
@@ -743,6 +746,9 @@ track_row:
     and #$0F
     sta.w trk_prow,x
     bne @trigger
+    lda.w trk_playcnt,x     ; one more pass done (I/J schedules)
+    inc a
+    sta.w trk_playcnt,x
     jsr track_chain_step    ; wrapped: next chain entry / launch / loop
     lda.w trk_phrase,x
     cmp #$FF
@@ -1059,6 +1065,70 @@ row_cmd_pre:
     sta.w trk_chord,x
     rts
 @not_c:
+    cmp #CMDID_I
+    bne @not_i
+    ; I: 8-bit play-count mask — the row's note fires only on set bits
+    ; ($FF always, $55/$AA alternate passes, $0F the first four of 8)
+    lda.w trk_cval,x
+    sta es0
+    lda.w trk_playcnt,x
+    and #$07
+    beq @i_test
+    sta es0 + 1
+@i_sh:
+    lsr es0
+    dec es0 + 1
+    bne @i_sh
+@i_test:
+    lda es0
+    and #$01
+    bne @i_play
+    lda #$00
+    sta.w str_buf + 28      ; drop the note this pass
+@i_play:
+    rts
+@not_i:
+    cmp #CMDID_J
+    bne @not_j
+    ; J xy: on passes picked by 4-bit mask x, transpose the row's note
+    ; by signed nibble y (kits: swaps the pad)
+    lda.w str_buf + 28
+    beq @j_out
+    cmp #NOTE_OFF
+    beq @j_out
+    lda.w trk_cval,x
+    lsr
+    lsr
+    lsr
+    lsr
+    sta es0
+    lda.w trk_playcnt,x
+    and #$03
+    beq @j_test
+    sta es0 + 1
+@j_sh:
+    lsr es0
+    dec es0 + 1
+    bne @j_sh
+@j_test:
+    lda es0
+    and #$01
+    beq @j_out
+    lda.w trk_cval,x
+    and #$0F
+    cmp #$08
+    bcc @j_add
+    ora #$F0                ; y is signed
+@j_add:
+    clc
+    adc.w str_buf + 28
+    beq @j_out              ; clamp: never underflow to empty
+    cmp #NOTE_MAX + 1
+    bcs @j_out
+    sta.w str_buf + 28
+@j_out:
+    rts
+@not_j:
     cmp #CMDID_M
     bne @not_m
     ; M: master volume (both channels)
