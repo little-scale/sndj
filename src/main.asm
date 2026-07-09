@@ -22,6 +22,7 @@
 .INCLUDE "ram.inc"
 .INCLUDE "song.inc"
 .INCLUDE "buildid.inc"      ; generated: .DEFINE BUILD_STAMP "..."
+.INCLUDE "logo.inc"          ; generated: LOGO_TW / LOGO_TH / LOGO_NTILES
 
 .BANK 0 SLOT 0
 .ORG $0000
@@ -268,7 +269,14 @@ draw_minimap:
 
 ; --- data ---------------------------------------------------------------------
 str_version:
-    .DB "V", VERSION, " ", BUILD_STAMP, 0
+    .DB "V", VERSION, 0
+str_stamp:
+    .DB BUILD_STAMP, 0
+
+; the tri-pixel wordmark (art/sndj-logo.png via makelogo.py)
+logo_data:
+    .INCBIN "logo.bin"
+logo_data_end:
 
 ; font, marker-wrapped so patcher.html can locate and replace it
     .DB "SNFONT"

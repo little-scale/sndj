@@ -27,11 +27,59 @@
 splash_init:
     stz ui_mode
     jsr text_clear
-    PUTS 13,  7, ATTR_ACCENT, str_title
-    PUTS  5,  9, ATTR_TEXT,   str_subtitle
-    PUTS  8, 11, ATTR_TEXT,   str_version
-    PUTS  2, 14, ATTR_DIM,    str_family
-    PUTS 10, 18, ATTR_ACCENT, str_start
+    ; the wordmark: LOGO_TW x LOGO_TH tiles (chr index 192+), centred
+    rep #$30
+.ACCU 16
+    lda #$0000
+    sta tmp2                ; tile counter
+    sep #$20
+.ACCU 8
+    stz tmp0 + 1            ; row
+@lrow:
+    stz tmp0                ; col
+@lcol:
+    ; shadow word offset = ((3 + row) * 32 + 5 + col) * 2
+    lda tmp0 + 1
+    clc
+    adc #3
+    rep #$30
+.ACCU 16
+    and #$00FF
+    xba
+    lsr
+    lsr
+    lsr                     ; * 32
+    sta tmp1
+    lda tmp0
+    and #$00FF
+    clc
+    adc #5
+    clc
+    adc tmp1
+    asl
+    tax
+    lda tmp2
+    clc
+    adc #192                ; logo tiles follow the two font sets
+    ora #ATTR_TEXT
+    sta.w SHADOW_BG3,x
+    inc tmp2
+    sep #$20
+.ACCU 8
+    inc tmp0
+    lda tmp0
+    cmp #LOGO_TW
+    bne @lcol
+    inc tmp0 + 1
+    lda tmp0 + 1
+    cmp #LOGO_TH
+    bne @lrow
+    ; full-width inverted band with the version (genmddj-style)
+    PUTS  0, 14, ATTR_ACCENT, str_band
+    PUTS 13, 14, ATTR_ACCENT, str_version
+    ; git stamp below, plain
+    PUTS 12, 16, ATTR_DIM,    str_stamp
+    PUTS 10, 20, ATTR_ACCENT, str_start
     PUTS  2, 24, ATTR_DIM,    str_pad
     rts
 
@@ -40,10 +88,10 @@ splash_update:
     lda frame_cnt
     and #$20
     beq @dimmed
-    PUTS 10, 18, ATTR_ACCENT, str_start
+    PUTS 10, 20, ATTR_ACCENT, str_start
     bra @pads
 @dimmed:
-    PUTS 10, 18, ATTR_DIM,    str_start
+    PUTS 10, 20, ATTR_DIM,    str_start
 @pads:
     ; pad echo: one glyph per button, accent when held
     lda #6
@@ -114,8 +162,6 @@ pad_glyphs:
     .DW PAD_R
     .DB 'R' - 32
 
-str_title:    .DB "SNDJ", 0
-str_subtitle: .DB "SNES/SFC MUSIC TRACKER", 0
-str_family:   .DB "SIBLING OF SMSGGDJ + GENMDDJ", 0
+str_band:     .DB "                                ", 0
 str_start:    .DB "PRESS START", 0
 str_pad:      .DB "PAD", 0

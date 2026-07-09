@@ -56,14 +56,10 @@ local function onFrame()
   if frames == 20 then
     check(wram(0x0001) == 0x5D, "magic_boot set (init completed)")
     fc_sample = wram16(0x0002)
-    local s = "SNDJ"
-    local ok = true
-    for i = 1, #s do
-      if cell(13 + i - 1, 7) ~= word(s:sub(i, i), ATTR_ACCENT) then
-        ok = false
-      end
-    end
-    check(ok, "splash title rendered in shadow map")
+    -- wordmark tile at the logo origin, inverted band at the version row
+    check(cell(5, 3) == (192 | 0x2000), "wordmark tiles in the shadow map")
+    check(cell(0, 14) == (96 | 0x2400), "inverted version band spans row 14")
+    check(cell(13, 14) == word("V", ATTR_ACCENT), "version sits in the band")
     check(wram(0x000C) == 0, "ui_mode is splash")
     pad = { start = true }
   elseif frames == 26 then

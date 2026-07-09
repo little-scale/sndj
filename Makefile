@@ -36,6 +36,9 @@ $(BUILD):
 $(BUILD)/font.bin: tools/makefont.py | $(BUILD)
 	python3 tools/makefont.py $@
 
+$(BUILD)/logo.bin $(BUILD)/logo.inc: tools/makelogo.py art/sndj-logo.png | $(BUILD)
+	python3 tools/makelogo.py $(BUILD)/logo.bin $(BUILD)/logo.inc
+
 $(BUILD)/schemes.bin $(BUILD)/tables.inc: tools/maketables.py | $(BUILD)
 	python3 tools/maketables.py $(BUILD)
 
@@ -50,7 +53,7 @@ $(BUILD)/driver.spc700.bin: $(BUILD)/driver.o
 	@printf '[objects]\n%s\n' "$(BUILD)/driver.o" > $(BUILD)/linkfile-apu
 	$(WLALINK) -S $(BUILD)/linkfile-apu $@
 
-$(BUILD)/main.o: $(SRCS) $(BUILD)/buildid.inc $(BUILD)/font.bin $(BUILD)/schemes.bin $(BUILD)/tables.inc $(BUILD)/pool.bin $(BUILD)/driver.spc700.bin
+$(BUILD)/main.o: $(SRCS) $(BUILD)/buildid.inc $(BUILD)/font.bin $(BUILD)/logo.bin $(BUILD)/logo.inc $(BUILD)/schemes.bin $(BUILD)/tables.inc $(BUILD)/pool.bin $(BUILD)/driver.spc700.bin
 	$(WLA65816) -I src -I $(BUILD) -o $@ src/main.asm
 
 $(BUILD)/linkfile: | $(BUILD)
@@ -82,9 +85,9 @@ shot: all
 	SNDJ_SHOT=$(abspath $(BUILD)/shot.png) "$(MESEN)" --testrunner $(abspath $(ROM)) $(abspath tools/shot.lua)
 	@echo "shot: $(BUILD)/shot.png"
 
-# splash comparison masks pixel rows 88-96 (the git-stamp text line)
+# splash comparison masks pixel rows 128-136 (the git-stamp text line)
 shot-diff: shot
-	@python3 tools/shotdiff.py $(BUILD)/shot.png tools/goldens/splash.png 88 96
+	@python3 tools/shotdiff.py $(BUILD)/shot.png tools/goldens/splash.png 128 136
 	@for g in phrase song instr wave live; do \
 	  if [ -f $(BUILD)/shot-$$g.png ]; then \
 	    python3 tools/shotdiff.py $(BUILD)/shot-$$g.png tools/goldens/$$g.png; \

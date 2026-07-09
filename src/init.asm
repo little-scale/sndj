@@ -207,6 +207,22 @@ init_video:
     lda #$01
     sta MDMAEN
 
+    ; wordmark tiles -> BG3 chr, right after the two font sets
+    ldx #(VRAM_BG3_CHR + 192 * 8)   ; 192 tiles x 16 bytes = $C00 words... 8 words/tile
+    stx VMADDL
+    lda #$01
+    sta DMAP0
+    lda #$18
+    sta BBAD0
+    ldx #logo_data
+    stx A1T0L
+    lda #:logo_data
+    sta A1B0
+    ldx #(logo_data_end - logo_data)
+    stx DAS0L
+    lda #$01
+    sta MDMAEN
+
     ; video mode: mode 1, BG3 priority, BG3 = text UI
     lda #$09
     sta BGMODE

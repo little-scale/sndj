@@ -2,6 +2,10 @@
 
 ## 0.1.0-dev (unreleased)
 
+- Boot splash carries the tri-pixel SNDJ wordmark (art/sndj-logo.png
+  via makelogo.py, drawn in the palette text colour) over a full-width
+  inverted version band and the git build stamp — the genmddj layout.
+
 - SF2 import in the browser: patcher.html takes .sf2 drops on any pool
   slot with a preset picker and melodic/one-shot modes — the exact
   factory pipeline (root-key bake, exact-loop resample, tune fields),
