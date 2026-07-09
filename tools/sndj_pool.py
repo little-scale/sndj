@@ -161,25 +161,38 @@ def sf2_samples(path):
 # ---------------------------------------------------------------- factory set
 DRUM_KITS = [('01 808', '808'), ('02 909', '909')]
 DRUM_MS = {'BD': 200, 'SD': 170, 'CP': 170, 'CY': 195, 'HO': 160}  # else 112
-SF2_PICKS = 8               # first N loopable melodic samples by size
+SF2_FONT = 'mario_paint'    # melodics come from this font (drums stay Seb's)
+SF2_PICKS = [               # (preset name, 8-char pool name)
+    ('Acoustic Guitar', 'AC GUITR'),
+    ('Acoustic Bass',   'AC BASS'),
+    ('Square',          'SQUARE'),
+    ('Organ 1',         'ORGAN1'),
+    ('Trumpet',         'TRUMPET'),
+    ('Synth Strings',   'STRINGS'),
+    ('Vibraphone',      'VIBES'),
+    ('Recorder',        'RECORDER'),
+]
 
 
 def build_factory():
     entries = []            # (name, samples, loop_block or None)
-    # melodics from the SSF2 font: 32 kHz native, looped, mid-sized
+    # melodics from the SF2_FONT soundfont, picked by preset name
     sf2_path = None
     sf_dir = os.path.join(ROOT, 'soundfonts')
     if os.path.isdir(sf_dir):
         for f in sorted(os.listdir(sf_dir)):
-            if 'street_fighter' in f.lower() and f.lower().endswith('.sf2'):
+            if SF2_FONT in f.lower() and f.lower().endswith('.sf2'):
                 sf2_path = os.path.join(sf_dir, f)
                 break
     if sf2_path:
-        cands = [s for s in sf2_samples(sf2_path)
-                 if s['loop'] and 1000 <= len(s['pcm']) <= 12000]
-        cands.sort(key=lambda s: len(s['pcm']))
-        step = max(1, len(cands) // SF2_PICKS)
-        for k, s in enumerate(cands[::step][:SF2_PICKS]):
+        allsmp = sf2_samples(sf2_path)
+        picks = []
+        for preset, short in SF2_PICKS:
+            hit = next((s for s in allsmp
+                        if s['loop'] and s.get('preset') == preset), None)
+            if hit:
+                picks.append((hit, short))
+        for k, (s, short) in enumerate(picks):
             # bake the SF2 root key/correction into the resample: after
             # this, playing DSP pitch $1000 sounds engine note 61, so the
             # tracker keyboard is in tune
@@ -213,9 +226,7 @@ def build_factory():
             cents = 1200 * math.log2(factor / ideal)
             semis = int(round(cents / 100))
             fine = max(-128, min(127, int(round((cents - semis * 100) * 2.56))))
-            pname = (s.get('preset') or f'SF2 {k:02d}')
-            pname = pname.upper().replace(' ', '')[:8]
-            entries.append((pname, pcm, loop_block, semis, fine))
+            entries.append((short, pcm, loop_block, semis, fine))
     # two drum kits, 16 slots each, drum-machine order preserved
     for folder, tag in DRUM_KITS:
         d = os.path.join(ROOT, 'samples', folder)
