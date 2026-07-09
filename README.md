@@ -1,5 +1,7 @@
 # sndj
 
+<p align="center"><img src="art/sndj-logo.png" alt="sndj"></p>
+
 An LSDJ-inspired music tracker for the **Super Nintendo / Super Famicom**,
 written in 65816 + SPC700 assembly. The third sibling of
 [smsggdj](https://github.com/little-scale/smsggdj) (SMS/Game Gear) and

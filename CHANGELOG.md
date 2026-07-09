@@ -1,5 +1,8 @@
 # Changelog
 
+All notable changes to sndj. First release will be **v0.1**; versions
+increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
+
 ## 0.1.0-dev (unreleased)
 
 - SNDJ1 v2 saves: genmddj-style variable packing — a 16-entry
