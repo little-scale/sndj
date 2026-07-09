@@ -91,22 +91,57 @@ def prep_oneshot(samples, rate, max_ms):
 # ---------------------------------------------------------------- SF2 reader
 def sf2_samples(path):
     data = open(path, 'rb').read()
-    smpl = shdr = None
+    chunks = {}
 
     def walk(pos, end):
-        nonlocal smpl, shdr
         while pos < end - 8:
             cid = data[pos:pos + 4]
             size = struct.unpack('<I', data[pos + 4:pos + 8])[0]
             body = pos + 8
             if cid == b'LIST':
                 walk(body + 4, body + size)
-            elif cid == b'smpl':
-                smpl = body
-            elif cid == b'shdr':
-                shdr = (body, size)
+            else:
+                chunks[cid.decode('latin1')] = (body, size)
             pos = body + size + (size & 1)
     walk(12, len(data))
+    smpl = chunks['smpl'][0]
+    shdr = chunks['shdr']
+
+    # resolve which PRESET owns each sample (phdr -> pbag -> pgen 41 ->
+    # inst -> ibag -> igen 53) so pool entries carry musical names
+    def recs(name, sz):
+        if name not in chunks:
+            return []
+        b, s = chunks[name]
+        return [data[b + i * sz:b + (i + 1) * sz] for i in range(s // sz)]
+    phdr, pbag, pgen = recs('phdr', 38), recs('pbag', 4), recs('pgen', 4)
+    inst, ibag, igen = recs('inst', 22), recs('ibag', 4), recs('igen', 4)
+    inst_samples = {}
+    for i in range(len(inst) - 1):
+        b0 = struct.unpack('<H', inst[i][20:22])[0]
+        b1 = struct.unpack('<H', inst[i + 1][20:22])[0]
+        sids = set()
+        for bg in range(b0, b1):
+            g0 = struct.unpack('<H', ibag[bg][:2])[0]
+            g1 = struct.unpack('<H', ibag[bg + 1][:2])[0]
+            for g in range(g0, g1):
+                op, amt = struct.unpack('<HH', igen[g])
+                if op == 53:
+                    sids.add(amt)
+        inst_samples[i] = sids
+    preset_of = {}
+    for pi in range(len(phdr) - 1):
+        pname = phdr[pi][:20].split(b'\0')[0].decode('latin1')
+        b0 = struct.unpack('<H', phdr[pi][24:26])[0]
+        b1 = struct.unpack('<H', phdr[pi + 1][24:26])[0]
+        for bg in range(b0, b1):
+            g0 = struct.unpack('<H', pbag[bg][:2])[0]
+            g1 = struct.unpack('<H', pbag[bg + 1][:2])[0]
+            for g in range(g0, g1):
+                op, amt = struct.unpack('<HH', pgen[g])
+                if op == 41:
+                    for sid in inst_samples.get(amt, ()):
+                        preset_of.setdefault(sid, pname)
     out = []
     for i in range(shdr[1] // 46 - 1):
         r = shdr[0] + i * 46
@@ -118,7 +153,8 @@ def sf2_samples(path):
                             data[smpl + start * 2:smpl + end * 2])
         loop = (ls - start, le - start) if le > ls >= start else None
         out.append({'name': name, 'pcm': list(pcm), 'rate': rate, 'loop': loop,
-                    'root': root, 'corr': corr})
+                    'root': root, 'corr': corr,
+                    'preset': preset_of.get(i)})
     return out
 
 
@@ -146,24 +182,40 @@ def build_factory():
         for k, s in enumerate(cands[::step][:SF2_PICKS]):
             # bake the SF2 root key/correction into the resample: after
             # this, playing DSP pitch $1000 sounds engine note 61, so the
-            # tracker keyboard is in tune with no runtime tune fields
+            # tracker keyboard is in tune
             root_eff = (s.get('root', 60) or 60) - s.get('corr', 0) / 100.0
             if not 24 <= root_eff <= 108:
                 root_eff = 60
             shift = 61 - root_eff            # semitones the data must move
-            dst = 32000 * 2 ** (-shift / 12)
-            pcm = resample(s['pcm'], s['rate'], dst)
-            scale = dst / s['rate']
-            loop_start = int(s['loop'][0] * scale)
-            loop_end = int(s['loop'][1] * scale)
-            loop_block = (loop_start // 16 * 16) // 16
-            # looped playback never reads past the loop end: truncate there
-            # (rounded up to a BRR block) to keep the resident set small
-            pcm = pcm[:min(len(pcm), (loop_end + 15) // 16 * 16)]
-            pcm = pcm[:len(pcm) // 16 * 16]
-            if loop_block * 16 >= len(pcm):
-                loop_block = 0
-            entries.append((f'SF2 {k:02d}', pcm, loop_block))
+            scale = 2 ** (-shift / 12)       # ideal resample factor vs 32 kHz
+            ideal = scale * 32000 / s['rate']
+            # BRR loops live on 16-sample boundaries. Snapping a loop that
+            # isn't a block multiple retunes the LOOPED section against the
+            # attack (audible pitch step at loop entry). So resample the
+            # whole sample such that the loop length lands EXACTLY on a
+            # block multiple, and push the tiny tuning residual into the
+            # entry's runtime tune fields.
+            ls, le = s['loop']
+            loop_len = le - ls
+            target = max(16, round(loop_len * ideal / 16) * 16)
+            factor = target / loop_len       # exact factor actually applied
+            pcm = resample(s['pcm'], s['rate'], s['rate'] * factor)
+            ls_out = round(ls * factor)
+            trim = ls_out % 16               # align the loop start by
+            pcm = pcm[trim:]                 # shaving the sample head
+            ls_out -= trim
+            end = ls_out + target
+            while len(pcm) < end:            # rounding shortfall: extend
+                pcm.append(pcm[len(pcm) - target])   # seamlessly from the loop
+            pcm = pcm[:end]
+            loop_block = ls_out // 16
+            # runtime tune compensation for the loop-quantise stretch
+            cents = 1200 * math.log2(factor / ideal)
+            semis = int(round(cents / 100))
+            fine = max(-128, min(127, int(round((cents - semis * 100) * 2.56))))
+            pname = (s.get('preset') or f'SF2 {k:02d}')
+            pname = pname.upper().replace(' ', '')[:8]
+            entries.append((pname, pcm, loop_block, semis, fine))
     # two drum kits, 16 slots each, drum-machine order preserved
     for folder, tag in DRUM_KITS:
         d = os.path.join(ROOT, 'samples', folder)

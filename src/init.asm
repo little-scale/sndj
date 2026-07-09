@@ -217,18 +217,6 @@ init_video:
     lda #$04                ; BG3 only for now
     sta TM
 
-    ; HDMA channel 7: backdrop gradient (mode 3 -> $2121), table in WRAM
-    ; so palette_apply can regenerate it at run time
-    lda #$03
-    sta DMAP7
-    lda #$21
-    sta BBAD7
-    ldx #GRAD_TAB
-    stx A1T7L
-    lda #$7E
-    sta A1B7
-    lda #$80
-    sta HDMAEN
     rts
 
 zero_byte: .DB $00

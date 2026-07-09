@@ -8,10 +8,16 @@
   insert, as before).
 - SONG/CHAIN/PHRASE grids sit four rows lower (headers at row 7,
   grids at row 8) and PHRASE cells line up under the NOTE/IN/CMD ruler.
-- Palette schemes: 8 factory palettes (snesdj house style + the
-  genmddj set), selectable on the new OPTIONS screen (A+Up from SONG),
-  applied instantly (CGRAM + HDMA gradient rebuilt at run time) and
-  persisted in SRAM; marker-wrapped SNPAL0 block for patching.
+- Palette schemes: the genmddj 8 (BLK default, WHT, KIDD, AMBR, CYAN,
+  PINK, NEON, MINT), selectable on the new OPTIONS screen (A+Up from
+  SONG), applied instantly, persisted in SRAM; solid backdrop; marker-
+  wrapped SNPAL0 block for patching.
+- Fixed the SMP pitch step at loop entry: looped SF2 samples now
+  resample so the loop is an exact BRR-block multiple (the old
+  block-snapping retuned the looped section against the attack by up
+  to ~2 semitones); the small stretch residual rides the pool entry's
+  tune fields. Pool entries are named after their SF2 presets
+  (FLUTE2, STEELGUI, SLAPBASS, SHAMISEN, TRUMPET, ...).
 - Right-column chrome moved to the top right, smsggdj-style: 16-bit
   tick counter (APU? on fault), PLAY/STOP, then the mini map with the
   sibling letters (PHRASE = P, FIR = F); MIDI and LIVE left the map.

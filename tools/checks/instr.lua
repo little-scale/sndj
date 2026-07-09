@@ -86,6 +86,9 @@ emu.addEventCallback(function()
     check(wram(0x4301) == 0, "phrase row 0 instrument = 00")
     check(wram(0x2402) == 0x2F and wram(0x2403) == 0xCA,
       "factory instrument ADSR present")
+    -- exact-pitch asserts below need a zero-tune sample (factory melodics
+    -- carry loop-quantise tune corrections now)
+    emu.write(0x2401, 8, emu.memType.snesWorkRam)
   elseif frames == shot_at then
     local out = os.getenv("SNESDJ_INSTR_SHOT")
     if out then
@@ -101,6 +104,9 @@ emu.addEventCallback(function()
     check(wram(0x240A) == 7, "OFS2 = 7 semitones")
   elseif frames == at_phrase + 2 then
     check(wram(0x000C) == 1, "back on PHRASE")
+  elseif frames == playing - 6 then
+    check(dsp(0x08) > 0 and dsp(0x18) > 0 and dsp(0x28) > 0,
+      "three envelopes alive")
   elseif frames == playing then
     check(wram(0x0016) == 1, "playing")
     check(dsp(0x4C) & 0x07 == 0x07, "KON hit voices 0+1+2 ($" ..
@@ -111,10 +117,8 @@ emu.addEventCallback(function()
     check(p0 == 0x0800, "voice 0 = C-4 ($" .. string.format("%04X", p0) .. ")")
     check(p1 == 0x0A14, "voice 1 = E-4 ($" .. string.format("%04X", p1) .. ")")
     check(p2 == 0x0BFC, "voice 2 = G-4 ($" .. string.format("%04X", p2) .. ")")
-    check(dsp(0x08) > 0 and dsp(0x18) > 0 and dsp(0x28) > 0,
-      "three envelopes alive")
-    check(dsp(0x04) == 1 and dsp(0x14) == 1 and dsp(0x24) == 1,
-      "GRP members use the resident sample (SRCN 1)")
+    check(dsp(0x04) == 9 and dsp(0x14) == 9 and dsp(0x24) == 9,
+      "GRP members use the resident sample (SRCN 9 = 808 BD)")
   elseif frames == done then
     if fails == 0 then
       print("ALL PASS instr.lua")

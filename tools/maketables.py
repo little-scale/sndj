@@ -5,7 +5,8 @@ Emits into the build directory:
   schemes.bin  — 8 palette schemes x 16 bytes (marker-wrapped SNPAL0 in ROM;
                  the engine builds CGRAM + the HDMA gradient from these at
                  apply time). Per scheme, little-endian 15-bit BGR words:
-                 bg, text, dim, accent, hilite, grad top, grad bottom, pad.
+                 bg, text, dim, accent, hilite, then padding (solid
+                 backdrop — no gradient).
 
 Scheme 0 is the snesdj house style; 1-7 follow genmddj's palette set
 (BLK / WHT / KIDD / AMBR / CYAN / PINK / MINT) so the family reads the
@@ -24,18 +25,16 @@ def bgr15(r, g, b):
 # bottom. Scheme 0 is the house style; 1-7 mirror genmddj (its MD nibble
 # levels mapped through the MD DAC ramp to 8-bit).
 
-def _lerp(a, b, t):
-    return tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(3))
-
 SCHEMES = [
+    # genmddj's 8 schemes, same order/indices (MD DAC levels -> 8-bit)
     # name   bg            text            dim            accent         hilite
-    ('SNES', (16, 18, 40), (222, 226, 232), (96, 104, 136), (255, 176, 32), (64, 208, 200)),
     ('BLK ', (0, 0, 0),    (255, 255, 255), (116, 116, 116), (255, 176, 32), (64, 208, 200)),
     ('WHT ', (255, 255, 255), (0, 0, 0),    (136, 136, 136), (206, 87, 0),  (0, 116, 144)),
     ('KIDD', (0, 87, 206), (255, 255, 0),   (144, 172, 240), (255, 255, 255), (144, 255, 230)),
     ('AMBR', (52, 0, 0),   (255, 172, 0),   (144, 87, 20),  (255, 255, 116), (255, 116, 52)),
     ('CYAN', (0, 0, 87),   (0, 255, 255),   (52, 116, 144), (255, 255, 255), (116, 255, 200)),
     ('PINK', (87, 0, 87),  (255, 0, 255),   (150, 87, 150), (255, 206, 226), (255, 144, 255)),
+    ('NEON', (87, 172, 255), (255, 0, 172), (130, 140, 200), (255, 255, 255), (255, 230, 87)),
     ('MINT', (0, 87, 87),  (87, 255, 172),  (52, 144, 120), (255, 255, 160), (255, 180, 87)),
 ]
 
@@ -43,12 +42,10 @@ SCHEMES = [
 def schemes_bin():
     out = bytearray()
     for name, bg, text, dim, accent, hilite in SCHEMES:
-        gtop = _lerp(bg, (0, 0, 0), 0.35)
-        gbot = _lerp(bg, text, 0.18)
-        for c in (bg, text, dim, accent, hilite, gtop, gbot):
+        for c in (bg, text, dim, accent, hilite):
             w = bgr15(*c)
             out += bytes((w & 0xFF, w >> 8))
-        out += bytes(2)  # pad to 16
+        out += bytes(6)  # pad to 16
     return bytes(out)
 
 

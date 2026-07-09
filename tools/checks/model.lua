@@ -82,12 +82,18 @@ emu.addEventCallback(function()
     check(wram(0x0018) == 1, "editing phrase 01")
     check(wram(0x3720) == 1, "chain 01 entry0 -> phrase 01")
     check(wram(0x3721) == 12, "chain 01 entry0 transpose +12")
+  elseif frames == 194 then
+    -- zero-tune sample for the exact pitch asserts (factory melodics
+    -- carry loop-quantise tune corrections)
+    emu.write(0x2401, 8, emu.memType.snesWorkRam)
   elseif frames == 192 then
     check(wram(0x000C) == 3, "A+Left climbed back to SONG")
     check(wram(0x3700) == 0, "chain 00 entry0 -> phrase 00")
     check(wram(0x3701) == 0, "chain 00 entry0 transpose 0")
     check(wram(0x4300) == 49, "phrase 00 row0 = C-4")
     check(wram(0x4340) == 49, "phrase 01 row0 = C-4")
+  elseif frames == 204 then
+    check(dsp(0x08) > 0 and dsp(0x18) > 0, "both envelopes alive")
   elseif frames == 212 then
     check(wram(0x0016) == 1, "song playing")
     check(wram(0x0020) == 0 and wram(0x0021) == 1, "tracks loaded chains 00/01")
@@ -97,7 +103,6 @@ emu.addEventCallback(function()
     check(p0 == 0x0800, "voice 0 pitch C-4 ($" .. string.format("%04X", p0) .. ")")
     check(p1 == 0x1000, "voice 1 pitch C-5 via +12 transpose ($" ..
       string.format("%04X", p1) .. ")")
-    check(dsp(0x08) > 0 and dsp(0x18) > 0, "both envelopes alive")
   elseif frames == 228 then
     check(wram(0x0016) == 0, "stopped")
     local out = os.getenv("SNESDJ_SONG_SHOT")

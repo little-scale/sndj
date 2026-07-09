@@ -1,7 +1,7 @@
 -- palette.lua — palette schemes: OPTIONS reachable with A+Up from SONG,
--- B-hold + Right cycles to scheme 1 (BLK: white text $7FFF on black bg),
+-- B-hold + Right cycles to scheme 1 (WHT: black text on white bg $7FFF),
 -- the choice lands in CGRAM via the NMI drain, persists in SRAM $0007,
--- and survives a reset.
+-- and survives a reset. Scheme 0 (boot default) is BLK.
 --
 -- WRAM: ui_mode $0C, opt_pal $1D4, pal_buf $1D6 (colour n at +n*2).
 
@@ -74,10 +74,10 @@ emu.addEventCallback(function()
     pad = {}
     stage = "applied"
   elseif stage == "applied" and frames == 52 then
-    check(wram(0x1D4) == 1, "B+Right selected scheme 1 (BLK)")
-    check(palbuf(0) == 0x0000 and palbuf(2) == 0x7FFF,
-      "pal_buf holds black bg / white text")
-    check(cgram(2) == 0x7FFF, "NMI drained the scheme into CGRAM")
+    check(wram(0x1D4) == 1, "B+Right selected scheme 1 (WHT)")
+    check(palbuf(0) == 0x7FFF and palbuf(2) == 0x0000,
+      "pal_buf holds white bg / black text")
+    check(cgram(6) == 0x0159, "NMI drained the scheme into CGRAM (accent)")
     check(sram(0x0007) == 1, "scheme persisted in SRAM $0007")
     emu.reset()
     _booted = false
@@ -85,7 +85,7 @@ emu.addEventCallback(function()
     frames = 0
   elseif stage == "reboot" and frames == 30 then
     check(wram(0x1D4) == 1, "scheme 1 restored from SRAM after reset")
-    check(cgram(2) == 0x7FFF, "CGRAM rebuilt from the persisted scheme")
+    check(cgram(6) == 0x0159, "CGRAM rebuilt from the persisted scheme")
     if fails == 0 then
       print("ALL PASS palette.lua")
       emu.stop(0)
