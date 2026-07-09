@@ -264,8 +264,13 @@ function renderSf2() {
     const hdr = t.insertRow();
     const hc = hdr.insertCell();
     hc.colSpan = 4;
-    hc.innerHTML = '<b>' + font.name + '</b>';
+    hc.innerHTML = '<b>' + (font.collapsed ? '\u25B8' : '\u25BE') + ' ' +
+      font.name + '</b>' + (font.collapsed ?
+        ' <span class="hint">(' + font.samples.length + ' samples)</span>' : '');
     hc.style.color = '#ffb020';
+    hc.style.cursor = 'pointer';
+    hc.title = font.collapsed ? 'expand' : 'collapse';
+    hc.onclick = () => { font.collapsed = !font.collapsed; renderSf2(); };
     const off = document.createElement('button');
     off.textContent = '×';
     off.title = 'unload this soundfont';
@@ -275,6 +280,7 @@ function renderSf2() {
       renderSf2();
     };
     hdr.insertCell().appendChild(off);
+    if (font.collapsed) return;
     font.samples.forEach((s, i) => {
       const row = t.insertRow();
       const label = s.preset ? s.preset + ' — ' + s.name : s.name;
