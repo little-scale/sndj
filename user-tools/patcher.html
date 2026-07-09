@@ -15,7 +15,7 @@
   .drop.small { padding: 1rem; }
   .drop.armed { border-color: #40d0c8; color: #40d0c8; }
   .cols { display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap; }
-  .cols > div { flex: 1; min-width: 320px; }
+  .cols > div { flex: 1 1 0; min-width: min(100%, 340px); }
   table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
   td, th { padding: .4rem .6rem; text-align: left;
            border-bottom: 1px solid #2a2e48; }
@@ -50,10 +50,10 @@ WAVs or straight from an <code>.sf2</code> soundfont (same in-tune
 pipeline the factory pool uses: root keys baked, loops landed on BRR
 blocks), audition the decoded BRR, recolour the 8 palette schemes, and
 export a patched ROM. Everything runs locally.</p>
-<div class="drop" id="drop">drop sndj.sfc here (or click)</div>
 <div id="status"></div>
 <div class="cols">
 <div>
+<div class="drop small" id="drop">drop sndj.sfc here (or click)</div>
 <div id="poolview" hidden>
   <div class="bar"><div id="budget" style="width:0"></div></div>
   <p id="budgettext"></p>
