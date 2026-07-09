@@ -11,11 +11,7 @@
 .ACCU 8
 .INDEX 16
 
-factory_kit_base: .DB 16, 26, 38
-factory_kit_len:  .DB 10, 12, 10
 str_defname: .DB "SONG    "
-factory_instr_type: .DB 0, 0, 0, 0, 0, 2, 3, 1
-factory_instr_smp:  .DB 0, 1, 2, 3, 4, 0, 0, 0
 
 ; command letter ids (1 = A ... 26 = Z)
 .DEFINE CMDID_A 1

@@ -2,6 +2,12 @@
 
 ## 0.1.0-dev (unreleased)
 
+- patcher.html gains a palette editor (8 schemes x 5 colours, snapped
+  to 15-bit BGR) alongside the sample pool; factory defaults (track
+  instruments + kit layout) are marker-wrapped as SNDEF0 so tools can
+  re-voice a built ROM. Verified end to end: a ROM patched purely via
+  markers boots with the patched colours and defaults.
+
 - Tuning fixes by ear: SW SLAP +1 semitone, MP RECRD +2 (per-pick trim
   field in the pool builder for wrong font root keys).
 - The ECHO screen's EDL edit now clamps to the ARAM actually free

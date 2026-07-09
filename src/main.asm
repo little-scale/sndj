@@ -278,8 +278,17 @@ font_data_end:
 pal_schemes:
     .INCBIN "schemes.bin"
 
+; factory defaults (track instruments + kit layout), marker-wrapped so
+; browser tools can re-voice a built ROM without a toolchain:
+; 8 track instrument types, 8 track samples/banks/kits,
+; 3 kit pool bases, 3 kit slot counts
+    .DB "SNDEF0"
+factory_instr_type: .DB 0, 0, 0, 0, 0, 2, 3, 1
+factory_instr_smp:  .DB 0, 1, 2, 3, 4, 0, 0, 0
+factory_kit_base:   .DB 16, 26, 38
+factory_kit_len:    .DB 10, 12, 10
+
 ; 8 factory FIR curves x 8 taps, marker-wrapped so firdesign.html patches
-; the ROM instead of rebuilding it
     .DB "SNFIR0"
 fir_presets:
     .DB $7F, $00, $00, $00, $00, $00, $00, $00   ; 0 FLAT (pass-through)
