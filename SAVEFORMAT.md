@@ -25,7 +25,9 @@ phrase growth moves nothing else. Save/load is a straight copy.
 Instrument record (16 bytes): type, sample, ADSR1 (low 7 bits), ADSR2,
 vol L, vol R, fine-tune (signed 1/256 semitone, interpolated between
 pitch-table entries), flags (bit 0 = EON echo send), GRP span,
-GRP offsets x3, reserved x4.
+GRP offsets x3, TABLE (byte 12, >= 32 = none), TBS (byte 13, ticks per
+table row, 0 = note-sync), VIB (byte 14, vibrato speed/depth nibbles),
+TRM (byte 15, tremolo speed/depth nibbles).
 
 Cell conventions: note 0 = empty, 1-96 = C-0..B-7, 97 = OFF; instrument
 $FF = none; command 0 = none, 1-26 = A-Z.

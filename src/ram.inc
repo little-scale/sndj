@@ -218,6 +218,10 @@ sv_mlen      dw      ; compaction: bytes left to move
 aud_note     db      ; chord audition: root note index (0-based)
 aud_instr    db      ; chord audition: resolved instrument ($FF = none)
 aud_chord    db      ; chord audition: C-command x/y nibbles
+trk_vib      ds 8    ; live vibrato speed/depth (instr VIB at trigger; V overrides)
+trk_trm      ds 8    ; live tremolo speed/depth (instr TRM at trigger)
+trk_trm_ph   ds 8    ; tremolo phase
+tg_vibtrm    dw      ; trigger scratch: instr VIB/TRM bytes (es3 is the tick loop's)
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

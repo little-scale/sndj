@@ -5,6 +5,12 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- Instruments gained **VIB** and **TRM** (smsggdj-style): vibrato and
+  tremolo as instrument settings, speed·depth nibbles each. VIB is the
+  familiar triangle pitch wobble on every note; TRM dips VOL L/R below
+  the set level (down only, so it composes with the hardware ADSR).
+  The `V` command now *overrides* the instrument's VIB for one note
+  (`V00` = straight), and works from tables too (it was inert there).
 - PHRASE: tapping B on a `C` chord command auditions the chord (root
   + both offset voices) through the row's note and instrument. Command
   cells now only accept a B-tap insert while empty (the genmddj rule),

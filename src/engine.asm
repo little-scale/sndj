@@ -514,6 +514,9 @@ engine_go:
     sta.w trk_sl_rate,x
     sta.w trk_arp_ph,x
     sta.w trk_vib_ph,x
+    sta.w trk_vib,x
+    sta.w trk_trm,x
+    sta.w trk_trm_ph,x
     sta.w trk_fine,x
     sta.w trk_chord,x
     sta.w trk_playcnt,x
@@ -876,7 +879,9 @@ track_trigger_note:
     ; TBS n = a row every n ticks from the top
     lda trig_id
     cmp #INSTR_NONE
-    beq @no_tbl
+    bne @have_id
+    jmp @no_tbl
+@have_id:
     phx
     rep #$30
 .ACCU 16
@@ -893,7 +898,20 @@ track_trigger_note:
     sta es2                 ; TBS
     lda.l $7E0000 + SB_INSTR + 12,x
     sta es2 + 1             ; TBL
+    lda.l $7E0000 + SB_INSTR + 14,x
+    sta tg_vibtrm           ; VIB
+    lda.l $7E0000 + SB_INSTR + 15,x
+    sta tg_vibtrm + 1       ; TRM
     plx
+    ; the instrument's VIB/TRM seed this note's LFOs (a row V overrides
+    ; vibrato after the trigger, for this note only)
+    lda tg_vibtrm
+    sta.w trk_vib,x
+    lda tg_vibtrm + 1
+    sta.w trk_trm,x
+    lda #$00
+    sta.w trk_vib_ph,x
+    sta.w trk_trm_ph,x
     lda es2 + 1
     cmp #$20
     bcc @tbl_on
@@ -997,9 +1015,16 @@ track_trigger_note:
     sta kon_mask
     jmp grp_fanout
 
-; --- post-trigger commands (X = track): P overrides the instrument volume ------
+; --- post-trigger commands (X = track): P overrides the instrument volume,
+; V overrides the instrument VIB (both last until the next trigger) -------------
 row_cmd_post:
     lda.w trk_cmd,x
+    cmp #CMDID_V
+    bne @not_v
+    lda.w trk_cval,x
+    sta.w trk_vib,x
+    rts
+@not_v:
     cmp #CMDID_P
     beq @pan
     rts
@@ -1945,15 +1970,22 @@ track_fx:
     beq @no_slide
     jsr fx_slide
 @no_slide:
-    ; A / V retune the voice every tick
+    ; A retunes per tick and owns the pitch for its row; otherwise the
+    ; track vibrato (instrument VIB, V-overridable) rides the base pitch
     lda.w trk_cmd,x
     cmp #CMDID_A
     bne @not_arp
-    jmp fx_arp
+    jsr fx_arp
+    bra @pitch_done
 @not_arp:
-    cmp #CMDID_V
-    bne @fx_done
-    jmp fx_vib
+    lda.w trk_vib,x
+    beq @pitch_done
+    jsr fx_vib
+@pitch_done:
+    ; tremolo (instrument TRM) dips the volume below the set level
+    lda.w trk_trm,x
+    beq @fx_done
+    jsr fx_trm
 @fx_done:
     rts
 
@@ -2068,12 +2100,13 @@ fx_arp:
     plx
     rts
 
-; --- V xy: triangle vibrato around the base pitch (speed x, depth y) -----------
+; --- trk_vib xy: triangle vibrato around the base pitch (speed x, depth y) -----
+; Seeded from the instrument's VIB at trigger; a row V command overrides.
 fx_vib:
     txa
     sta trig_voice
     ; phase += speed
-    lda.w trk_cval,x
+    lda.w trk_vib,x
     lsr
     lsr
     lsr
@@ -2096,7 +2129,7 @@ fx_vib:
     inc a
 @pos:
     sta es0 + 1             ; magnitude
-    lda.w trk_cval,x
+    lda.w trk_vib,x
     and #$0F
     sta es1 + 1             ; depth counter
     stz es1
@@ -2139,5 +2172,100 @@ fx_vib:
 .ACCU 8
     phx
     jsr voice_pitch_write
+    plx
+    rts
+
+; --- trk_trm xy: triangle tremolo below the instrument volume ------------------
+; Seeded from the instrument's TRM at trigger. One dip per cycle (0..15
+; fold), dip = tri * depth / 2 (0..112), subtracted from the record's
+; VOL L/R and clamped at zero — the level only ever moves down, so it
+; composes with the hardware envelope. Preserves X.
+fx_trm:
+    ; phase += speed
+    lda.w trk_trm,x
+    lsr
+    lsr
+    lsr
+    lsr
+    clc
+    adc.w trk_trm_ph,x
+    sta.w trk_trm_ph,x
+    ; one-sided triangle 0..15
+    and #$1F
+    cmp #$10
+    bcc @rising
+    eor #$1F                ; falling half: 31-t
+@rising:
+    sta es0                 ; tri 0..15
+    lda.w trk_trm,x
+    and #$0F
+    sta es1 + 1             ; depth counter
+    stz es1
+    lda es1 + 1
+    beq @dip_have
+@mul:
+    lda es1
+    clc
+    adc es0
+    sta es1                 ; tri * depth, max 225
+    dec es1 + 1
+    bne @mul
+@dip_have:
+    lsr es1                 ; dip 0..112
+    ; volumes from the instrument record (VIB/TRM require an instrument)
+    lda.w trk_instr,x
+    cmp #INSTR_NONE
+    bne @have_instr
+    rts
+@have_instr:
+    phx
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR + 4,x  ; VOL L
+    sta es0
+    lda.l $7E0000 + SB_INSTR + 5,x  ; VOL R
+    plx
+    sta es0 + 1
+    ; L
+    lda es0
+    sec
+    sbc es1
+    bcs @l_ok
+    lda #$00
+@l_ok:
+    tay
+    txa
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0VOLL
+    phx
+    jsr apu_dsp_write
+    plx
+    ; R
+    lda es0 + 1
+    sec
+    sbc es1
+    bcs @r_ok
+    lda #$00
+@r_ok:
+    tay
+    txa
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0VOLR
+    phx
+    jsr apu_dsp_write
     plx
     rts

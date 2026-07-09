@@ -197,6 +197,13 @@ Mario Paint drums, the MP toybox).
 - **GRP** — chord span: the instrument drives 1 or 2 extra voices to
   its right with per-member semitone offsets. A pad track that plays
   full triads from one phrase column.
+- **VIB** — vibrato, two nibbles **speed**·**depth** (`00` = none): a
+  triangle pitch wobble that runs on every note this instrument
+  plays. The `V` command overrides it for one note (`V00` = hold that
+  note straight); the next plain note reloads the instrument's value.
+- **TRM** — tremolo, same **speed**·**depth** nibbles: dips the
+  volume below the set VOL L/R level (only ever downward, so it
+  rides on top of the hardware envelope).
 - **TBL / TBS** — attach a table (`--` = none) and set its clock:
   TBS `1`–`F` runs a table row every n ticks; TBS `0` is *note-sync*
   — each new note advances the table one row (great for cycling
@@ -253,7 +260,7 @@ Values are hex (`xy` = two nibbles).
 | `S xy` | sweep | pitch sweep up at rate x or down at rate y |
 | `T xy` | tempo | set BPM (hex; `96` = 150) |
 | `U xy` | surround | invert L (x≠0) / R (y≠0) phase for width |
-| `V xy` | vibrato | triangle vibrato, speed x, depth y |
+| `V xy` | vibrato | override the instrument's VIB for this note: speed x, depth y (`V00` = off) |
 | `X 0x` | echo send | this voice into the room: `X01` on, `X00` off |
 | `Y 0x` | FIR preset | switch the echo filter curve (global) |
 | `Z 0x` | pitch-mod | enable (`Z01`) / disable modulation by the left voice |
