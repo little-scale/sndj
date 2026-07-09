@@ -78,7 +78,7 @@ chain_update:
     beq @no_start
     jsr engine_toggle
 @no_start:
-    ; A held + B: play this chain from the cursor entry (genmddj C+B)
+    ; A held + B: play this chain from its top
     lda a_down
     beq @no_ab
     rep #$20
@@ -93,13 +93,7 @@ chain_update:
     jsr engine_stop         ; A+B while playing = stop, on every screen
     bra @ab_used
 @ab_play:
-    jsr engine_play_chain
-    lda chain_cy
-    sta trk_cpos
-    ldx #$0000
-    jsr track_load_chain_entry
-    lda #$FF
-    sta trk_prow
+    jsr engine_play_chain   ; from the top of the chain
 @ab_used:
     lda #$01
     sta a_used

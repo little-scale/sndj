@@ -80,7 +80,6 @@ splash_init:
     ; git stamp below, plain
     PUTS 12, 16, ATTR_DIM,    str_stamp
     PUTS 10, 20, ATTR_ACCENT, str_start
-    PUTS  2, 24, ATTR_DIM,    str_pad
     rts
 
 splash_update:
@@ -93,36 +92,6 @@ splash_update:
 @dimmed:
     PUTS 10, 20, ATTR_DIM,    str_start
 @pads:
-    ; pad echo: one glyph per button, accent when held
-    lda #6
-    sta text_x
-    lda #24
-    sta text_y
-    ldx #$0000
-@padloop:
-    phx
-    rep #$20
-.ACCU 16
-    lda.w pad_glyphs,x
-    and pad_held
-    bne @held
-    lda #ATTR_DIM
-    bra @setattr
-@held:
-    lda #ATTR_ACCENT
-@setattr:
-    sta text_attr
-    sep #$20
-.ACCU 8
-    lda.w pad_glyphs+2,x
-    jsr text_puttile
-    plx
-    inx
-    inx
-    inx
-    cpx #(12 * 3)
-    bne @padloop
-
     ; Start -> song stub
     rep #$20
 .ACCU 16
@@ -135,33 +104,5 @@ splash_update:
 @done:
     rts
 
-; button glyph table: mask (word), tile (byte)
-pad_glyphs:
-    .DW PAD_B
-    .DB 'B' - 32
-    .DW PAD_Y
-    .DB 'Y' - 32
-    .DW PAD_SELECT
-    .DB 'E' - 32
-    .DW PAD_START
-    .DB 'S' - 32
-    .DW PAD_UP
-    .DB GLYPH_ARROW_U
-    .DW PAD_DOWN
-    .DB GLYPH_ARROW_D
-    .DW PAD_LEFT
-    .DB GLYPH_ARROW_L
-    .DW PAD_RIGHT
-    .DB GLYPH_ARROW_R
-    .DW PAD_A
-    .DB 'A' - 32
-    .DW PAD_X
-    .DB 'X' - 32
-    .DW PAD_L
-    .DB 'L' - 32
-    .DW PAD_R
-    .DB 'R' - 32
-
 str_band:     .DB "                                ", 0
 str_start:    .DB "PRESS START", 0
-str_pad:      .DB "PAD", 0

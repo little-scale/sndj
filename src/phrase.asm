@@ -61,7 +61,7 @@ phrase_update:
     beq @no_start
     jsr engine_toggle
 @no_start:
-    ; A held + B tap: play this phrase from the cursor row (genmddj C+B)
+    ; A held + B tap: play this phrase from its top
     lda a_down
     beq @no_ab
     rep #$20
@@ -76,11 +76,7 @@ phrase_update:
     jsr engine_stop         ; A+B while playing = stop, on every screen
     bra @ab_used
 @ab_play:
-    jsr engine_play_phrase
-    lda cur_y
-    dec a
-    and #$0F
-    sta trk_prow            ; next tick advances INTO the cursor row
+    jsr engine_play_phrase  ; from the top of the phrase
 @ab_used:
     lda #$01
     sta a_used
