@@ -72,12 +72,13 @@ export a patched ROM. Everything runs locally.</p>
   <h1><small id="sf2name">soundfont</small></h1>
   <div class="row">
     <select id="sfmode">
+      <option value="auto">auto (loop &rarr; melodic, else one-shot)</option>
       <option value="melodic">melodic (looped, in tune)</option>
       <option value="oneshot">one-shot (8 kHz kit drum)</option>
     </select>
     <label id="sftrimlab">trim semis <input type="number" id="sftrim" value="0"
       min="-24" max="24" style="width:3.5rem"></label>
-    <label id="sfcaplab" hidden>cap ms <input type="number" id="sfcap" value="160"
+    <label id="sfcaplab">cap ms <input type="number" id="sfcap" value="160"
       min="20" max="500" style="width:4rem"></label>
   </div>
   <p class="hint">play auditions through the real BRR pipeline with the
@@ -293,12 +294,19 @@ function renderSf2() {
   });
 }
 
-// prep an sf2 sample through the console pipeline with the panel settings
+// prep an sf2 sample through the console pipeline with the panel
+// settings; a sample without a loop can never go melodic, so it always
+// falls through to the one-shot prep instead of failing silently
 function sf2Prep(s) {
-  if ($('sfmode').value === 'melodic') {
-    return { prep: S.sf2Melodic(s, +$('sftrim').value || 0), rate: 32000 };
+  let mode = $('sfmode').value;
+  if (mode !== 'oneshot' && !s.loop) mode = 'oneshot';
+  if (mode === 'auto') mode = 'melodic';
+  if (mode === 'melodic') {
+    return { prep: S.sf2Melodic(s, +$('sftrim').value || 0),
+             rate: 32000, mode };
   }
-  return { prep: S.sf2Oneshot(s, +$('sfcap').value || 160), rate: 8000 };
+  return { prep: S.sf2Oneshot(s, +$('sfcap').value || 160),
+           rate: 8000, mode };
 }
 
 function auditionSf2(fi, i) {
@@ -308,16 +316,14 @@ function auditionSf2(fi, i) {
     const brr = S.brrEncode(prep.pcm, prep.loopBlock);
     audition({ brr, loopBlock: prep.loopBlock }, rate);
   } catch (err) {
-    status('audition failed: ' + err.message +
-      ($('sfmode').value === 'melodic' && !s.loop ?
-        ' — one-shot samples want the one-shot mode' : ''), 1);
+    status('audition failed: ' + err.message, 1);
   }
 }
 
 function sf2Import(fi, sIdx, slot) {
   const s = sf2fonts[fi].samples[sIdx];
   try {
-    const { prep } = sf2Prep(s);
+    const { prep, mode } = sf2Prep(s);
     const brr = S.brrEncode(prep.pcm, prep.loopBlock);
     const name = (s.preset || s.name).toUpperCase().replace(/[^A-Z0-9 ]/g, '')
       .slice(0, 8) || 'SF2';
@@ -325,9 +331,9 @@ function sf2Import(fi, sIdx, slot) {
       name, loopBlock: prep.loopBlock,
       tuneSemis: prep.tuneSemis, tuneFine: prep.tuneFine, brr,
     };
-    status('imported ' + name + ' into slot #' + slot +
+    status('imported ' + name + ' into slot #' + slot + ' as ' + mode +
       ' (' + brr.length + ' B, tune ' + prep.tuneSemis + ':' + prep.tuneFine +
-      ($('sfmode').value === 'oneshot' ? ', 8 kHz — kit slots want tune -24' : '') + ')');
+      (mode === 'oneshot' ? ', 8 kHz — kit slots want tune -24' : '') + ')');
     render();
   } catch (err) {
     status('sf2 import failed: ' + err.message, 1);
@@ -335,9 +341,9 @@ function sf2Import(fi, sIdx, slot) {
 }
 
 $('sfmode').onchange = () => {
-  const one = $('sfmode').value === 'oneshot';
-  $('sfcaplab').hidden = !one;
-  $('sftrimlab').hidden = one;
+  const m = $('sfmode').value;
+  $('sfcaplab').hidden = m === 'melodic';
+  $('sftrimlab').hidden = m === 'oneshot';
 };
 
 // --------------------------------------------------------- WAV replace

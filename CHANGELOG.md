@@ -5,6 +5,11 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- patcher.html: the soundfont mode defaults to **auto** — looped
+  samples prep melodic, loop-less ones prep one-shot — and a melodic
+  request on a loop-less sample falls through to one-shot instead of
+  failing with a message parked off-screen (the "silent play button").
+  Import status names the mode that was actually used.
 - patcher.html: pool slots gained a **clear** button (9 bytes of
   silence — instantly frees the budget), and the soundfont panel
   **stacks multiple .sf2 files**: drop them one after another, each

@@ -6,3 +6,9 @@ tools/emu/cores/
 
 # macOS
 .DS_Store
+
+# Personal soundfonts: only the three factory-pool fonts are tracked
+soundfonts/*
+!soundfonts/mario_paint.sf2
+!soundfonts/super_mario_world.sf2
+!soundfonts/super_street_fighter_2.sf2
