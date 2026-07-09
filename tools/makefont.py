@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""makefont.py — render the snesdj 8x8 UI font to SNES 2bpp tiles.
+"""makefont.py — render the sndj 8x8 UI font to SNES 2bpp tiles.
 
 Glyphs are authored here as 5x7 pixel art (centred in the 8x8 cell) so the
 font is fully self-contained: no PNG, no PIL, no external assets. Output is

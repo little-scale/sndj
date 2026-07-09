@@ -114,7 +114,7 @@ pad_glyphs:
     .DW PAD_R
     .DB 'R' - 32
 
-str_title:    .DB "SNESDJ", 0
+str_title:    .DB "SNDJ", 0
 str_subtitle: .DB "SNES/SFC MUSIC TRACKER", 0
 str_family:   .DB "SIBLING OF SMSGGDJ + GENMDDJ", 0
 str_start:    .DB "PRESS START", 0

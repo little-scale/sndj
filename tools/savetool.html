@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>snesdj savetool</title>
+<title>sndj savetool</title>
 <script src="sndj.js"></script>
 <style>
   :root { color-scheme: dark; }
@@ -29,7 +29,7 @@
 </style>
 </head>
 <body>
-<h1>snesdj savetool <small>— songs &amp; saves</small></h1>
+<h1>sndj savetool <small>— songs &amp; saves</small></h1>
 <p>Drop a <code>.srm</code> cart save (FXPak / Mesen / ares / snes9x are all
 raw) to view its song slots, extract them as <code>.sndj</code> files, or
 assemble a new cart image from <code>.sndj</code> files. Everything runs
@@ -167,7 +167,7 @@ $('slots').onclick = e => {
   }
 };
 
-$('download').onclick = () => { save(srm, 'snesdj.srm'); };
+$('download').onclick = () => { save(srm, 'sndj.srm'); };
 $('fresh').onclick = () => { srm = S.srmNew(); status('new cart image'); render(); };
 
 render();

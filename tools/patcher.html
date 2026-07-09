@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>snesdj patcher</title>
+<title>sndj patcher</title>
 <script src="sndj.js"></script>
 <style>
   :root { color-scheme: dark; }
@@ -30,11 +30,11 @@
 </style>
 </head>
 <body>
-<h1>snesdj patcher <small>— sample pool</small></h1>
-<p>Drop a built <code>snesdj.sfc</code>, replace pool samples with your own
+<h1>sndj patcher <small>— sample pool</small></h1>
+<p>Drop a built <code>sndj.sfc</code>, replace pool samples with your own
 WAVs (auto-resampled to 32 kHz, BRR-encoded with the reference codec),
 audition the decoded BRR, and export a patched ROM. Everything runs locally.</p>
-<div class="drop" id="drop">drop snesdj.sfc here (or click)</div>
+<div class="drop" id="drop">drop sndj.sfc here (or click)</div>
 <input type="file" id="file" hidden>
 <div id="status"></div>
 <div id="poolview" hidden>
@@ -49,7 +49,7 @@ audition the decoded BRR, and export a patched ROM. Everything runs locally.</p>
 'use strict';
 const S = window.SNDJ;
 const RESERVED = 0x27FFA;
-let rom = null, poolOff = -1, entries = [], replacing = -1, romName = 'snesdj.sfc';
+let rom = null, poolOff = -1, entries = [], replacing = -1, romName = 'sndj.sfc';
 
 const $ = id => document.getElementById(id);
 const status = (msg, warn) => {
@@ -72,7 +72,7 @@ async function loadRom(f) {
   romName = f.name;
   rom = new Uint8Array(await f.arrayBuffer());
   poolOff = S.findMarker(rom, 'SNPOOL');
-  if (poolOff < 0) { status('no SNPOOL marker found — is this a snesdj ROM?', 1); return; }
+  if (poolOff < 0) { status('no SNPOOL marker found — is this a sndj ROM?', 1); return; }
   try {
     entries = S.poolParse(rom.subarray(poolOff));
   } catch (err) { status('pool parse failed: ' + err.message, 1); return; }

@@ -1,4 +1,4 @@
-# snesdj
+# sndj
 
 An LSDJ-inspired music tracker for the **Super Nintendo / Super Famicom**,
 written in 65816 + SPC700 assembly. The third sibling of
@@ -53,7 +53,7 @@ Requires WLA-DX (`brew install wla-dx`), Python 3, Node, and
 [Mesen 2](https://github.com/SourMesen/Mesen2) for the verification loop.
 
 ```
-make            # build/snesdj.sfc (+ git-stamped dev copy)
+make            # build/sndj.sfc (+ git-stamped dev copy)
 make run        # launch in Mesen 2
 make check      # emulator-in-the-loop assertions — the ground truth
 make test       # host-side unit tests (BRR, RLE, sndj.js, tools)

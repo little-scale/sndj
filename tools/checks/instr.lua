@@ -90,7 +90,7 @@ emu.addEventCallback(function()
     -- carry loop-quantise tune corrections now)
     emu.write(0x2401, 8, emu.memType.snesWorkRam)
   elseif frames == shot_at then
-    local out = os.getenv("SNESDJ_INSTR_SHOT")
+    local out = os.getenv("SNDJ_INSTR_SHOT")
     if out then
       local png = emu.takeScreenshot()
       local f = io.open(out, "wb")

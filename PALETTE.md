@@ -1,4 +1,4 @@
-# snesdj palettes
+# sndj palettes
 
 The UI is drawn from a **palette scheme**: five 15-bit BGR colours with
 semantic roles (solid backdrop — no gradient), from which the engine

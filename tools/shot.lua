@@ -2,8 +2,8 @@
 -- Waits for boot (magic_boot) plus a settle delay deep inside the
 -- PRESS-START blink window, then writes a PNG and exits.
 
-local out = os.getenv("SNESDJ_SHOT") or "build/shot.png"
-local settle = tonumber(os.getenv("SNESDJ_SHOT_FRAME") or "48")
+local out = os.getenv("SNDJ_SHOT") or "build/shot.png"
+local settle = tonumber(os.getenv("SNDJ_SHOT_FRAME") or "48")
 local booted = false
 local frames = 0
 

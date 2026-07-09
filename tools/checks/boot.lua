@@ -52,7 +52,7 @@ local function onFrame()
   if frames == 20 then
     check(wram(0x0001) == 0x5D, "magic_boot set (init completed)")
     fc_sample = wram16(0x0002)
-    local s = "SNESDJ"
+    local s = "SNDJ"
     local ok = true
     for i = 1, #s do
       if cell(13 + i - 1, 7) ~= word(s:sub(i, i), ATTR_ACCENT) then

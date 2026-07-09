@@ -1,7 +1,7 @@
-# CLAUDE.md — snesdj
+# CLAUDE.md — sndj
 
 This file is the master plan and working guide for agents (Claude Code / Opus)
-building **snesdj**. It is written before any code exists; as milestones land,
+building **sndj**. It is written before any code exists; as milestones land,
 sections here graduate into DESIGN.md (the contract), MANUAL.md (the player's
 guide), SAVEFORMAT.md, and HARDWARE.md, exactly as in the sibling repos.
 Until then, **this document is the contract.** Read the relevant section before
@@ -11,7 +11,7 @@ making design decisions; decisions marked ⚖ SETTLED are not to be re-litigated
 
 ## 1. Project identity
 
-**snesdj** — an LSDJ-inspired music tracker for the **Super Nintendo /
+**sndj** — an LSDJ-inspired music tracker for the **Super Nintendo /
 Super Famicom**, written in **65816 + SPC700 assembly**. It is the third
 sibling of:
 
@@ -32,7 +32,7 @@ hardware forces otherwise:
    screen navigation and transport.
 3. **Screen set**: SONG / CHAIN / PHRASE / INSTR / TABLE / WAVE / GROOVE /
    ECHO / FILES / PROJECT / OPTIONS / LIVE, arranged on a 2-D screen map
-   navigated by (screen-modifier held) + d-pad. snesdj adds SNES-specific
+   navigated by (screen-modifier held) + d-pad. sndj adds SNES-specific
    screens (KIT, FIR, MIDI — §8).
 4. **Command set**: the shared A–Z single-letter command language, one executor
    shared by phrase and table columns, `cmd_chars`/`cmd_order` id↔letter↔rank
@@ -62,13 +62,13 @@ Naming (⚖ SETTLED unless Seb objects):
 
 | Thing              | Name                        |
 |--------------------|-----------------------------|
-| Repo / project     | `snesdj`                    |
-| ROM                | `build/snesdj.sfc`          |
+| Repo / project     | `sndj`                    |
+| ROM                | `build/sndj.sfc`          |
 | Song file          | `.sndj`                     |
 | Save format magic  | `SNDJ1` (family: SMDJ3/4)   |
 | SPC driver blob    | `build/driver.spc700.bin`   |
 | Reference JS lib   | `tools/sndj.js`             |
-| ESP32 bridge repo  | `snesdj-link-esp32`         |
+| ESP32 bridge repo  | `sndj-link-esp32`         |
 
 Voices (8): `V1`–`V8`, all hosted by the S-DSP. Unlike the siblings there is
 no chip heterogeneity — every voice is a full citizen (sample, kit, wavetable,
@@ -82,7 +82,7 @@ versus the siblings and should be embraced, not fought.
 
 The S-DSP is not a synthesizer chip with a sampler bolted on — it is a
 **sampler with a mixing console, a modulation bus, and a room built in**.
-snesdj should be designed around the five things only this chip does:
+sndj should be designed around the five things only this chip does:
 
 1. **BRR + Gaussian interpolation = the SNES timbre.** All samples are
    4-bit-nibble BRR blocks (9 bytes → 16 samples, four prediction filters),
@@ -97,7 +97,7 @@ snesdj should be designed around the five things only this chip does:
    (EDL = 0–15 → 0–240 ms in 16 ms steps, 2 KB per step), per-voice echo
    send (EON), stereo echo volume, feedback, and — uniquely — an 8-tap FIR in
    the feedback path. This is the cathedral of DKC and the metallic slapback
-   of a hundred soundtracks. snesdj gives it two dedicated screens (ECHO for
+   of a hundred soundtracks. sndj gives it two dedicated screens (ECHO for
    the send/level/feedback/time, FIR for the taps) and a browser FIR designer
    with a live frequency-response plot (§11, §17).
 3. **Pitch modulation (PMON).** Voice *n*'s pitch can be modulated by voice
@@ -131,7 +131,7 @@ Two facts of life that shape everything:
 One genuine SNES advantage worth designing around: **the APU has its own
 24.576 MHz crystal, identical in every region.** DSP sample rate, pitch, and
 SPC700 timers are region-independent. genmddj needs separate VIDEO and CLOCK
-options; snesdj needs only **VIDEO** (50/60 Hz display + NMI rate). If the
+options; sndj needs only **VIDEO** (50/60 Hz display + NMI rate). If the
 engine tick is derived from an SPC700 timer rather than NMI (§3.4), *tempo*
 becomes region-independent too, and PAL vs NTSC affects nothing but the
 picture.
@@ -254,7 +254,7 @@ Adding a file = add an `.INCLUDE` *and* a Makefile prerequisite.
   viewers for ARAM, event viewer, and a **Lua scripting API usable in a
   headless test-runner mode**. This is the agent's assertion harness (§4.3).
 - **ares** — accuracy referee; run before every release and when Mesen and
-  hardware disagree. Also the future home of a snesdj `ares-link-sync`
+  hardware disagree. Also the future home of a sndj `ares-link-sync`
   counterpart if desired (the existing ares fork pattern).
 - **bsnes-plus** — secondary SPC700/DSP debugging opinion when chasing driver
   bugs.
@@ -319,14 +319,14 @@ Adding a file = add an `.INCLUDE` *and* a Makefile prerequisite.
 ### 4.6 Make targets (summary)
 
 ```
-make            # build/snesdj.sfc + version+hash dev copies + driver blob
+make            # build/sndj.sfc + version+hash dev copies + driver blob
 make run        # launch in Mesen 2
 make check      # emulator-in-the-loop Lua assertions (agent ground truth)
 make test       # host-side unit tests (sndj.js, BRR, RLE mirror, JS lint)
 make shot       # headless screenshot -> build/shot.png
 make shot-diff  # compare against tools/goldens/
 make wav        # headless N-second audio render of the demo song
-make demo       # self-playing attract build (snesdj-demo.sfc)
+make demo       # self-playing attract build (sndj-demo.sfc)
 make dist       # version-only release ROMs for the GitHub release
 make clean
 ```
@@ -336,7 +336,7 @@ make clean
 ## 5. Repository layout & documentation set
 
 ```
-snesdj/
+sndj/
   src/                65816 sources: main, ppu, input, engine, editor,
                       scb, sync, midi, save  (single .INCLUDE tree)
   src/apu/            SPC700 driver: driver, mailbox, dsp, tick, upload
@@ -350,7 +350,7 @@ snesdj/
     sndj.js           THE shared JS library (format, RLE, BRR codec,
                       reference sequencer, DSP model) — node self-test
     patcher.html  savetool.html  firdesign.html  kitbuild.html
-    als2snesdj.html  spcexport.html  sramconvert.html
+    als2sndj.html  spcexport.html  sramconvert.html
   samples/            sample sources; samples/pool.bin = production bank
   instrument-patches/ factory instrument/kit presets
   songs/              bundled demo song(s)
@@ -441,7 +441,7 @@ buttons on accelerators, not new grammar:
 
 Rule for new gestures (⚖ SETTLED): must fit the held-modifier frame; L/R/X/
 Select may only ever be *shortcuts to things the core grammar can already
-do*, so a three-button description of snesdj (d-pad + B + Y + A + Start)
+do*, so a three-button description of sndj (d-pad + B + Y + A + Start)
 remains complete and sibling-identical.
 
 ---
@@ -626,19 +626,19 @@ special" deliverable in user-facing form.
 - **Cross-sibling cable**: a DE-9 ↔ SNES-plug adapter locks a Mega Drive
   and a SNES (or SMS) on one row clock — an explicit test case in the
   release checklist. One rig, three consoles, one transport.
-- **Bridge**: `snesdj-link-esp32` (XIAO ESP32-C3, level-shifted), a port of
+- **Bridge**: `sndj-link-esp32` (XIAO ESP32-C3, level-shifted), a port of
   smsggdj-link-esp32 — Ableton Link → IN24 counter. An emulator-side
   counterpart via the ares-link-sync pattern is optional later.
 - **VJ future**: sync OUT is already sufficient for a future SNES VJ
   companion ROM (the smsggdj VJ pattern); no extra provision needed now,
   but don't design the port protocol in a way that precludes a second
-  snesdj listening on IN.
+  sndj listening on IN.
 
 ---
 
 ## 13. MIDI takeover mode
 
-snesdj as an **8-voice BRR sample module**, driven live from a DAW or
+sndj as an **8-voice BRR sample module**, driven live from a DAW or
 keyboard through the controller-port bridge.
 
 - **Transport**: auto-joypad reading is disabled while MIDI mode is armed;
@@ -767,7 +767,7 @@ lets every tool below *play actual SNES sound in the browser*.
 
 ### 17.1 `patcher.html` — the ROM patcher
 
-Drop a built `snesdj.sfc`, then patch any of:
+Drop a built `sndj.sfc`, then patch any of:
 
 - **Samples**: drop WAVs → BRR encode with per-sample trim/gain/tanh
   soft-clip/fades/loop tools (the smsggdj patcher feature set) *plus*
@@ -796,7 +796,7 @@ supplied by dropping the ROM alongside (samples resolve by name+hash, §15).
 Legacy/foreign migration hooks stubbed from day one (the smsggdj
 migrate.html lesson: formats change, plan the door).
 
-### 17.3 `als2snesdj` — the Ableton path (ALS.md documents it)
+### 17.3 `als2sndj` — the Ableton path (ALS.md documents it)
 
 Bidirectional, like the genmddj tool:
 
@@ -848,7 +848,7 @@ gzip variants).
 ### 17.8 CLI mirrors
 
 Every browser tool has a Python CLI twin (`savetool.py`, `sndj_brr.py`,
-`sndj_pool.py`, `als2snesdj.py`, `spcexport.py`) sharing fixture-based
+`sndj_pool.py`, `als2sndj.py`, `spcexport.py`) sharing fixture-based
 tests with the JS via `make test` — the agent automates with the CLIs, the
 musician gets the browser.
 
@@ -928,7 +928,7 @@ Commit at every milestone boundary; each has a verification gate
 - **M14 — MIDI takeover.** Ingest framing, MIDI screen, mapping, pool
   polyphony. 🔩 bridge + keyboard latency feel test. Gate: injected MIDI
   stream → KON pattern assert.
-- **M15 — Ecosystem round-out.** savetool, als2snesdj (both directions),
+- **M15 — Ecosystem round-out.** savetool, als2sndj (both directions),
   spcexport (WAV then .spc), firdesign, kitbuild, budget tool, demo build,
   factory content pass (🔩 voiced via usb2snes on hardware), MANUAL.md.
 - **M16 — Release.** Hardware matrix (§4.4), goldens regenerated,
@@ -1011,7 +1011,7 @@ For fast lookup — full rationale in the sections cited:
    map chromatically-with-retune above the slot count (LSDJ-style)?
 3. **FIR screen depth**: hex taps + presets only (proposed), or a full
    on-console tap editor?
-4. **Wordmark**: tri-pixel session for the snesdj logo — same family
+4. **Wordmark**: tri-pixel session for the sndj logo — same family
    geometry, new mark?
 5. **Factory sample identity**: share source material with the smsggdj
    pool for family continuity, or an all-new 32 kHz-native bank?
@@ -1020,5 +1020,5 @@ For fast lookup — full rationale in the sections cited:
 
 ---
 
-*snesdj — a sibling to smsggdj and genmddj, built on the work of the
+*sndj — a sibling to smsggdj and genmddj, built on the work of the
 SNES/SFC homebrew and reverse-engineering communities. MIT.*

@@ -1,5 +1,5 @@
 ; ============================================================================
-; snesdj — an LSDJ-inspired music tracker for the SNES / Super Famicom
+; sndj — an LSDJ-inspired music tracker for the SNES / Super Famicom
 ; main.asm — single translation unit for the S-CPU (65816)
 ;
 ; Register-width convention (CLAUDE.md invariant #8): natural state is
@@ -325,7 +325,7 @@ pool_data:
 .BANK 0 SLOT 0
 ; --- internal header (hand-rolled; checksum fixed by tools/fixsum.py) --------
 .ORG $7FC0
-    .DB "SNESDJ               "      ; 21-byte title
+    .DB "SNDJ                 "    ; 21-byte title
     .DB $30                          ; LoROM, FastROM
     .DB $02                          ; ROM + RAM + battery
     .DB $0A                          ; 1 MB

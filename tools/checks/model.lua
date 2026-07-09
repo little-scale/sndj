@@ -105,7 +105,7 @@ emu.addEventCallback(function()
       string.format("%04X", p1) .. ")")
   elseif frames == 228 then
     check(wram(0x0016) == 0, "stopped")
-    local out = os.getenv("SNESDJ_SONG_SHOT")
+    local out = os.getenv("SNDJ_SONG_SHOT")
     if out then
       local png = emu.takeScreenshot()
       local f = io.open(out, "wb")

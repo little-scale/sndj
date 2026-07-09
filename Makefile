@@ -1,4 +1,4 @@
-# snesdj Makefile — see CLAUDE.md §4.6
+# sndj Makefile — see CLAUDE.md §4.6
 # Requires: wla-65816, wla-spc700, wlalink (WLA-DX), python3, node
 
 VERSION := $(shell sed -n 's/^\.DEFINE VERSION "\(.*\)".*/\1/p' src/main.asm)
@@ -7,8 +7,8 @@ DIRTY   := $(shell git diff --quiet 2>/dev/null && git diff --cached --quiet 2>/
 STAMP   := $(GITHASH)$(DIRTY)
 
 BUILD   := build
-ROM     := $(BUILD)/snesdj.sfc
-DEVROM  := $(BUILD)/snesdj-$(VERSION)-$(STAMP).sfc
+ROM     := $(BUILD)/sndj.sfc
+DEVROM  := $(BUILD)/sndj-$(VERSION)-$(STAMP).sfc
 
 WLA65816 := wla-65816
 WLASPC   := wla-spc700
@@ -69,17 +69,17 @@ check: all
 	@python3 tools/mesen_setup.py
 	@for c in $(CHECKS); do \
 	  echo "== $$c"; \
-	  SNESDJ_PHRASE_SHOT=$(abspath $(BUILD)/shot-phrase.png) \
-	  SNESDJ_SONG_SHOT=$(abspath $(BUILD)/shot-song.png) \
-	  SNESDJ_INSTR_SHOT=$(abspath $(BUILD)/shot-instr.png) \
-	  SNESDJ_WAVE_SHOT=$(abspath $(BUILD)/shot-wave.png) \
-	  SNESDJ_LIVE_SHOT=$(abspath $(BUILD)/shot-live.png) \
+	  SNDJ_PHRASE_SHOT=$(abspath $(BUILD)/shot-phrase.png) \
+	  SNDJ_SONG_SHOT=$(abspath $(BUILD)/shot-song.png) \
+	  SNDJ_INSTR_SHOT=$(abspath $(BUILD)/shot-instr.png) \
+	  SNDJ_WAVE_SHOT=$(abspath $(BUILD)/shot-wave.png) \
+	  SNDJ_LIVE_SHOT=$(abspath $(BUILD)/shot-live.png) \
 	  "$(MESEN)" --testrunner $(abspath $(ROM)) $(abspath $$c) || exit 1; \
 	done
 
 shot: all
 	@python3 tools/mesen_setup.py
-	SNESDJ_SHOT=$(abspath $(BUILD)/shot.png) "$(MESEN)" --testrunner $(abspath $(ROM)) $(abspath tools/shot.lua)
+	SNDJ_SHOT=$(abspath $(BUILD)/shot.png) "$(MESEN)" --testrunner $(abspath $(ROM)) $(abspath tools/shot.lua)
 	@echo "shot: $(BUILD)/shot.png"
 
 # splash comparison masks pixel rows 88-96 (the git-stamp text line)
@@ -93,7 +93,7 @@ shot-diff: shot
 
 # host-side unit tests, no emulator
 test:
-	python3 tools/makefont.py /tmp/snesdj-font-test.bin > /dev/null
+	python3 tools/makefont.py /tmp/sndj-font-test.bin > /dev/null
 	python3 tools/maketables.py /tmp > /dev/null
 	python3 tools/sndj_brr.py --selftest
 	python3 tools/sndj_rle.py --selftest
@@ -102,8 +102,8 @@ test:
 	@echo "test: OK"
 
 dist: all
-	cp $(ROM) $(BUILD)/snesdj-$(VERSION).sfc
-	@echo "dist: $(BUILD)/snesdj-$(VERSION).sfc"
+	cp $(ROM) $(BUILD)/sndj-$(VERSION).sfc
+	@echo "dist: $(BUILD)/sndj-$(VERSION).sfc"
 
 clean:
 	rm -rf $(BUILD)

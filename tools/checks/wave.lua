@@ -106,7 +106,7 @@ emu.addEventCallback(function()
     check(dsp(0x6C) % 32 == 23, "noise clock follows the note (G-4 -> 23)")
   elseif frames == at_wave then
     check(wram(0x0C) == 7, "A+Up from INSTR opened WAVE")
-    local out = os.getenv("SNESDJ_WAVE_SHOT")
+    local out = os.getenv("SNDJ_WAVE_SHOT")
     if out then
       local png = emu.takeScreenshot()
       local f = io.open(out, "wb")

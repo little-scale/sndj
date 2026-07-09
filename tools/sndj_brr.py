@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""sndj_brr.py — BRR encoder/decoder for snesdj (CLAUDE.md §14.3).
+"""sndj_brr.py — BRR encoder/decoder for sndj (CLAUDE.md §14.3).
 
 The reference BRR codec for the whole project: brute-force filter/range
 search per 16-sample block, bit-exact decoder for round-trip verification

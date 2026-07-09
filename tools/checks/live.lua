@@ -107,7 +107,7 @@ emu.addEventCallback(function()
       mute_seq[#mute_seq + 1] = m
     end
 
-    local out = os.getenv("SNESDJ_LIVE_SHOT")
+    local out = os.getenv("SNDJ_LIVE_SHOT")
     if out then
       local png = emu.takeScreenshot()
       local f = io.open(out, "wb")

@@ -130,7 +130,7 @@ emu.addEventCallback(function()
   elseif frames == 332 then
     check(wram(0x4320) == 0, "B held + A cut row 8")
   elseif frames == 340 then
-    local out = os.getenv("SNESDJ_PHRASE_SHOT")
+    local out = os.getenv("SNDJ_PHRASE_SHOT")
     if out then
       local png = emu.takeScreenshot()
       local f = io.open(out, "wb")

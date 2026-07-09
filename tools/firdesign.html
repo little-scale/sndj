@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>snesdj FIR designer</title>
+<title>sndj FIR designer</title>
 <script src="sndj.js"></script>
 <style>
   :root { color-scheme: dark; }
@@ -39,10 +39,10 @@
 </style>
 </head>
 <body>
-<h1>snesdj FIR designer <small>— the room's tone control</small></h1>
+<h1>sndj FIR designer <small>— the room's tone control</small></h1>
 <p>Design the 8-tap FIR in the S-DSP echo feedback path. Audition it through
 the full echo model (delay, feedback, FIR), then patch a preset slot in your
-<code>snesdj.sfc</code> — the ROM's FIR screen recalls what you design here.</p>
+<code>sndj.sfc</code> — the ROM's FIR screen recalls what you design here.</p>
 
 <canvas id="plot" width="760" height="220"></canvas>
 
@@ -64,7 +64,7 @@ the full echo model (delay, feedback, FIR), then patch a preset slot in your
   <button id="stop">stop</button>
 </div>
 
-<div class="drop" id="drop">drop snesdj.sfc here to patch its presets (or click)</div>
+<div class="drop" id="drop">drop sndj.sfc here to patch its presets (or click)</div>
 <input type="file" id="file" hidden accept=".sfc,.smc">
 <div class="row" id="romrow" hidden>
   <label>write into slot</label>
@@ -94,7 +94,7 @@ const FACTORY = [
 ];
 const s8 = v => (v > 127 ? v - 256 : v);
 let taps = FACTORY[5][1].map(s8);
-let rom = null, romName = 'snesdj.sfc', firOff = null;
+let rom = null, romName = 'sndj.sfc', firOff = null;
 
 // ------------------------------------------------------------------ tap UI
 for (let i = 0; i < 8; i++) {
@@ -247,7 +247,7 @@ function loadRom(f) {
     rom = new Uint8Array(b);
     firOff = S.findMarker(rom, 'SNFIR0');
     if (firOff < 0) {
-      status(f.name + ': no SNFIR0 marker — not a snesdj ROM?', true);
+      status(f.name + ': no SNFIR0 marker — not a sndj ROM?', true);
       rom = null;
       $('romrow').hidden = true;
       return;

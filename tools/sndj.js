@@ -1,4 +1,4 @@
-// sndj.js — THE shared snesdj JS library (CLAUDE.md §17).
+// sndj.js — THE shared sndj JS library (CLAUDE.md §17).
 // One reference implementation, imported by every browser tool and
 // self-tested under node (`node tools/sndj.js --selftest`, run by
 // `make test`). Mirrors tools/sndj_brr.py and tools/sndj_rle.py exactly.

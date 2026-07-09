@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""maketables.py — generate ROM data tables for snesdj.
+"""maketables.py — generate ROM data tables for sndj.
 
 Emits into the build directory:
   schemes.bin  — 8 palette schemes x 16 bytes (marker-wrapped SNPAL0 in ROM;
@@ -8,7 +8,7 @@ Emits into the build directory:
                  bg, text, dim, accent, hilite, then padding (solid
                  backdrop — no gradient).
 
-Scheme 0 is the snesdj house style; 1-7 follow genmddj's palette set
+Scheme 0 is the sndj house style; 1-7 follow genmddj's palette set
 (BLK / WHT / KIDD / AMBR / CYAN / PINK / MINT) so the family reads the
 same across consoles. PALETTE.md documents them.
 """

@@ -1,5 +1,5 @@
 ; ============================================================================
-; snesdj SPC700 driver — pure chip servant (CLAUDE.md §3.1)
+; sndj SPC700 driver — pure chip servant (CLAUDE.md §3.1)
 ;
 ; Holds no song state. Drains mailbox commands into the DSP, runs the
 ; timer-derived master tick, reports telemetry on port 3.

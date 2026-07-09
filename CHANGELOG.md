@@ -2,6 +2,11 @@
 
 ## 0.1.0-dev (unreleased)
 
+- Project renamed **sndj** (in line with smsggdj/genmddj): ROM is
+  build/sndj.sfc, splash and cart title updated. Save magic (SNDJ1),
+  song files (.sndj) and the JS library (sndj.js) already carried the
+  name.
+
 - Block select everywhere (Y+B, stretch, B copy / Y cut / A cancel,
   B double-tap paste) on PHRASE, CHAIN and SONG.
 - Single-cell cut is B held + A tap (the cut value feeds the next
