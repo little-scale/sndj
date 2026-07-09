@@ -2,6 +2,15 @@
 
 ## 0.1.0-dev (unreleased)
 
+- SF2 import in the browser: patcher.html takes .sf2 drops on any pool
+  slot with a preset picker and melodic/one-shot modes — the exact
+  factory pipeline (root-key bake, exact-loop resample, tune fields),
+  mirror-tested byte-identical between JS and python.
+- FIR screen (A+Right from ECHO): the song owns its 8 taps now (saved
+  in the header); B+d-pad edits them live, Y+up/down recalls ROM
+  presets, hand edits read as a custom curve. ECHO's FIR field and the
+  Y command copy presets into the song's taps.
+
 - Screen titles and track headers render plain (only cursors/selection
   invert); track columns are numbered 1-8; grids sit one row lower.
 - TMPO is editable on PROJECT (80-255, drives the APU timer instantly

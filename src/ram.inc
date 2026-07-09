@@ -185,6 +185,7 @@ fl_freed     db      ; FILES: PURGE result count for the status line
 pg_i         dw      ; purge scan indices
 pg_j         dw
 fl_usedv     db      ; FILES: packed slot count (first empty row)
+fs_row       db      ; FIR screen tap cursor
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

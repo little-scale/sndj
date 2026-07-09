@@ -294,8 +294,7 @@ apu_echo_apply_light:
     tay
     lda #DSP_EON
     jsr apu_dsp_write
-    lda.l $7E0000 + SB_HEADER + SH_FIR
-    jmp apu_fir_preset
+    jmp apu_fir_apply       ; the song's own taps (presets copy into them)
 
 apu_echo_apply:
     jsr apu_echo_apply_light
@@ -316,9 +315,12 @@ apu_echo_apply:
     lda #CMD_ECHO_CFG
     jmp apu_send
 
-; --- write FIR preset A (0-7) to the 8 FIR tap registers ------------------------
+; --- recall ROM preset A (0-7): copy its taps into the song header, apply -------
+; Songs own their taps (SH_FIRTAPS); presets are starting points and
+; the FIR screen edits the header directly.
 apu_fir_preset:
     and #$07
+    sta.l $7E0000 + SB_HEADER + SH_FIR
     rep #$30
 .ACCU 16
     and #$00FF
@@ -329,8 +331,39 @@ apu_fir_preset:
     sep #$20
 .ACCU 8
     stz trig_id             ; tap counter (borrow; safe outside triggers)
-@tap:
+@copy:
+    phx                     ; ROM table index
     lda.w fir_presets,x
+    pha
+    lda trig_id
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    pla
+    sta.l $7E0000 + SB_HEADER + SH_FIRTAPS,x
+    plx
+    inx
+    inc trig_id
+    lda trig_id
+    cmp #$08
+    bne @copy
+    ; fall through: ship the header taps to the DSP
+
+; --- write the song header's 8 FIR taps to the DSP -------------------------------
+apu_fir_apply:
+    stz trig_id
+@tap:
+    lda trig_id
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_HEADER + SH_FIRTAPS,x
     tay
     lda trig_id
     asl
@@ -338,10 +371,7 @@ apu_fir_preset:
     asl
     asl
     ora #$0F                ; FIR tap register = v*16 + $0F
-    phx
     jsr apu_dsp_write
-    plx
-    inx
     inc trig_id
     lda trig_id
     cmp #$08

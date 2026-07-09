@@ -23,6 +23,7 @@
 .DEFINE SCREEN_OPTIONS 10
 .DEFINE SCREEN_GROOVE 11
 .DEFINE SCREEN_PROJECT 12
+.DEFINE SCREEN_FIR    13
 
 ; called every frame from the main loop
 screen_update:
@@ -69,6 +70,8 @@ screen_update:
     beq @groove
     cmp #SCREEN_PROJECT
     beq @project
+    cmp #SCREEN_FIR
+    beq @fir
     jmp song_update
 @phrase:
     jmp phrase_update
@@ -88,6 +91,8 @@ screen_update:
     jmp groove_update
 @project:
     jmp project_update
+@fir:
+    jmp fir_update
 @chain:
     jmp chain_update
 @instr:
@@ -233,8 +238,14 @@ nav_update:
     cmp #SCREEN_PHRASE
     beq @to_instr
     cmp #SCREEN_WAVE
-    bne @no_right
+    bne @right_not_wave
     jsr kit_init
+    bra @eat_right
+@right_not_wave:
+    cmp #SCREEN_ECHO
+    bne @no_right
+    jsr fir_init
+@eat_right:
     rep #$20
 .ACCU 16
     lda #$0000
@@ -311,8 +322,14 @@ nav_update:
     cmp #SCREEN_INSTR
     beq @to_phrase2
     cmp #SCREEN_KIT
-    bne @no_left
+    bne @left_not_kit
     jsr wave_init
+    bra @eat_left2
+@left_not_kit:
+    cmp #SCREEN_FIR
+    bne @no_left
+    jsr echo_init
+@eat_left2:
     rep #$20
 .ACCU 16
     lda #$0000

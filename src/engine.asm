@@ -262,6 +262,14 @@ song_init:
     bne @sname
     lda #150
     sta.l $7E0000 + SB_HEADER + SH_BPM
+    ; FIR taps seed from preset 0 (FLAT)
+    ldx #$0000
+@ftaps:
+    lda.w fir_presets,x
+    sta.l $7E0000 + SB_HEADER + SH_FIRTAPS,x
+    inx
+    cpx #$0008
+    bne @ftaps
     lda #$00
     sta.l $7E0000 + SB_HEADER + SH_GROOVE
     sta.l $7E0000 + SB_HEADER + SH_EDL

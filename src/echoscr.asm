@@ -212,10 +212,16 @@ ef_nudge:
     pla
 @store:
     sta.l $7E0000,x
-    ; apply: EDL (field 0) walks the safe reconfig; the rest are live writes
+    ; apply: EDL (field 0) walks the safe reconfig; the FIR field (5)
+    ; recalls the preset into the song's taps; the rest are live writes
     lda if_cur
-    bne @light
+    bne @not_edl
     jmp apu_echo_apply
+@not_edl:
+    cmp #$05
+    bne @light
+    lda.l $7E0000 + SB_HEADER + SH_FIR
+    jmp apu_fir_preset
 @light:
     jmp apu_echo_apply_light
 
