@@ -53,6 +53,10 @@ emu.addEventCallback(function()
     row(10, 0, 0xFF, 17, 0x00) -- Q00: back to ADSR
     row(12, 0, 0xFF, 21, 0x11) -- U11: invert both phases
     row(14, 0, 0xFF, 19, 0x0F) -- S0F: sweep down
+    -- second phrase pass never happens: chain has only entry 0 and the
+    -- block loops, so extend the test into phrase rows via a C command
+    -- on its own row 15 with a fresh note
+    row(15, 49, 0, 3, 0x47)  -- C-4 + C47: fan a major chord
   elseif frames == 44 then
     pad = { start = true }
   elseif frames == 46 then
@@ -75,12 +79,21 @@ emu.addEventCallback(function()
   elseif frames == 126 then
     check(dsp(0x00) == 0xB0 and dsp(0x01) == 0xB0,
       "U11 inverted both volume phases ($50 -> $B0)")
-  elseif frames == 135 then
+  elseif frames == 133 then
     sweep_a = dsp(0x02) + dsp(0x03) * 256
-  elseif frames == 140 then
+  elseif frames == 136 then
     sweep_b = dsp(0x02) + dsp(0x03) * 256
     check(sweep_b < sweep_a, "S0F sweeps the pitch down (" ..
       string.format("%04X -> %04X", sweep_a, sweep_b) .. ")")
+  elseif frames == 148 then
+    -- row 15: C47 chord (offsets +4/+7 on the next two voices)
+    local p0 = dsp(0x02) + dsp(0x03) * 256
+    local p1 = dsp(0x12) + dsp(0x13) * 256
+    local p2 = dsp(0x22) + dsp(0x23) * 256
+    -- the root keeps row 0's F fine (+64); members play pure offsets
+    check(p0 == 0x081E and p1 == 0x0A14 and p2 == 0x0BFC,
+      "C47 fanned a major chord (" ..
+      string.format("%04X/%04X/%04X", p0, p1, p2) .. ")")
     if fails == 0 then
       print("ALL PASS cmd2.lua")
       emu.stop(0)

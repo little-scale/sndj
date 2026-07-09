@@ -16,6 +16,7 @@ str_defname: .DB "SONG    "
 ; command letter ids (1 = A ... 26 = Z)
 .DEFINE CMDID_A 1
 .DEFINE CMDID_B 2
+.DEFINE CMDID_C 3
 .DEFINE CMDID_D 4
 .DEFINE CMDID_F 6
 .DEFINE CMDID_G 7
@@ -499,6 +500,7 @@ engine_go:
     sta.w trk_arp_ph,x
     sta.w trk_vib_ph,x
     sta.w trk_fine,x
+    sta.w trk_chord,x
     inx
     cpx #TRACKS
     bne @fx_reset
@@ -1048,6 +1050,15 @@ row_cmd_pre:
     plx
     rts
 @not_n:
+    cmp #CMDID_C
+    bne @not_c
+    ; C xy: chord override — fan the next triggers out to +x and +y
+    ; semitones on the two voices to the right (works on any SMP/WAV
+    ; instrument, GRP or not); C00 back to the instrument's own GRP
+    lda.w trk_cval,x
+    sta.w trk_chord,x
+    rts
+@not_c:
     cmp #CMDID_M
     bne @not_m
     ; M: master volume (both channels)
@@ -1379,6 +1390,13 @@ grp_fanout:
     sta trig_id
     txa
     sta grp_track
+    ; the C command overrides the record's GRP with a 2-voice chord
+    lda.w trk_chord,x
+    beq @from_rec
+    lda #$02
+    sta grp_span
+    bra @go
+@from_rec:
     rep #$30
 .ACCU 16
     lda trig_id
@@ -1393,7 +1411,9 @@ grp_fanout:
     lda.l $7E0000 + SB_INSTR + 8,x  ; span
     and #$03
     sta grp_span
-    beq @out
+    bne @go
+    jmp @out
+@go:
     lda #$01
     sta grp_m
 @member:
@@ -1403,7 +1423,35 @@ grp_fanout:
     cmp #TRACKS
     bcs @out
     sta trig_voice
-    ; member offset = rec[8 + m]
+    ; member offset: the C-command nibbles when overriding, else rec[8+m]
+    phx
+    rep #$30
+.ACCU 16
+    lda grp_track
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w trk_chord,x
+    plx
+    cmp #$00                ; plx set the flags; re-test the chord byte
+    beq @rec_ofs
+    ; m=1 -> x nibble, m=2 -> y nibble
+    pha
+    lda grp_m
+    cmp #$01
+    beq @hi_nib
+    pla
+    and #$0F
+    bra @ofs_have
+@hi_nib:
+    pla
+    lsr
+    lsr
+    lsr
+    lsr
+    bra @ofs_have
+@rec_ofs:
     rep #$30
 .ACCU 16
     lda trig_id
@@ -1421,6 +1469,7 @@ grp_fanout:
     sep #$20
 .ACCU 8
     lda.l $7E0000 + SB_INSTR + 8,x
+@ofs_have:
     clc
     adc trig_note
     cmp #NOTE_MAX
