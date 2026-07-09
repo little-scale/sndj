@@ -9,6 +9,14 @@
 
 .DEFINE MAGIC_BOOT_OK $5D    ; written to magic_boot when init completes
 
+; sync modes (genmddj numbering; sync.asm/midi.asm implement them)
+.DEFINE SYNC_OFF   0
+.DEFINE SYNC_OUT   1
+.DEFINE SYNC_PULSE 2
+.DEFINE SYNC_IN    3
+.DEFINE SYNC_MIDI  4
+.DEFINE SYNC_IN24  5
+
 .ENUM $0000
 frame_flag   db      ; $00  set by NMI, cleared by main loop
 magic_boot   db      ; $01  = MAGIC_BOOT_OK once init is complete
@@ -225,6 +233,28 @@ tg_vibtrm    dw      ; trigger scratch: instr VIB/TRM bytes (es3 is the tick loo
 trk_voll     ds 8    ; live volume L (signed): record at load, X/P/U retarget,
 trk_volr     ds 8    ; TRM dips from it              live volume R
 ap_vol       dw      ; apply_instrument scratch: record VOL L/R pair
+; --- sync (M12) + MIDI takeover (M14); genmddj numbering ---
+opt_sync     db      ; 0 OFF, 1 OUT (dummy), 2 PULSE, 3 IN, 4 MIDI, 5 IN24 (SRAM $0009)
+sync_last    db      ; IN: 2-bit counter (port 2 D0/D1) read last poll
+sync_wait    db      ; IN: armed — hold silently until the first external clock
+sync_gctr    db      ; IN: accrued clocks toward the next row
+sync_cnt     db      ; PULSE: tick phase within the 12-tick cycle
+sync_act     dw      ; activity counter (clocks in / pulses out) for the chrome
+sync_shadow  db      ; last-seen opt_sync (detects MIDI entry/exit)
+sy_tmp       db      ; sync poll scratch (es* belong to the tick loop)
+midi_instr   ds 8    ; MIDI: each voice's current instrument (PC changes it)
+midi_note    ds 8    ; MIDI: sounding console note index ($FF = none)
+midi_bsemi   ds 8    ; MIDI: pitch-bend whole semitones (signed)
+midi_bfine   ds 8    ; MIDI: pitch-bend fraction (signed 1/256 semi)
+midi_rx      dw      ; monitor: decoded-event counter
+midi_last    ds 3    ; monitor: last frame (status, d1, d2)
+mp_cap       db      ; midi_poll: events left this frame
+mp_bits      db      ; midi_clock_byte: bit counter
+mp_b         db      ; midi_clock_byte: shift accumulator
+mp_settle    db      ; midi_clock_bit: low-phase settle counter
+mp_ev        ds 3    ; current event (status, d1, d2)
+mp_voice     db      ; dispatch: addressed voice
+mb_tot       dw      ; bend scratch: signed 1/256-semi total
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

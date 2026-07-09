@@ -495,6 +495,7 @@ song_renew:
     jmp apu_echo_apply
 
 engine_go:
+    jsr sync_play_start     ; port config + slave arming per opt_sync
     ldx #$0000
 @fx_reset:
     lda #$00
@@ -553,7 +554,8 @@ engine_stop:
     jsr apu_dsp_write
     lda #DSP_KOF
     ldy #$0000              ; drop the latch so later KONs win
-    jmp apu_dsp_write
+    jsr apu_dsp_write
+    jmp sync_stop
 
 ; Start: the transport — stop if playing, else play the whole song,
 ; whatever screen you're on (contextual play lives on A+B)
@@ -590,10 +592,20 @@ engine_update:
 engine_tick:
     stz kon_mask
     stz koff_mask
+    ; SYNC IN/IN24: the wire drives row advance (groove ignored); fx and
+    ; the KON/KOF ship still run per APU tick
+    lda opt_sync
+    cmp #SYNC_IN
+    beq @slv_tramp
+    cmp #SYNC_IN24
+    bne @master
+@slv_tramp:
+    jmp engine_tick_slave
+@master:
     lda eng_tickwait
     beq @row
     dec eng_tickwait
-    bra @fx
+    jmp engine_tick_fx
 @row:
     ; ticks for this row from the active groove
     lda eng_groove
@@ -624,6 +636,7 @@ engine_tick:
     sta eng_gpos
 
     ; advance + trigger every track
+engine_tick_row:
     ldx #$0000
 @each:
     jsr track_row
@@ -633,6 +646,7 @@ engine_tick:
     lda trk_prow            ; mirror track 0 for playhead/checks
     sta eng_row
 @fx:
+engine_tick_fx:
     ; per-tick effects on every live track
     ldx #$0000
 @fxloop:
@@ -658,7 +672,38 @@ engine_tick:
     jsr apu_dsp_write
     inc kon_count
 @no_kon:
+    ; PULSE master: drive the analog clock line every tick
+    lda opt_sync
+    cmp #SYNC_PULSE
+    bne @no_pulse
+    jsr sync_pulse_tick
+@no_pulse:
     rts
+
+; --- SYNC IN/IN24 row gate: external clocks decide the row, one per tick ---------
+; (excess clocks carry in sync_gctr and catch up on following ticks)
+engine_tick_slave:
+    jsr sync_in_poll
+    lda sync_wait
+    bne @hold                ; armed: row 0 stays silent until the first clock
+    lda opt_sync
+    cmp #SYNC_IN24
+    beq @div6
+    lda sync_gctr            ; IN: one row per clock
+    beq @hold
+    dec a
+    sta sync_gctr
+    bra @go
+@div6:
+    lda sync_gctr            ; IN24: 24 PPQN, six clocks per row
+    cmp #$06
+    bcc @hold
+    sbc #$06
+    sta sync_gctr
+@go:
+    jmp engine_tick_row
+@hold:
+    jmp engine_tick_fx
 
 ; --- advance to the next chain position for track X ------------------------------
 ; (LIVE-queued launch beats everything; standalone phrase loops; chain end

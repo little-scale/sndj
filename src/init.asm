@@ -199,6 +199,7 @@ init_video:
 
     ; palette: build CGRAM + the gradient from the persisted scheme
     jsr palette_boot
+    jsr sync_boot
 
     ; font -> BG3 chr
     ldx #VRAM_BG3_CHR

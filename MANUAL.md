@@ -348,9 +348,54 @@ songs as `.sndj` files, share them, rebuild cart images.
 | **PALETTE** | two-colour UI schemes (cursors render as negatives) |
 | **CLONE** | SLIM / DEEP chain cloning (§4) |
 | **VIDEO** | readout of the console standard — NTSC 60 Hz / PAL 50 Hz. Display only: pitch and tempo come from the audio crystal and never change. |
-| **SYNC** | clock sync mode (in development) |
+| **SYNC** | clock sync / MIDI takeover mode (§13a) |
 
 Options persist on the cart across power cycles.
+
+## 13a. Syncing to other gear (OPTIONS → SYNC)
+
+sndj locks to other machines over **controller port 2**, speaking the
+same wire protocol as its siblings — a genmddj or smsggdj master, or
+the ESP32 Link bridge, drives it with no changes on their side.
+
+- **OFF** — no sync (default).
+- **OUT** — reserved (master clock; not wired yet).
+- **PULSE** — analog clock out for Volca / Pocket Operator gear: a
+  2 PPQN pulse on pin 6 while playing.
+- **IN** — **follow** a sibling master (one row per clock). Press
+  Start and the transport arms — the top-right shows **WAIT** — then
+  locks to the first clock (which plays row 0). The master owns the
+  tempo; your groove is ignored until you leave IN. No song-position
+  pointer: each unit plays from its own cursor, LSDJ-style.
+- **MIDI** — MIDI note takeover, below.
+- **IN24** — follow a **24 PPQN** source (the Ableton Link bridge);
+  same WAIT-then-lock behaviour, six clocks per row.
+
+While IN/IN24 is armed, OPTIONS shows a live **RX** clock counter —
+if it climbs, the wire works.
+
+### MIDI takeover (SYNC: MIDI)
+
+sndj becomes an **8-voice BRR sample module**: keep the transport
+stopped, and a keyboard or DAW plays the voices live through the
+ESP32-S3 bridge (the same 3-wire link the clock sync uses).
+
+- **MIDI channels 1–8 map 1:1 onto V1–V8** (9–16 are ignored).
+- Each voice remembers its own **current instrument**, seeded on
+  entry to channel−1 (ch 1 → instr 00 … ch 8 → 07) and changed live
+  by **Program Change** (0–63 → the instrument pool). The instrument
+  is never sent over MIDI — only notes, like a phrase INSTR column.
+- **Velocity** drives the voice level, **pitch bend** bends ±2
+  semitones (kits don't bend), note-off releases the hardware
+  envelope. Kits play their slots chromatically.
+- **CC 7** = volume, **CC 10** = pan, **CC 91** = echo send on/off,
+  **CC 74** = FIR preset — the room stays playable from the DAW.
+- OPTIONS shows the decode monitor while in MIDI mode: **RX** counts
+  every decoded event, plus the last frame's raw bytes — the console
+  half of the two-sided bring-up diagnostic.
+
+Entering the mode silences everything and re-seeds the channel map;
+leaving it (or a MIDI panic message) releases all voices.
 
 ## 14. Quick reference
 

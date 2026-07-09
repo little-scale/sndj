@@ -56,6 +56,8 @@
 .DEFINE WMADDH   $2183
 
 ; --- CPU / system --------------------------------------------------------
+.DEFINE JOYSER0  $4016
+.DEFINE JOYSER1  $4017
 .DEFINE NMITIMEN $4200
 .DEFINE WRIO     $4201
 .DEFINE WRMPYA   $4202

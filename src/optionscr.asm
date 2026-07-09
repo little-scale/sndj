@@ -56,7 +56,7 @@ options_update:
 .ACCU 8
     bne @b_held
     stz b_down
-    bra @cursor
+    jmp @cursor
 @b_held:
     lda opt_cur
     cmp #$01
@@ -82,6 +82,48 @@ options_update:
 @b_done_far:
     jmp options_draw
 @not_clone:
+    lda opt_cur
+    cmp #$03
+    bne @not_sync
+    ; SYNC: B + left/right cycles the six modes and persists
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_LEFT
+    sep #$20
+.ACCU 8
+    beq @sy_r
+    lda #$01
+    sta b_used
+    lda opt_sync
+    dec a
+    bpl @sy_set
+    lda #$05
+    bra @sy_set
+@sy_r:
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_RIGHT
+    sep #$20
+.ACCU 8
+    beq @b_done_far
+    lda #$01
+    sta b_used
+    lda opt_sync
+    inc a
+    cmp #$06
+    bcc @sy_set
+    lda #$00
+@sy_set:
+    sta opt_sync             ; midi_service applies MIDI entry/exit next frame
+    lda.l $700000
+    cmp #'S'
+    bne @b_done_far
+    lda opt_sync
+    sta.l $700009
+    jmp options_draw
+@not_sync:
     ; PALETTE (field 0) edits
     lda opt_cur
     bne @b_done
@@ -267,20 +309,20 @@ options_draw:
     bne @pname
     bra @next
 @fixed:
-    ; fixed placeholders, dim
+    ; SYNC (field 3): the live mode name
     rep #$20
 .ACCU 16
-    lda #ATTR_DIM
+    lda #ATTR_TEXT
     sta text_attr
     sep #$20
 .ACCU 8
-    lda ui_cnt
+    lda opt_sync
     rep #$30
 .ACCU 16
     and #$00FF
     asl
     tax
-    lda.w opt_values,x
+    lda.w sync_names,x
     tax
     sep #$20
 .ACCU 8
@@ -290,12 +332,68 @@ options_draw:
     lda ui_cnt
     cmp #OPT_FIELDS
     bne @rows_far
-    rts
+    ; monitor line (y14): IN/IN24 show clocks received, MIDI shows the
+    ; decoded-event counter + last frame — the bring-up diagnostic
+    lda opt_sync
+    cmp #SYNC_IN
+    beq @mon
+    cmp #SYNC_IN24
+    beq @mon
+    cmp #SYNC_MIDI
+    beq @mon
+    ; not a monitored mode: blank the line (stale RX text otherwise)
+    lda #2
+    sta text_x
+    lda #14
+    sta text_y
+    rep #$20
+.ACCU 16
+    lda #ATTR_DIM
+    sta text_attr
+    sep #$20
+.ACCU 8
+    ldx #str_o_blank
+    jmp text_puts
+@mon:
+    lda #2
+    sta text_x
+    lda #14
+    sta text_y
+    rep #$20
+.ACCU 16
+    lda #ATTR_DIM
+    sta text_attr
+    sep #$20
+.ACCU 8
+    ldx #str_o_rx
+    jsr text_puts
+    lda opt_sync
+    cmp #SYNC_MIDI
+    beq @mon_midi
+    lda sync_act + 1
+    jsr text_hex8
+    lda sync_act
+    jmp text_hex8
+@mon_midi:
+    lda midi_rx + 1
+    jsr text_hex8
+    lda midi_rx
+    jsr text_hex8
+    lda #' ' - 32
+    jsr text_puttile
+    lda midi_last
+    jsr text_hex8
+    lda #' ' - 32
+    jsr text_puttile
+    lda midi_last + 1
+    jsr text_hex8
+    lda midi_last + 2
+    jmp text_hex8
 @rows_far:
     jmp @rows
 
 opt_labels: .DW str_o_pal, str_o_clone, str_o_vid, str_o_sync
-opt_values: .DW str_o_pal, str_o_pal, str_o_v60, str_o_soff
+sync_names: .DW str_o_soff, str_o_sout, str_o_spul, str_o_sin, str_o_smid, str_o_s24
 
 str_options: .DB "OPTIONS", 0
 str_o_pal:   .DB "PALETTE", 0
@@ -307,4 +405,11 @@ str_o_sync:  .DB "SYNC", 0
 str_o_v60:   .DB "60HZ", 0
 str_o_ntsc:  .DB "NTSC 60HZ", 0
 str_o_pal50: .DB "PAL 50HZ ", 0
-str_o_soff:  .DB "OFF", 0
+str_o_soff:  .DB "OFF  ", 0
+str_o_sout:  .DB "OUT  ", 0
+str_o_spul:  .DB "PULSE", 0
+str_o_sin:   .DB "IN   ", 0
+str_o_smid:  .DB "MIDI ", 0
+str_o_s24:   .DB "IN24 ", 0
+str_o_rx:    .DB "RX ", 0
+str_o_blank: .DB "                ", 0

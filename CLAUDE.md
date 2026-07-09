@@ -627,9 +627,15 @@ special" deliverable in user-facing form.
   shifting** requirement for the ESP32 bridge (same lesson as the Game Gear
   link work).
 - **Modes** (⚖ SETTLED — numbered identically to genmddj/smsggdj):
-  `OFF / OUT / PULSE / IN / IN24`. OUT/IN = 1 clock per row; IN24 =
-  24 PPQN for the Link bridge. In IN modes the external clock leases the
-  tick (§3.4).
+  `OFF / OUT / PULSE / IN / IN24` (+ MIDI in slot 4, as on genmddj).
+  OUT/IN = 1 clock per row; IN24 = 24 PPQN for the Link bridge. In IN
+  modes the external clock drives ROW advance (fx keep the APU tick).
+  **Status (2026-07-09)**: IN/IN24/PULSE/MIDI built (`src/sync.asm`,
+  `src/midi.asm`; checks `sync.lua`/`midi.lua` inject clocks on the
+  real pin-read paths); **OUT is a selectable dummy** — the SNES can
+  drive only IOBit, so a single-line row clock locks sndj→sndj but a
+  genmddj slave needs a ten-line "edge IN" patch or the bridge as
+  translator; decision pending. 🔩 hardware bring-up pending.
 - **Cross-sibling cable**: a DE-9 ↔ SNES-plug adapter locks a Mega Drive
   and a SNES (or SMS) on one row clock — an explicit test case in the
   release checklist. One rig, three consoles, one transport.
@@ -648,16 +654,22 @@ special" deliverable in user-facing form.
 sndj as an **8-voice BRR sample module**, driven live from a DAW or
 keyboard through the controller-port bridge.
 
-- **Transport**: auto-joypad reading is disabled while MIDI mode is armed;
-  the CPU manually strobes latch/clock and reads port 2's two data lines —
-  2 bits per clock, the nibble-ingest pattern already designed for the
-  genmddj port-2 work. The ESP32 bridge presents itself as a shift register
-  carrying framed messages (sync byte + 3-byte MIDI message, running status
-  resolved on the bridge so the console parser stays trivial). Budget: even
-  a conservative 20 µs/bit manual clock gives tens of kilobits/s — hundreds
-  of MIDI messages per frame; latency is bounded by the poll cadence
-  (poll in the main loop at tick rate + once per NMI → worst case ~2 ms).
-- **Mapping** (MIDI screen, §8): per-voice MIDI channel, or **pool mode**
+- **Transport (as built, `src/midi.asm`)**: the genmddj-proven 2-wire
+  protocol, verbatim, so the ESP32-S3 bridge firmware serves all three
+  siblings with no reflash: the console is the clock master — CLK =
+  IOBit (port 2 pin 6, `$4201` bit 7, push-pull; the open-drain RC-ramp
+  lesson is inherited), DAT = D0 (pin 4, `$4017` bit 0). Per event the
+  S3 presents a leading flag bit (1 = a 3-byte bridge-normalised frame
+  follows: `type<<4|channel`, d1, d2; 0 = queue empty), MSB first,
+  sampled on the rising edge, next bit presented on the falling edge.
+  Auto-joypad reading stays ON (pads keep working); the drain runs once
+  per frame from the main loop, gated on `$4212`, capped at 8
+  events/frame. The earlier latch/clock nibble-ingest sketch is
+  superseded — no manual pad strobing needed.
+- **Mapping** (v1 built: channels 1-8 → V1-V8 fixed, PC → instrument
+  0-63, velocity → level, bend ±2 semi, CC7/10/91/74, RX monitor on
+  OPTIONS; the rest below is the v2 wishlist). Per-voice MIDI channel,
+  or **pool mode**
   (one channel, 8-voice round-robin polyphony with voice stealing —
   genuinely playable pads); Program Change → instrument; velocity → volume
   (curve in OPTIONS); pitch bend → pitch (range setting); CC1 → vibrato

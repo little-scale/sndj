@@ -37,6 +37,8 @@
 .INCLUDE "pool.asm"
 .INCLUDE "screens.asm"
 .INCLUDE "engine.asm"
+.INCLUDE "sync.asm"
+.INCLUDE "midi.asm"
 .INCLUDE "phrase.asm"
 .INCLUDE "chainscr.asm"
 .INCLUDE "songscr.asm"
@@ -71,6 +73,7 @@ main_loop:
     jsr input_update
     jsr apu_update
     jsr engine_update
+    jsr midi_service
     jsr tick_track
 
     jsr screen_update
@@ -147,6 +150,10 @@ draw_status:
     sep #$20
 .ACCU 8
     ldx #str_play
+    lda sync_wait            ; armed slave: holding for the external clock
+    beq @have_str
+    ldx #str_wait
+@have_str:
     jmp text_puts
 @stopped:
     rep #$20
@@ -160,6 +167,7 @@ draw_status:
 
 str_apu_bad: .DB "APU?", 0
 str_play:    .DB "PLAY", 0
+str_wait:    .DB "WAIT", 0
 str_stop:    .DB "STOP", 0
 
 ; the mini map (sibling chrome, smsggdj letters): 3x5 at the top right,

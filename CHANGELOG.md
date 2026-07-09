@@ -5,6 +5,19 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- **Sync (M12, console side) + MIDI takeover (M14, console side).**
+  OPTIONS → SYNC now works: **IN** follows a sibling master one row
+  per clock, **IN24** follows the 24-PPQN Ableton Link bridge (÷6) —
+  both with WAIT arming (Start holds silently, the first clock plays
+  row 0) and lossless 2-bit catch-up, wire-identical to genmddj so no
+  bridge reflash is needed. **PULSE** drives a 2 PPQN Volca/PO clock
+  on pin 6. **MIDI** turns sndj into an 8-voice sample module:
+  channels 1-8 map onto V1-V8, velocity → level, Program Change →
+  instrument, pitch bend ±2 semi, CC 7/10/91/74 = vol/pan/echo/FIR,
+  with a live RX monitor on OPTIONS. OUT is selectable but inert for
+  now. The mode persists on the cart. Hardware bring-up still to come
+  (checks inject clocks/frames on the real pin-read paths).
+
 - Command reshuffle to match the family: **`X` is now volume/accent**
   (as in genmddj) — `X xy` sets the voice's level (both sides, 00-7F),
   persisting like `P` until the instrument reloads. **The echo send
