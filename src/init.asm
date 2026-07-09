@@ -57,6 +57,9 @@ Reset:
     jsr init_video
     jsr apu_upload_driver   ; on timeout: apu_status=1, UI shows "APU?"
     bcs +
+    lda #$FF
+    sta edl_applied         ; no echo config shipped yet
+    stz apu_cool
     jsr apu_audio_init      ; factory sample + directory + voice 0 config
 +
     jsr song_init           ; fresh song block (NEW)
@@ -66,6 +69,9 @@ Reset:
     jsr wave_sync_all       ; compile + upload the 8 wave banks
     jsr residency_build     ; upload the samples this song references
     jsr apu_echo_apply      ; song echo defaults -> DSP (safe reconfig)
+    ; (no auto-EDL at boot: the 30 KB buffer clear leaves the driver deaf
+    ; for ~20 frames, which soft-reset paths turn into missed input;
+    ; PROJECT NEW / load-on-empty open the room via song_renew instead)
 +
 
     ; per-voice instrument shadows start unknown so the first apply loads

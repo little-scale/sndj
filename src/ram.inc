@@ -255,6 +255,10 @@ mp_settle    db      ; midi_clock_bit: low-phase settle counter
 mp_ev        ds 3    ; current event (status, d1, d2)
 mp_voice     db      ; dispatch: addressed voice
 mb_tot       dw      ; bend scratch: signed 1/256-semi total
+edl_applied  db      ; EDL the driver last configured ($FF = never)
+apu_cool     db      ; frames to hold the heartbeat off (driver inside a
+                     ; long echo reconfig; a blocked write would freeze
+                     ; the main loop and eat input)
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

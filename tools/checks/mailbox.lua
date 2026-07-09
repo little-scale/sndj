@@ -49,7 +49,7 @@ local function onFrame()
     local t = wram(0x0011)
     check(t ~= tick_sample, "APU tick telemetry advancing (" ..
       tick_sample .. " -> " .. t .. ")")
-    -- after audio + echo init: unmuted, echo active (EDL 0 buffer at $FF00)
+    -- after audio + echo init: unmuted, echo idle at EDL 0 (buffer at $FF00)
     check(dsp(0x6C) == 0x20, "DSP FLG unmuted, echo idle at EDL 0 ($" ..
       string.format("%02X", dsp(0x6C)) .. ")")
   elseif frames == 100 then

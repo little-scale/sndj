@@ -94,6 +94,8 @@ emu.addEventCallback(function()
   elseif frames == 580 then
     check(wram(0x4300) == 0, "LOAD on (EMPTY) blanked the working song")
     check(wram(0x3602) == 0xD7, "fresh song re-seeded (magic)")
+    check(wram(0x3603) == 15,
+      "a NEW song auto-opens the delay to the ARAM max (EDL 15)")
   elseif frames == 640 then
     -- rename: B-hold + Up on the working song's name (empty row);
     -- S -> T (ring: blank, A-Z, specials, digits)

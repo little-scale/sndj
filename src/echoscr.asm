@@ -224,6 +224,29 @@ ef_nudge:
 @light:
     jmp apu_echo_apply_light
 
+; --- fresh song: open the delay as wide as the resident set allows -------------
+; (runs after residency_build on boot/NEW; the caller applies the echo).
+; max EDL = free 2 KB steps above the samples, capped by the field's 15.
+echo_auto_edl:
+    rep #$30
+.ACCU 16
+    lda res_cursor
+    eor #$FFFF
+    inc a                   ; $10000 - res_cursor
+    xba
+    and #$00FF
+    lsr
+    lsr
+    lsr                     ; >> 11 = free 2 KB steps
+    sep #$20
+.ACCU 8
+    cmp #$0F
+    bcc @have
+    lda #$0F
+@have:
+    sta.l $7E0000 + SB_HEADER + SH_EDL
+    rts
+
 echo_draw:
     stz ui_cnt
 @rows:

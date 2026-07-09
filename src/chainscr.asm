@@ -694,6 +694,35 @@ chain_cursor_move:
 @nd:
     rts
 
+; carry set when any live track is playing ed_chain at entry tmp0+1
+chain_playrow:
+    lda eng_playing
+    beq @no
+    phx
+    ldx #$0000
+@scan:
+    lda.w trk_chain,x
+    cmp ed_chain
+    bne @next
+    lda.w trk_phrase,x
+    cmp #$FF
+    beq @next
+    lda.w trk_cpos,x
+    cmp tmp0 + 1
+    beq @yes
+@next:
+    inx
+    cpx #TRACKS
+    bne @scan
+    plx
+@no:
+    clc
+    rts
+@yes:
+    plx
+    sec
+    rts
+
 chain_draw:
     stz tmp0 + 1
 @rows:
@@ -710,6 +739,19 @@ chain_draw:
 .ACCU 8
     lda tmp0 + 1
     jsr text_hex8
+    ; playhead: any track walking this chain at this entry (drawn plain;
+    ; the phrase cell carries the highlight)
+    lda #2
+    sta text_x
+    jsr chain_playrow
+    bcc @no_head
+    lda #GLYPH_ARROW_R
+    jsr text_puttile
+    bra @fetch
+@no_head:
+    lda #' ' - 32
+    jsr text_puttile
+@fetch:
     ; fetch row bytes
     rep #$30
 .ACCU 16
@@ -793,6 +835,16 @@ chain_cell_attr:
 .ACCU 8
     rts
 @plain:
+    jsr chain_playrow
+    bcc @text
+    rep #$20
+.ACCU 16
+    lda #ATTR_HILITE
+    sta text_attr
+    sep #$20
+.ACCU 8
+    rts
+@text:
     rep #$20
 .ACCU 16
     lda #ATTR_TEXT

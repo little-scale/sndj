@@ -5,6 +5,26 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- **Fixed: a track whose column starts with empty rows never played.**
+  Tracks now enter at the first populated cell at/below the start row
+  (the genmddj rule), so a chain placed at row 01 joins the song; a
+  fully empty column still stays silent. Regression check: entry.lua.
+- **Play indicators everywhere**: CHAIN gained a playhead arrow with
+  the playing entry highlighted (any track walking the edited chain);
+  SONG highlights the row label of every playing row (the playing cell
+  already inverts); GROOVE's step marker moved to the LEFT of the
+  ticks column, drawn plain, with the tick value carrying the
+  highlight instead.
+- **NEW opens the room automatically**: PROJECT NEW (and FILES
+  load-on-empty) set the delay to whatever the resident sample set
+  allows — EDL 15 with the factory set. Boot stays at EDL 0 so power-on
+  is instant. Under the hood: echo reconfig is now idempotent (an
+  unchanged EDL skips the driver's drain — song loads no longer stall
+  up to 240 ms), the driver skips the 280 ms offset-wrap drain when the
+  buffer GROWS (only shrinks can strand an in-flight offset), and the
+  CPU holds its heartbeat off for the reconfig's deaf window instead of
+  freezing the UI on a blocked mailbox.
+
 - **The factory model got lean and legible.** Instruments 00-06 are
   pitched SMP melodics, 07 is KIT 0 (SMW percussion); slots 08-63
   ship as SMP-on-sample-0 and kits 1-15 as blank canvases. Since

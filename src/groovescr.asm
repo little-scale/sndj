@@ -260,15 +260,38 @@ groove_draw:
 .ACCU 8
     lda ui_cnt
     jsr text_hex8
-    ; value cell
+    ; playhead: left of the ticks column, drawn plain (the value below
+    ; carries the highlight)
+    lda #5
+    sta text_x
+    jsr gv_playrow
+    bcc @no_head
+    lda #GLYPH_ARROW_R
+    jsr text_puttile
+    bra @val_cell
+@no_head:
+    lda #' ' - 32
+    jsr text_puttile
+@val_cell:
+    ; value cell: cursor accent > playing hilite > plain
     lda #6
     sta text_x
     lda ui_cnt
     cmp gv_row
-    bne @plain
+    bne @not_cur
     rep #$20
 .ACCU 16
     lda #ATTR_ACCENT
+    sta text_attr
+    sep #$20
+.ACCU 8
+    bra @val
+@not_cur:
+    jsr gv_playrow
+    bcc @plain
+    rep #$20
+.ACCU 16
+    lda #ATTR_HILITE
     sta text_attr
     sep #$20
 .ACCU 8
@@ -290,31 +313,6 @@ groove_draw:
     sta gv_row
     lda.l $7E0000,x
     jsr text_hex8
-    ; playing-position marker on the active groove
-    lda #9
-    sta text_x
-    lda eng_playing
-    beq @no_head
-    lda eng_groove
-    cmp ed_groove
-    bne @no_head
-    lda eng_gpos
-    dec a
-    and #$0F
-    cmp ui_cnt
-    bne @no_head
-    rep #$20
-.ACCU 16
-    lda #ATTR_HILITE
-    sta text_attr
-    sep #$20
-.ACCU 8
-    lda #GLYPH_ARROW_R
-    jsr text_puttile
-    bra @next
-@no_head:
-    lda #' ' - 32
-    jsr text_puttile
 @next:
     inc ui_cnt
     lda ui_cnt
@@ -322,6 +320,24 @@ groove_draw:
     beq @done
     jmp @rows
 @done:
+    rts
+
+; carry set when step ui_cnt is the playing position of the edited groove
+gv_playrow:
+    lda eng_playing
+    beq @no
+    lda eng_groove
+    cmp ed_groove
+    bne @no
+    lda eng_gpos
+    dec a
+    and #$0F
+    cmp ui_cnt
+    bne @no
+    sec
+    rts
+@no:
+    clc
     rts
 
 ; print tmp0 (16-bit, <= 999) as three decimal digits at text_x/y

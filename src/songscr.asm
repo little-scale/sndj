@@ -395,6 +395,33 @@ song_snap_window:
 @done:
     rts
 
+; carry set when any live track's song row equals A (absolute row)
+song_playrow:
+    sta es3
+    lda eng_playing
+    beq @no
+    phx
+    ldx #$0000
+@scan:
+    lda.w trk_phrase,x
+    cmp #$FF
+    beq @next
+    lda.w trk_songrow,x
+    cmp es3
+    beq @yes
+@next:
+    inx
+    cpx #TRACKS
+    bne @scan
+    plx
+@no:
+    clc
+    rts
+@yes:
+    plx
+    sec
+    rts
+
 song_draw:
     stz tmp0 + 1            ; visible row counter
 @rows:
@@ -402,14 +429,28 @@ song_draw:
     clc
     adc #5
     sta text_y
-    ; row label = song_top + i
+    ; row label = song_top + i; hilite while a track plays this row
     stz text_x
+    lda song_top
+    clc
+    adc tmp0 + 1
+    jsr song_playrow
+    bcs @lab_play
     rep #$20
 .ACCU 16
     lda #ATTR_DIM
     sta text_attr
     sep #$20
 .ACCU 8
+    bra @lab_go
+@lab_play:
+    rep #$20
+.ACCU 16
+    lda #ATTR_HILITE
+    sta text_attr
+    sep #$20
+.ACCU 8
+@lab_go:
     lda song_top
     clc
     adc tmp0 + 1

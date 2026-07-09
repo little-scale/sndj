@@ -101,6 +101,9 @@ elsewhere pastes it. Works in PHRASE, CHAIN and SONG.
 - A chain that ends in the song grid loops back to the top of its
   track's contiguous block — so a 4-row loop keeps looping without
   needing the grid filled to the bottom.
+- On play, each track **enters at the first populated cell at/below
+  the start row** — a column can leave early rows empty and join late.
+  A fully empty column stays silent.
 
 ## 3. The screens
 
@@ -129,7 +132,7 @@ left/right.
 | **GROOVE** | ticks-per-row patterns — grooves ARE the tempo. |
 | **ECHO** | the room: delay, feedback, level, per-voice sends. |
 | **FIR** | the echo filter's 8 taps, hex-editable, with presets. |
-| **PROJECT** | song name, BPM, transpose, default groove, LIVE mode, NEW. |
+| **PROJECT** | song name, BPM, transpose, default groove, LIVE mode, NEW (a fresh song opens the delay to whatever audio RAM allows). |
 | **FILES** | save / load / rename songs in cart SRAM. |
 | **OPTIONS** | device settings: palette, cloning depth, video readout. |
 

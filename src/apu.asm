@@ -299,9 +299,42 @@ apu_echo_apply_light:
 
 apu_echo_apply:
     jsr apu_echo_apply_light
-    ; EDL/ESA: echo buffer at the top of ARAM (ESA = $100 - EDL*8 pages)
+    ; EDL/ESA: echo buffer at the top of ARAM (ESA = $100 - EDL*8 pages).
+    ; Idempotent: an unchanged EDL skips the driver's safe reconfig —
+    ; the drain of the OLD delay line otherwise stalls the main loop for
+    ; up to 240 ms on every song load
     lda.l $7E0000 + SB_HEADER + SH_EDL
     and #$0F
+    cmp edl_applied
+    bne @cfg
+    rts
+@cfg:
+    ; heartbeat cooldown sized to the driver's deaf window: the buffer
+    ; clear (~2 frames per EDL step) plus the shrink drain (old delay +
+    ; the 17-tick offset wrap); a first config ($FF) counts as a grow
+    pha
+    asl
+    clc
+    adc #$04
+    sta apu_cool
+    pla
+    pha
+    lda edl_applied
+    cmp #$FF
+    beq @grow
+    pla
+    pha
+    cmp edl_applied
+    bcs @grow               ; new >= old: no drain
+    lda edl_applied
+    clc
+    adc #20
+    clc
+    adc apu_cool
+    sta apu_cool
+@grow:
+    pla
+    sta edl_applied
     sta tmp2                ; payload lo = EDL
     asl
     asl
@@ -1037,6 +1070,11 @@ apu_update:
     sta.w envx_mirror,x
     lda APUIO2
     sta.w envx_mirror + 1,x
+    lda apu_cool
+    beq @cool_ok
+    dec apu_cool            ; driver busy reconfiguring: no heartbeat
+    bra @done
+@cool_ok:
     lda apu_status
     bne @done               ; don't hammer a dead mailbox every heartbeat
     rep #$20

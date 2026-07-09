@@ -263,10 +263,43 @@ track_load_songrow:
     plx
     sta.w trk_chain,x
     cmp #$FF
-    beq @halt
+    beq @scan_down
     lda #$00
     sta.w trk_cpos,x
     jmp track_load_chain_entry
+@scan_down:
+    ; sibling contract (genmddj 5.4): a track ENTERS at the first
+    ; populated cell at/below the start row. Tight flat walk - a naive
+    ; loader re-entry per row cost ~2 frames of Start latency
+    phx
+    rep #$30
+.ACCU 16
+    txa
+    xba
+    lsr                     ; track*128 = column base
+    sta tmp2
+    lda.w trk_songrow,x
+    and #$00FF
+    tay                     ; Y = row
+    clc
+    adc tmp2
+    tax                     ; X = grid index of the current row
+    sep #$20
+.ACCU 8
+@scan:
+    iny
+    inx
+    cpy #SONG_ROWS
+    bcs @scan_halt
+    lda.l $7E0000 + SB_SONG,x
+    cmp #$FF
+    beq @scan
+    tya                     ; found: land there, reload normally
+    plx
+    sta.w trk_songrow,x
+    jmp track_load_songrow
+@scan_halt:
+    plx
 @halt:
     lda #$FF
     sta.w trk_phrase,x
@@ -406,6 +439,7 @@ song_renew:
     jsr song_init
     jsr wave_sync_all
     jsr residency_build
+    jsr echo_auto_edl       ; NEW opens the room as wide as ARAM allows
     jmp apu_echo_apply
 
 engine_go:

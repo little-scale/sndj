@@ -57,6 +57,7 @@ cur_esa   db
 wait_cnt  db
 new_edl   db      ; latched CMD_ECHO_CFG payload (ports change under us)
 new_esa   db
+shrinking db      ; this reconfig shrinks the buffer (offset drain needed)
 .ENDE
 
 .BANK 0 SLOT 0
@@ -219,6 +220,15 @@ echo_cfg:
     bne @do_cfg
     ret
 @do_cfg:
+    ; a GROW can't strand an in-flight offset past the new wrap point,
+    ; so only a SHRINK pays the step-5 drain — the boot 0->15 config
+    ; would otherwise leave the mailbox deaf for ~300 ms
+    mov shrinking, #$00
+    mov a, new_edl
+    cmp a, cur_edl
+    bcs @not_shrink
+    mov shrinking, #$01
+@not_shrink:
     ; 1. mute + disable echo buffer writes
     mov rDSPADDR, #$6C
     mov rDSPDATA, #$60
@@ -262,16 +272,19 @@ echo_cfg:
     inc dest_hi
     dbnz wait_cnt, @clear
     ; 5. the echo OFFSET counter free-runs even with ECEN off; if the new
-    ; EDL is smaller, an in-flight offset never hits the new wrap point and
-    ; the DSP would write past the buffer (wrapping into low ARAM!) once
-    ; re-enabled. Wait a full max-delay (16 x ~16.6 ms) for the offset to
-    ; wrap around before enabling writes.
+    ; EDL is SMALLER, an in-flight offset never hits the new wrap point
+    ; and the DSP would write past the buffer (wrapping into low ARAM!)
+    ; once re-enabled. Wait a full max-delay (16 x ~16.6 ms) for the
+    ; offset to wrap before enabling writes; a grow skips this safely.
+    mov a, shrinking
+    beq @enable
     mov wait_cnt, #17
     mov a, rT0OUT           ; clear the counter
 @offset_wait:
     mov a, rT0OUT
     beq @offset_wait
     dbnz wait_cnt, @offset_wait
+@enable:
     ; 6. re-enable: unmute, echo writes on
     mov rDSPADDR, #$6C
     mov rDSPDATA, #$00
