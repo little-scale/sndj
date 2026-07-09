@@ -1,5 +1,5 @@
 ; chainscr.asm — the CHAIN screen: 16 rows of (PHRASE id, TRANSPOSE).
-; Same B-grammar as everywhere: tap insert, B+d-pad nudge, Y+B block
+; Same B-grammar as everywhere: tap insert, B+d-pad nudge, B+A cut, Y+B block
 ; select (B copy / Y cut / A cancel, B double-tap paste).
 ; Transpose is a signed byte, displayed as hex.
 
@@ -167,7 +167,7 @@ chain_update:
     sta blk_start
     lda #$01
     sta b_used
-    bra @cursor
+    jmp @cursor
 @no_cut:
     rep #$20
 .ACCU 16
@@ -218,6 +218,19 @@ chain_update:
     sta.l $7E0000 + SB_CHAINS + 1,x
     bra @draw
 @b_held:
+    ; B held + A tap: cut the cell
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_A
+    sep #$20
+.ACCU 8
+    beq @no_cut_a
+    lda #$01
+    sta b_used
+    jsr chain_cell_cut
+    bra @draw
+@no_cut_a:
     rep #$20
 .ACCU 16
     lda pad_event
@@ -478,6 +491,24 @@ chain_paste:
     sep #$20
 .ACCU 8
 @done:
+    rts
+
+; B+A: cut the cursor cell (phrase id feeds the next insert; tsp -> 0)
+chain_cell_cut:
+    jsr chain_cell_addr_p
+    lda chain_cx
+    bne @tsp
+    lda.l $7E0000 + SB_CHAINS,x
+    cmp #$FF
+    beq @wr
+    sta ed_lastphrid
+@wr:
+    lda #$FF
+    sta.l $7E0000 + SB_CHAINS,x
+    rts
+@tsp:
+    lda #$00
+    sta.l $7E0000 + SB_CHAINS + 1,x
     rts
 
 chain_hdr:

@@ -4,6 +4,8 @@
 
 - Block select everywhere (Y+B, stretch, B copy / Y cut / A cancel,
   B double-tap paste) on PHRASE, CHAIN and SONG.
+- Single-cell cut is B held + A tap (the cut value feeds the next
+  insert, as before).
 - Channel switching: L/R shoulders (or Y+left/right) hop tracks on SONG,
   CHAIN and PHRASE.
 - Per-instrument echo send (ECHO field) and fine-tune (FINE field,

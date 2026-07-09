@@ -1,6 +1,6 @@
 ; phrase.asm — the PHRASE screen: 16 rows of NOTE / INSTR / CMD / VAL with
 ; the sibling B-grammar: B tap = insert/edit (+audition on the note column),
-; B held + d-pad = nudge (L/R small, U/D big), Y+B = clear cell,
+; B held + d-pad = nudge (L/R small, U/D big), B held + A = cut cell,
 ; Start = play/stop. CMD/VAL are stored but inert until M7; INSTR until M6.
 
 .ACCU 8
@@ -149,7 +149,7 @@ phrase_update:
     sta blk_start
     lda #$01
     sta b_used              ; swallow the release tap
-    bra @dpad_cursor
+    jmp @dpad_cursor
 @no_clear:
 
     ; B edge tracking
@@ -195,6 +195,19 @@ phrase_update:
     bra @dpad_cursor
 
 @b_is_down:
+    ; B held + A tap: cut the cell (deleted value feeds the next insert)
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_A
+    sep #$20
+.ACCU 8
+    beq @no_cut_a
+    lda #$01
+    sta b_used
+    jsr cell_clear
+    bra @draw
+@no_cut_a:
     ; B held + Y tap: copy the cell to the insert buffer (genmddj B+A)
     rep #$20
 .ACCU 16
@@ -395,7 +408,7 @@ cell_copy:
     sta ed_lastval
     rts
 
-; --- Y+B: cut (deleted value becomes the next B-tap insert) --------------------
+; --- B+A: cut (deleted value becomes the next B-tap insert) --------------------
 cell_clear:
     jsr cell_addr
     lda.l $7E0000 + SB_PHRASES,x

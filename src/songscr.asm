@@ -1,6 +1,6 @@
 ; songscr.asm — the SONG screen: 8 track columns x a 16-row window into the
 ; 128-row grid. Cells are chain ids. B tap = insert (last chain), B+d-pad =
-; nudge, Y+B = block select (B copy / Y cut / A cancel, B double-tap
+; nudge, B+A = cut, Y+B = block select (B copy / Y cut / A cancel, B double-tap
 ; paste). Playheads highlight
 ; each track's current song row while playing.
 
@@ -170,7 +170,7 @@ song_update:
     sta blk_start
     lda #$01
     sta b_used
-    bra @cursor
+    jmp @cursor
 @no_cut:
     ; B edges
     rep #$20
@@ -216,6 +216,19 @@ song_update:
     sta.l $7E0000 + SB_SONG,x
     bra @draw
 @b_held:
+    ; B held + A tap: cut the cell
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_A
+    sep #$20
+.ACCU 8
+    beq @no_cut_a
+    lda #$01
+    sta b_used
+    jsr song_cell_cut
+    bra @draw
+@no_cut_a:
     rep #$20
 .ACCU 16
     lda pad_event
@@ -434,6 +447,18 @@ song_draw:
     beq @done
     jmp @rows
 @done:
+    rts
+
+; B+A: cut the cursor cell (chain id feeds the next insert)
+song_cell_cut:
+    jsr song_cell_addr
+    lda.l $7E0000 + SB_SONG,x
+    cmp #$FF
+    beq @wr
+    sta ed_lastchain
+@wr:
+    lda #$FF
+    sta.l $7E0000 + SB_SONG,x
     rts
 
 ; --- block mode on SONG: 1-byte cells along the cursor track, kind 3 --------

@@ -70,6 +70,11 @@ local script = {
   [286] = { down = true }, [288] = {},     -- cursor on row 8
   [294] = { b = true }, [296] = {},
   [298] = { b = true }, [300] = {},        -- double-tap = paste
+  -- B held + A tap: cut the pasted cell on row 8
+  [320] = { b = true },
+  [322] = { b = true, a = true },
+  [324] = { b = true },
+  [326] = {},
 }
 
 emu.addEventCallback(function() emu.setInput(pad, 0) end, emu.eventType.inputPolled)
@@ -120,7 +125,9 @@ emu.addEventCallback(function()
     check(wram(0x4320) == 50, "paste row 8 = C#4")
     check(wram(0x4324) == 0, "paste row 9 empty (from empty row 1)")
     check(wram(0x4328) == 50, "paste row 10 = C#4")
-  elseif frames == 315 then
+  elseif frames == 332 then
+    check(wram(0x4320) == 0, "B held + A cut row 8")
+  elseif frames == 340 then
     local out = os.getenv("SNESDJ_PHRASE_SHOT")
     if out then
       local png = emu.takeScreenshot()
