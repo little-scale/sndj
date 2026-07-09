@@ -2,6 +2,12 @@
 
 ## 0.1.0-dev (unreleased)
 
+- Seven more commands: F fine tune (per track, folds into the trigger
+  tune), M master volume, N noise clock, S sweep up/down, Q GAIN
+  override (direct + the four hardware ramps, Q00 back to ADSR),
+  U surround (invert L/R phase), Z pitch-mod enable. 20 of 25 planned
+  commands now live; C E I O W remain.
+
 - Boot splash carries the tri-pixel SNDJ wordmark (art/sndj-logo.png
   via makelogo.py, drawn in the palette text colour) over a full-width
   inverted version band and the git build stamp — the genmddj layout.

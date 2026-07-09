@@ -17,16 +17,23 @@ str_defname: .DB "SONG    "
 .DEFINE CMDID_A 1
 .DEFINE CMDID_B 2
 .DEFINE CMDID_D 4
+.DEFINE CMDID_F 6
 .DEFINE CMDID_G 7
 .DEFINE CMDID_H 8
 .DEFINE CMDID_K 11
 .DEFINE CMDID_L 12
+.DEFINE CMDID_M 13
+.DEFINE CMDID_N 14
+.DEFINE CMDID_Q 17
 .DEFINE CMDID_P 16
 .DEFINE CMDID_R 18
+.DEFINE CMDID_S 19
 .DEFINE CMDID_T 20
+.DEFINE CMDID_U 21
 .DEFINE CMDID_V 22
 .DEFINE CMDID_X 24
 .DEFINE CMDID_Y 25
+.DEFINE CMDID_Z 26
 
 ; --- initialise a NEW song block ----------------------------------------------
 song_init:
@@ -491,9 +498,11 @@ engine_go:
     sta.w trk_sl_rate,x
     sta.w trk_arp_ph,x
     sta.w trk_vib_ph,x
+    sta.w trk_fine,x
     inx
     cpx #TRACKS
     bne @fx_reset
+    stz eng_pmon
     lda.l $7E0000 + SB_HEADER + SH_GROOVE
     and #(GROOVE_COUNT - 1)
     sta eng_groove
@@ -840,6 +849,11 @@ track_trigger_note:
     jsr apply_instrument
     plx
 @no_apply:
+    ; F command: per-track fine tune folds into the trigger tune context
+    lda.w trk_fine,x
+    clc
+    adc trig_fine
+    sta trig_fine
     lda.w str_buf + 26
     clc
     adc.w trk_tsp,x
@@ -1021,6 +1035,101 @@ row_cmd_pre:
     plx
     rts
 @not_y:
+    cmp #CMDID_N
+    bne @not_n
+    ; N: global noise clock (like the NSE trigger path)
+    lda.w trk_cval,x
+    and #$1F
+    sta eng_noise
+    tay
+    lda #DSP_FLG
+    phx
+    jsr apu_dsp_write
+    plx
+    rts
+@not_n:
+    cmp #CMDID_M
+    bne @not_m
+    ; M: master volume (both channels)
+    lda.w trk_cval,x
+    and #$7F
+    tay
+    lda #DSP_MVOLL
+    phx
+    jsr apu_dsp_write
+    plx
+    lda.w trk_cval,x
+    and #$7F
+    tay
+    lda #DSP_MVOLR
+    phx
+    jsr apu_dsp_write
+    plx
+    rts
+@not_m:
+    cmp #CMDID_F
+    bne @not_f
+    ; F: per-track fine tune (signed 1/256 semitone, applied at trigger)
+    lda.w trk_cval,x
+    sta.w trk_fine,x
+    rts
+@not_f:
+    cmp #CMDID_S
+    bne @not_s
+    ; S xy: sweep up at rate x, or down at rate y (rides the slide fx)
+    lda.w trk_note,x
+    sta.w trk_sl_note,x
+    lda.w trk_cval,x
+    and #$F0
+    beq @s_down
+    lsr
+    lsr
+    lsr
+    lsr
+    sta.w trk_sl_rate,x
+    lda #$FF
+    sta.w trk_sl_tlo,x
+    lda #$3F
+    sta.w trk_sl_thi,x
+    rts
+@s_down:
+    lda.w trk_cval,x
+    and #$0F
+    sta.w trk_sl_rate,x
+    lda #$00
+    sta.w trk_sl_tlo,x
+    sta.w trk_sl_thi,x
+    rts
+@not_s:
+    cmp #CMDID_Q
+    bne @not_q
+    jmp cmd_gain
+@not_q:
+    cmp #CMDID_U
+    bne @not_u
+    jmp cmd_surround
+@not_u:
+    cmp #CMDID_Z
+    bne @not_z
+    ; Z: pitch-mod by the left neighbour (voice 0's bit is inert)
+    lda.w trk_cval,x
+    beq @z_off
+    lda.w bit_for_track,x
+    ora eng_pmon
+    bra @z_wr
+@z_off:
+    lda.w bit_for_track,x
+    eor #$FF
+    and eng_pmon
+@z_wr:
+    sta eng_pmon
+    tay
+    lda #DSP_PMON
+    phx
+    jsr apu_dsp_write
+    plx
+    rts
+@not_z:
     cmp #CMDID_K
     bne @not_k
     lda.w trk_cval,x
@@ -1095,6 +1204,167 @@ row_cmd_pre:
 @halt:
     lda #$FF
     sta.w trk_phrase,x
+    rts
+
+; --- Q xy: GAIN override — mode x (0 = back to ADSR, 1 direct, 2 lin dec,
+; 3 exp dec, 4 lin inc, 5 bent inc), value/rate y ------------------------------
+cmd_gain:
+    lda.w trk_instr,x
+    cmp #$FF
+    beq @out
+    ; the instrument's ADSR1 byte -> es0
+    phx
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR + 2,x
+    sta es0
+    plx
+    lda.w trk_cval,x
+    and #$F0
+    bne @gain
+    ; Q00: ADSR again (bit 7 on)
+    lda es0
+    ora #$80
+    tay
+    txa
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0ADSR1
+    phx
+    jsr apu_dsp_write
+    plx
+    rts
+@gain:
+    lsr
+    lsr
+    lsr
+    lsr
+    cmp #$01
+    bne @ramp
+    ; direct level: 0vvvvvvv from y<<3
+    lda.w trk_cval,x
+    and #$0F
+    asl
+    asl
+    asl
+    bra @g_wr
+@ramp:
+    ; modes 2-5 -> $80/$A0/$C0/$E0 | rate y
+    dec a
+    dec a
+    and #$03
+    asl                     ; 0,2,4,6
+    asl
+    asl
+    asl
+    asl                     ; <<5: $00,$40? no: (mode-2)<<5 = $00,$20,$40,$60
+    ora #$80
+    sta es0 + 1
+    lda.w trk_cval,x
+    and #$0F
+    ora es0 + 1
+@g_wr:
+    tay
+    txa
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0GAIN
+    phx
+    jsr apu_dsp_write
+    plx
+    ; ADSR1 bit 7 off = GAIN active
+    lda es0
+    and #$7F
+    tay
+    txa
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0ADSR1
+    phx
+    jsr apu_dsp_write
+    plx
+    ; envelope no longer matches the record
+    lda #$FF
+    sta.w trk_instr_active,x
+@out:
+    rts
+
+; --- U xy: surround — invert L (x) / R (y) phase via signed volumes ------------
+cmd_surround:
+    lda.w trk_instr,x
+    cmp #$FF
+    beq @out
+    phx
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR + 4,x
+    sta es0
+    lda.l $7E0000 + SB_INSTR + 5,x
+    sta es0 + 1
+    plx
+    lda.w trk_cval,x
+    and #$F0
+    beq @l_ok
+    lda es0
+    eor #$FF
+    inc a
+    sta es0
+@l_ok:
+    lda.w trk_cval,x
+    and #$0F
+    beq @r_ok
+    lda es0 + 1
+    eor #$FF
+    inc a
+    sta es0 + 1
+@r_ok:
+    lda es0
+    tay
+    txa
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0VOLL
+    phx
+    jsr apu_dsp_write
+    plx
+    lda es0 + 1
+    tay
+    txa
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0VOLR
+    phx
+    jsr apu_dsp_write
+    plx
+    lda #$FF
+    sta.w trk_instr_active,x
+@out:
     rts
 
 ; --- GRP: instrument on track X drives voices X+1..X+span with offsets --------
