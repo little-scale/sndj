@@ -211,7 +211,7 @@ emu.addEventCallback(function()
     poke(0x2000, 0)
     poke(0x3700, 0)
     poke(0x3701, 0)
-    poke(0x2401, 8)          -- instr 0 -> 808 BD: pool tune 0, exact pitches
+    poke(0x2401, 23)          -- instr 0 -> SW ORCH: pool tune 0, exact pitches
     cur = 1
     phase = "setup"
   end

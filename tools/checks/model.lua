@@ -11,6 +11,7 @@ local frames = 0
 local _booted = false
 local fails = 0
 local pad = {}
+local env0_peak, env1_peak = 0, 0
 
 local function wram(addr) return emu.read(addr, emu.memType.snesWorkRam) end
 local function dsp(reg) return emu.read(reg, emu.memType.spcDspRegisters) end
@@ -70,6 +71,14 @@ emu.addEventCallback(function()
     return
   end
   frames = frames + 1
+  if frames > 196 then
+    if emu.read(0x08, emu.memType.spcDspRegisters) > env0_peak then
+      env0_peak = emu.read(0x08, emu.memType.spcDspRegisters)
+    end
+    if emu.read(0x18, emu.memType.spcDspRegisters) > env1_peak then
+      env1_peak = emu.read(0x18, emu.memType.spcDspRegisters)
+    end
+  end
   if script[frames] then pad = script[frames] end
 
   if frames == 70 then
@@ -85,15 +94,16 @@ emu.addEventCallback(function()
   elseif frames == 194 then
     -- zero-tune sample for the exact pitch asserts (factory melodics
     -- carry loop-quantise tune corrections)
-    emu.write(0x2401, 8, emu.memType.snesWorkRam)
+    emu.write(0x2401, 23, emu.memType.snesWorkRam)
   elseif frames == 192 then
     check(wram(0x000C) == 3, "A+Left climbed back to SONG")
     check(wram(0x3700) == 0, "chain 00 entry0 -> phrase 00")
     check(wram(0x3701) == 0, "chain 00 entry0 transpose 0")
     check(wram(0x4300) == 49, "phrase 00 row0 = C-4")
     check(wram(0x4340) == 49, "phrase 01 row0 = C-4")
-  elseif frames == 204 then
-    check(dsp(0x08) > 0 and dsp(0x18) > 0, "both envelopes alive")
+  elseif frames == 212 - 2 then
+    check(env0_peak > 0 and env1_peak > 0, "both envelopes alive (peaks " ..
+      env0_peak .. "/" .. env1_peak .. ")")
   elseif frames == 212 then
     check(wram(0x0016) == 1, "song playing")
     check(wram(0x0020) == 0 and wram(0x0021) == 1, "tracks loaded chains 00/01")

@@ -8,6 +8,7 @@ local frames = 0
 local _booted = false
 local fails = 0
 local pad = {}
+local env_peak = { 0, 0, 0 }
 
 local function wram(addr) return emu.read(addr, emu.memType.snesWorkRam) end
 local function dsp(reg) return emu.read(reg, emu.memType.spcDspRegisters) end
@@ -80,6 +81,11 @@ emu.addEventCallback(function()
   end
   frames = frames + 1
   if script[frames] then pad = script[frames] end
+  if frames > at_phrase then
+    for i, r in ipairs({ 0x08, 0x18, 0x28 }) do
+      if dsp(r) > env_peak[i] then env_peak[i] = dsp(r) end
+    end
+  end
 
   if frames == at_instr then
     check(wram(0x000C) == 4, "A+Right opened INSTR from the phrase row")
@@ -88,7 +94,7 @@ emu.addEventCallback(function()
       "factory instrument ADSR present")
     -- exact-pitch asserts below need a zero-tune sample (factory melodics
     -- carry loop-quantise tune corrections now)
-    emu.write(0x2401, 8, emu.memType.snesWorkRam)
+    emu.write(0x2401, 23, emu.memType.snesWorkRam)
   elseif frames == shot_at then
     local out = os.getenv("SNDJ_INSTR_SHOT")
     if out then
@@ -104,9 +110,11 @@ emu.addEventCallback(function()
     check(wram(0x240A) == 7, "OFS2 = 7 semitones")
   elseif frames == at_phrase + 2 then
     check(wram(0x000C) == 1, "back on PHRASE")
-  elseif frames == playing - 6 then
-    check(dsp(0x08) > 0 and dsp(0x18) > 0 and dsp(0x28) > 0,
-      "three envelopes alive")
+  elseif frames == playing - 8 then
+    -- 8 kHz one-shots at chord pitches are short: peaks tracked per frame
+    check(env_peak[1] > 0 and env_peak[2] > 0 and env_peak[3] > 0,
+      "three envelopes alive (peaks " .. env_peak[1] .. "/" ..
+      env_peak[2] .. "/" .. env_peak[3] .. ")")
   elseif frames == playing then
     check(wram(0x0016) == 1, "playing")
     check(dsp(0x4C) & 0x07 == 0x07, "KON hit voices 0+1+2 ($" ..
@@ -117,8 +125,8 @@ emu.addEventCallback(function()
     check(p0 == 0x0800, "voice 0 = C-4 ($" .. string.format("%04X", p0) .. ")")
     check(p1 == 0x0A14, "voice 1 = E-4 ($" .. string.format("%04X", p1) .. ")")
     check(p2 == 0x0BFC, "voice 2 = G-4 ($" .. string.format("%04X", p2) .. ")")
-    check(dsp(0x04) == 9 and dsp(0x14) == 9 and dsp(0x24) == 9,
-      "GRP members use the resident sample (SRCN 9 = 808 BD)")
+    check(dsp(0x04) == 24 and dsp(0x14) == 24 and dsp(0x24) == 24,
+      "GRP members use the resident sample (SRCN 24 = SW ORCH)")
   elseif frames == done then
     if fails == 0 then
       print("ALL PASS instr.lua")

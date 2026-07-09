@@ -7,6 +7,7 @@ local frames = 0
 local _booted = false
 local fails = 0
 local pad = {}
+local kick_peak = 0
 local W = emu.memType.snesWorkRam
 local R = emu.memType.snesPrgRom
 
@@ -44,6 +45,7 @@ emu.addEventCallback(function()
     return
   end
   frames = frames + 1
+  if frames > 44 and dsp(0x08) > kick_peak then kick_peak = dsp(0x08) end
 
   if frames == 14 then pad = { start = true } end
   if frames == 17 then pad = {} end
@@ -52,7 +54,7 @@ emu.addEventCallback(function()
     check(rom(POOL) == string.byte("S") and rom(POOL + 8) == 2,
       "pool v2 magic in ROM bank 1")
     local count = rom(POOL + 9)
-    check(count == 45, "factory pool has 45 samples (" .. count .. ")")
+    check(count == 47, "factory pool has 47 samples (" .. count .. ")")
     check(aram(0x1000) == 0x00 and aram(0x1001) == 0x12,
       "directory slot 0 -> silent stub")
     check(aram(0x1200) == 0x01, "silent stub BRR (END block) uploaded")
@@ -88,16 +90,17 @@ emu.addEventCallback(function()
     end
     check(all_ok, "residency: referenced samples uploaded in order (" ..
       (slot - 1) .. " resident)")
-    check(srcn_of[8] ~= nil and srcn_of[13] ~= nil,
-      "the 808 kit samples made the budget")
-    check(wram(0x3240) == 24 and wram(0x3241) == 0xF4 and wram(0x3242) == 0x50,
-      "kit 1 slot 0 = MP KICK (pool 24, tune -12)")
-    check(wram(0x326C) == 35, "kit 1 slot 11 = MP UNDO")
+    check(srcn_of[16] ~= nil and srcn_of[21] ~= nil,
+      "the SMW kit samples made the budget")
+    check(wram(0x3200) == 16 and wram(0x3201) == 0xE8 and wram(0x3202) == 0x50,
+      "kit 0 slot 0 = SW KICK (pool 16, tune -24)")
+    check(wram(0x3240) == 25 and wram(0x3241) == 0xE8,
+      "kit 1 slot 0 = MP KICK (pool 25, tune -24)")
+    check(wram(0x326C) == 36, "kit 1 slot 11 = MP UNDO")
     check(wram(0x3272) == 0, "kit 1 slots 12-15 empty")
-    check(wram(0x3280) == 36 and wram(0x3282) == 0x50,
-      "kit 2 slot 0 = SW KICK (pool 36)")
-    check(wram(0x32A0) == 44, "kit 2 slot 8 = SW BEEP")
-    check(wram(0x32A6) == 0, "kit 2 slots 9-15 empty")
+    check(wram(0x3280) == 37, "kit 2 slot 0 = MP BONGO1 (toybox)")
+    check(wram(0x32A4) == 46, "kit 2 slot 9 = MP CHEER")
+    check(wram(0x32A8) == 0, "kit 2 slots 10-15 empty")
     check(wram(0x27A0) == 1 and wram(0x27A1) == 2, "instrument 58 is KIT 2")
     -- author a kit test: instrument 7 is factory KIT 0 (the 808)
     poke(0x2000, 0)          -- grid V1r0 = chain 0
@@ -113,17 +116,17 @@ emu.addEventCallback(function()
     pad = {}
   elseif frames == 54 then
     check(wram(0x16) == 1, "playing")
-    -- C-4 -> kit slot 0 -> 808 BD (pool 8)
-    check(dsp(0x04) == srcn_of[8], "kit slot 0 routed to the 808 BD (SRCN " ..
-      tostring(srcn_of[8]) .. ")")
-    check(dsp(0x02) + dsp(0x03) * 256 == 0x0800,
-      "16 kHz factory drum tuned -12 ($0800)")
+    -- C-4 -> kit slot 0 -> SW KICK (pool 16)
+    check(dsp(0x04) == srcn_of[16], "kit slot 0 routed to SW KICK (SRCN " ..
+      tostring(srcn_of[16]) .. ")")
+    check(dsp(0x02) + dsp(0x03) * 256 == 0x0400,
+      "8 kHz factory drum tuned -24 ($0400)")
     check(dsp(0x00) == 0x50 and dsp(0x01) == 0x50, "kit slot volume applied")
-    check(dsp(0x08) > 0, "kick envelope alive")
+    check(kick_peak > 0, "kick envelope ran (peak " .. kick_peak .. ")")
   elseif frames == 80 then
-    -- row 4: F-4 -> slot 5 (808 MC, pool 13), tuned +12
-    check(dsp(0x04) == srcn_of[13], "kit slot 5 routed to the 808 MC (SRCN " ..
-      tostring(srcn_of[13]) .. ")")
+    -- row 4: F-4 -> slot 5 (SW BONGO, pool 21), tuned +12
+    check(dsp(0x04) == srcn_of[21], "kit slot 5 routed to SW BONGO (SRCN " ..
+      tostring(srcn_of[21]) .. ")")
     check(dsp(0x02) + dsp(0x03) * 256 == 0x2000,
       "per-slot tune +12 doubled the pitch")
     if fails == 0 then

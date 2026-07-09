@@ -11,8 +11,8 @@
 .ACCU 8
 .INDEX 16
 
-factory_kit_base: .DB 8, 24, 36
-factory_kit_len:  .DB 16, 12, 9
+factory_kit_base: .DB 16, 25, 37
+factory_kit_len:  .DB 9, 12, 10
 str_defname: .DB "SONG    "
 factory_instr_type: .DB 0, 0, 0, 0, 0, 2, 3, 1
 factory_instr_smp:  .DB 0, 1, 2, 3, 4, 0, 0, 0
@@ -198,7 +198,7 @@ song_init:
     jmp @autoinstr
 @ai_done:
     ; factory kits from the base/length tables:
-    ; kit 0 = 808, kit 1 = Mario Paint, kit 2 = SMW percussion
+    ; kit 0 = SMW percussion, kit 1 = Mario Paint, kit 2 = MP toybox
     stz es2                 ; kit
 @fk_kit:
     stz es2 + 1             ; slot
@@ -245,8 +245,8 @@ song_init:
     adc es2 + 1
     plx
     sta.l $7E0000 + SB_KITS,x       ; sample
-    lda #$F4
-    sta.l $7E0000 + SB_KITS + 1,x   ; tune -12: factory drums are 16 kHz
+    lda #$E8
+    sta.l $7E0000 + SB_KITS + 1,x   ; tune -24: factory drums are 8 kHz
     lda #$50
     sta.l $7E0000 + SB_KITS + 2,x   ; vol
     inc es2 + 1

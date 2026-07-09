@@ -78,9 +78,9 @@ def trim_tail(samples, floor=300):
 
 
 def prep_oneshot(samples, rate, max_ms):
-    # drums live at 16 kHz (factory kit slots are tuned -12): half the ARAM
-    s = resample(trim_tail(samples), rate, 16000)
-    s = s[:int(16 * max_ms)]
+    # drums live at 8 kHz (factory kit slots are tuned -24): quarter ARAM
+    s = resample(trim_tail(samples), rate, 8000)
+    s = s[:int(8 * max_ms)]
     # short fade-out so the END block doesn't click
     fade = min(256, len(s))
     for i in range(fade):
@@ -159,11 +159,34 @@ def sf2_samples(path):
 
 
 # ---------------------------------------------------------------- factory set
-DRUM_KITS = [('01 808', '808')]      # 909 retired for the SMW kit
+DRUM_KITS = []                       # sample-folder kits retired for now
 DRUM_MS = {'BD': 200, 'SD': 170, 'CP': 170, 'CY': 195, 'HO': 160}  # else 112
 SF2_FONT = 'mario_paint'    # melodics come from this font (drums stay Seb's)
+MP_FONT = 'mario_paint'
 SMW_FONT = 'super_mario_world'
-SMW_KIT = [                 # kit 2: SMW percussion, by SAMPLE name (16 kHz)
+
+# pitched sounds, in pool order. The first four are the SMW classics
+# (tracks 1-5 default to pool 0-4), then three Mario Paint icons, then
+# the option-1 songbook fill from both fonts.
+MELODICS = [                # (font, preset name, 8-char pool name)
+    (SMW_FONT, 'Xylophone',       'SW XYLO'),
+    (SMW_FONT, 'Steel Drums',     'SW STEEL'),
+    (SMW_FONT, 'E. Piano',        'SW EPIAN'),
+    (SMW_FONT, 'Slap Bass',       'SW SLAP'),
+    (MP_FONT,  'Square',          'MPSQUARE'),
+    (MP_FONT,  'Recorder',        'MP RECRD'),
+    (MP_FONT,  'Acoustic Guitar', 'MP GUITR'),
+    (SMW_FONT, 'Trombone',        'SW TBONE'),
+    (SMW_FONT, 'Trumpet',         'SW TRMPT'),
+    (SMW_FONT, 'Violin 1',        'SW STRNG'),
+    (SMW_FONT, 'Nylon Guitar',    'SW NYLON'),
+    (SMW_FONT, 'Saxophone',       'SW SAX'),
+    (MP_FONT,  'Organ 1',         'MP ORGAN'),
+    (MP_FONT,  'Vibraphone',      'MP VIBES'),
+    (MP_FONT,  'Glockenspiel',    'MP GLOCK'),
+    (MP_FONT,  'Acoustic Bass',   'MP ABASS'),
+]
+SMW_KIT = [                 # kit 0: SMW percussion, by SAMPLE name
     ('kick-1',       'SW KICK', 160),
     ('snare-1',      'SW SNARE', 200),
     ('snare2-1',     'SW SNAR2', 200),
@@ -174,7 +197,7 @@ SMW_KIT = [                 # kit 2: SMW percussion, by SAMPLE name (16 kHz)
     ('orchestrahit', 'SW ORCH', 250),
     ('2R',           'SW BEEP', 160),
 ]
-MP_KIT = [                  # kit 1: Mario Paint one-shots (16 kHz, cap ms)
+MP_KIT = [                  # kit 1: Mario Paint percussion (by preset)
     ('Kick',        'MP KICK', 160),
     ('Snare',       'MP SNARE', 160),
     ('Snap',        'MP SNAP', 160),
@@ -188,115 +211,86 @@ MP_KIT = [                  # kit 1: Mario Paint one-shots (16 kHz, cap ms)
     ('Yoshi',       'MP YOSHI', 160),
     ('Undo Dog',    'MP UNDO', 160),
 ]
-SF2_PICKS = [               # (preset name, 8-char pool name)
-    ('Acoustic Guitar', 'AC GUITR'),
-    ('Acoustic Bass',   'AC BASS'),
-    ('Square',          'SQUARE'),
-    ('Organ 1',         'ORGAN1'),
-    ('Trumpet',         'TRUMPET'),
-    ('Glockenspiel',    'GLOCKEN'),
-    ('Vibraphone',      'VIBES'),
-    ('Recorder',        'RECORDER'),
+TOYBOX = [                  # kit 2: the Mario Paint toybox (by preset)
+    ('Bongo 1',       'MPBONGO1', 200),
+    ('Bongo 2',       'MPBONGO2', 200),
+    ('Tom',           'MP TOM', 200),
+    ('Splash',        'MPSPLASH', 200),
+    ('Slide Whistle', 'MP SLIDE', 250),
+    ('Glass Shatter', 'MP GLASS', 200),
+    ('Clown Honk',    'MP HONK', 160),
+    ('Baby',          'MP BABY', 250),
+    ('Voice 1',       'MPVOICE1', 200),
+    ('Cheering',      'MP CHEER', 250),
 ]
 
 
 def build_factory():
-    entries = []            # (name, samples, loop_block or None)
-    # melodics from the SF2_FONT soundfont, picked by preset name
-    sf2_path = None
+    entries = []
     sf_dir = os.path.join(ROOT, 'soundfonts')
-    if os.path.isdir(sf_dir):
+
+    def find_font(tag):
+        if not os.path.isdir(sf_dir):
+            return None
         for f in sorted(os.listdir(sf_dir)):
-            if SF2_FONT in f.lower() and f.lower().endswith('.sf2'):
-                sf2_path = os.path.join(sf_dir, f)
-                break
-    if sf2_path:
-        allsmp = sf2_samples(sf2_path)
-        picks = []
-        for preset, short in SF2_PICKS:
-            hit = next((s for s in allsmp
-                        if s['loop'] and s.get('preset') == preset), None)
-            if hit:
-                picks.append((hit, short))
-        for k, (s, short) in enumerate(picks):
-            # bake the SF2 root key/correction into the resample: after
-            # this, playing DSP pitch $1000 sounds engine note 61, so the
-            # tracker keyboard is in tune
-            root_eff = (s.get('root', 60) or 60) - s.get('corr', 0) / 100.0
-            if not 24 <= root_eff <= 108:
-                root_eff = 60
-            shift = 61 - root_eff            # semitones the data must move
-            scale = 2 ** (-shift / 12)       # ideal resample factor vs 32 kHz
-            ideal = scale * 32000 / s['rate']
-            # BRR loops live on 16-sample boundaries. Snapping a loop that
-            # isn't a block multiple retunes the LOOPED section against the
-            # attack (audible pitch step at loop entry). So resample the
-            # whole sample such that the loop length lands EXACTLY on a
-            # block multiple, and push the tiny tuning residual into the
-            # entry's runtime tune fields.
-            ls, le = s['loop']
-            loop_len = le - ls
-            target = max(16, round(loop_len * ideal / 16) * 16)
-            factor = target / loop_len       # exact factor actually applied
-            pcm = resample(s['pcm'], s['rate'], s['rate'] * factor)
-            ls_out = round(ls * factor)
-            trim = ls_out % 16               # align the loop start by
-            pcm = pcm[trim:]                 # shaving the sample head
-            ls_out -= trim
-            end = ls_out + target
-            while len(pcm) < end:            # rounding shortfall: extend
-                pcm.append(pcm[len(pcm) - target])   # seamlessly from the loop
-            pcm = pcm[:end]
-            loop_block = ls_out // 16
-            # runtime tune compensation for the loop-quantise stretch
-            cents = 1200 * math.log2(factor / ideal)
-            semis = int(round(cents / 100))
-            fine = max(-128, min(127, int(round((cents - semis * 100) * 2.56))))
-            entries.append((short, pcm, loop_block, semis, fine))
-    # two drum kits, 16 slots each, drum-machine order preserved
-    for folder, tag in DRUM_KITS:
-        d = os.path.join(ROOT, 'samples', folder)
-        seen = {}
-        for f in sorted(os.listdir(d)):
-            if not f.lower().endswith('.wav'):
+            if tag in f.lower() and f.lower().endswith('.sf2'):
+                return os.path.join(sf_dir, f)
+        return None
+
+    fonts = {}
+    for tag in {MP_FONT, SMW_FONT}:
+        path = find_font(tag)
+        fonts[tag] = sf2_samples(path) if path else []
+
+    # pitched sounds: exact-loop resample (see below), tune residual in
+    # the entry fields
+    for font, preset, short in MELODICS:
+        s = next((x for x in fonts[font]
+                  if x['loop'] and x.get('preset') == preset), None)
+        if s is None:
+            continue
+        root_eff = (s.get('root', 60) or 60) - s.get('corr', 0) / 100.0
+        if not 24 <= root_eff <= 108:
+            root_eff = 60
+        shift = 61 - root_eff
+        scale = 2 ** (-shift / 12)
+        ideal = scale * 32000 / s['rate']
+        ls, le = s['loop']
+        loop_len = le - ls
+        target = max(16, round(loop_len * ideal / 16) * 16)
+        factor = target / loop_len
+        pcm = resample(s['pcm'], s['rate'], s['rate'] * factor)
+        ls_out = round(ls * factor)
+        trim = ls_out % 16
+        pcm = pcm[trim:]
+        ls_out -= trim
+        end = ls_out + target
+        while len(pcm) < end:
+            pcm.append(pcm[len(pcm) - target])
+        pcm = pcm[:end]
+        loop_block = ls_out // 16
+        cents = 1200 * math.log2(factor / ideal)
+        semis = int(round(cents / 100))
+        fine = max(-128, min(127, int(round((cents - semis * 100) * 2.56))))
+        entries.append((short, pcm, loop_block, semis, fine))
+
+    # kits: 8 kHz one-shots (kit slots seed tune -24). SMW picks go by
+    # SAMPLE name (its Percussion preset shares one name); their SF2
+    # loop flags are whole-sample sustains, so loops are ignored.
+    for sname, short, cap in SMW_KIT:
+        s = next((x for x in fonts[SMW_FONT] if x['name'] == sname), None)
+        if s is None:
+            continue
+        pcm = prep_oneshot(s['pcm'], s['rate'], cap)
+        entries.append((short, pcm if len(pcm) >= 16 else [0] * 16, None))
+    for kit in (MP_KIT, TOYBOX):
+        for preset, short, cap in kit:
+            s = next((x for x in fonts[MP_FONT]
+                      if x.get('preset') == preset), None)
+            if s is None:
                 continue
-            code = f.split()[1].split('.')[0]
-            seen[code] = seen.get(code, 0) + 1
-            name = f'{tag} {code}' if seen[code] == 1 else f'{tag} {code}{seen[code]}'
-            pcm, rate = read_wav(os.path.join(d, f))
-            ms = DRUM_MS.get(code, 112)
-            pcm = prep_oneshot(pcm, rate, ms)
-            if len(pcm) < 16:
-                pcm = [0] * 16
-            entries.append((name, pcm, None))
-    # kit 1: Mario Paint one-shots, 16 kHz like the drums
-    if sf2_path:
-        for preset, short, cap in MP_KIT:
-            hit = next((s for s in allsmp if s.get('preset') == preset), None)
-            if hit is None:
-                continue
-            pcm = prep_oneshot(hit['pcm'], hit['rate'], cap)
-            if len(pcm) < 16:
-                pcm = [0] * 16
-            entries.append((short, pcm, None))
-    # kit 2: the SMW percussion set (selected by sample name; their loop
-    # flags are whole-sample sustains, so treat them as one-shots)
-    smw_path = None
-    if os.path.isdir(sf_dir):
-        for f in sorted(os.listdir(sf_dir)):
-            if SMW_FONT in f.lower() and f.lower().endswith('.sf2'):
-                smw_path = os.path.join(sf_dir, f)
-                break
-    if smw_path:
-        smw = sf2_samples(smw_path)
-        for sname, short, cap in SMW_KIT:
-            hit = next((s for s in smw if s['name'] == sname), None)
-            if hit is None:
-                continue
-            pcm = prep_oneshot(hit['pcm'], hit['rate'], cap)
-            if len(pcm) < 16:
-                pcm = [0] * 16
-            entries.append((short, pcm, None))
+            pcm = prep_oneshot(s['pcm'], s['rate'], cap)
+            entries.append((short, pcm if len(pcm) >= 16 else [0] * 16, None))
     return entries
 
 

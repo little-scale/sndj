@@ -18,11 +18,15 @@
 - Factory melodics now come from the Mario Paint soundfont, picked by
   preset: AC GUITR, AC BASS, SQUARE, ORGAN1, TRUMPET, GLOCKEN, VIBES,
   RECORDER. Drums stay the provided 808/909 kits.
-- Factory kits: kit 0 = 808, kit 1 = Mario Paint (KICK, SNARE, SNAP,
-  WOOD1/2, POP, DOG, CAT, PIG, BIRD, YOSHI, UNDO DOG), kit 2 = SMW
-  percussion (KICK, SNARE, SNAR2, HISNR, HAT, BONGO, DEW, ORCH, BEEP).
-  The 909 kit is retired; all 45 pool samples stay resident with
-  ~13 KB of echo headroom.
+- Factory content is the classic-SNES songbook now: 16 pitched
+  instruments led by the SMW four (XYLO, STEEL, EPIANO, SLAP) and the
+  Mario Paint three (SQUARE, RECORDER, GUITAR), then TBONE, TRUMPET,
+  STRINGS, NYLON, SAX, ORGAN, VIBES, GLOCKEN, ABASS. Three kits: SMW
+  percussion (kit 0, the track-8 default), Mario Paint percussion
+  (kit 1) and the MP toybox (kit 2: bongos, tom, splash, slide
+  whistle, glass, honk, baby, voice, cheering). Sample-folder kits
+  (808/909) are retired for now. Kit one-shots live at 8 kHz (slots
+  tune -24); 47 samples resident at 51.8 of 60.7 KB.
 
 - Project renamed **sndj** (in line with smsggdj/genmddj): ROM is
   build/sndj.sfc, splash and cart title updated. Save magic (SNDJ1),
