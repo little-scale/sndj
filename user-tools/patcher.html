@@ -7,12 +7,15 @@
 <style>
   :root { color-scheme: dark; }
   body { font-family: ui-monospace, Menlo, monospace; background: #101228;
-         color: #dee2e8; max-width: 780px; margin: 2rem auto; padding: 0 1rem; }
+         color: #dee2e8; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
   h1 { color: #ffb020; font-size: 1.3rem; }
   h1 small { color: #606888; font-weight: normal; }
   .drop { border: 2px dashed #606888; border-radius: 8px; padding: 2rem;
-          text-align: center; color: #606888; margin: 1rem 0; }
+          text-align: center; color: #606888; margin: 1rem 0; cursor: pointer; }
+  .drop.small { padding: 1rem; }
   .drop.armed { border-color: #40d0c8; color: #40d0c8; }
+  .cols { display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap; }
+  .cols > div { flex: 1; min-width: 320px; }
   table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
   td, th { padding: .4rem .6rem; text-align: left;
            border-bottom: 1px solid #2a2e48; }
@@ -27,6 +30,17 @@
   .bar { height: 8px; background: #2a2e48; border-radius: 4px; overflow: hidden; }
   .bar div { height: 100%; background: #40d0c8; }
   .bar div.over { background: #ff6060; }
+  .hint { color: #606888; font-size: .85rem; }
+  #sf2list tr[draggable] { cursor: grab; }
+  #sf2list tr[draggable]:active { cursor: grabbing; }
+  #pool tr.target td { background: #16324a; }
+  #pool tr.target td:first-child { box-shadow: inset 3px 0 #40d0c8; }
+  .row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+  input[type=number] { background: #2a2e48; color: #dee2e8;
+                       border: 1px solid #606888; border-radius: 4px;
+                       font: inherit; padding: .2rem .3rem; }
+  select { background: #2a2e48; color: #dee2e8; border: 1px solid #606888;
+           border-radius: 4px; font: inherit; padding: .25rem .4rem; }
 </style>
 </head>
 <body>
@@ -37,25 +51,24 @@ pipeline the factory pool uses: root keys baked, loops landed on BRR
 blocks), audition the decoded BRR, recolour the 8 palette schemes, and
 export a patched ROM. Everything runs locally.</p>
 <div class="drop" id="drop">drop sndj.sfc here (or click)</div>
-<input type="file" id="file" hidden>
 <div id="status"></div>
+<div class="cols">
+<div>
 <div id="poolview" hidden>
   <div class="bar"><div id="budget" style="width:0"></div></div>
   <p id="budgettext"></p>
   <table id="pool"></table>
 </div>
-<div id="palview" hidden>
-  <h1><small>palettes</small></h1>
-  <table id="pal"></table>
-</div>
 <div id="exportview" hidden>
   <button class="primary" id="export">export patched ROM</button>
 </div>
-<input type="file" id="wavfile" hidden accept=".wav,.sf2">
+</div>
+<div>
+<div class="drop small" id="sf2drop">drop an .sf2 soundfont here (or click)</div>
+<input type="file" id="sf2file" hidden accept=".sf2">
 <div id="sf2view" hidden>
-  <h1><small>import from soundfont</small></h1>
-  <div class="row" style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">
-    <select id="sfpick"></select>
+  <h1><small id="sf2name">soundfont</small></h1>
+  <div class="row">
     <select id="sfmode">
       <option value="melodic">melodic (looped, in tune)</option>
       <option value="oneshot">one-shot (8 kHz kit drum)</option>
@@ -64,10 +77,18 @@ export a patched ROM. Everything runs locally.</p>
       min="-24" max="24" style="width:3.5rem"></label>
     <label id="sfcaplab" hidden>cap ms <input type="number" id="sfcap" value="160"
       min="20" max="500" style="width:4rem"></label>
-    <button class="primary" id="sfimport">import into slot</button>
-    <button id="sfcancel">cancel</button>
   </div>
+  <p class="hint">play auditions through the real BRR pipeline with the
+  settings above; drag a row onto a pool slot to import it there.</p>
+  <table id="sf2list"></table>
 </div>
+</div>
+</div>
+<div id="palview" hidden>
+  <h1><small>palettes</small></h1>
+  <table id="pal"></table>
+</div>
+<input type="file" id="wavfile" hidden accept=".wav,.sf2">
 
 <script>
 'use strict';
@@ -84,18 +105,26 @@ const status = (msg, warn) => {
   $('status').className = warn ? 'warn' : '';
 };
 
-$('drop').onclick = () => $('file').click();
+const fileInput = document.createElement('input');
+fileInput.type = 'file';
+fileInput.accept = '.sfc,.sf2';
+fileInput.onchange = e => routeFile(e.target.files[0]);
+$('drop').onclick = () => fileInput.click();
 $('drop').ondragover = e => { e.preventDefault(); $('drop').classList.add('armed'); };
 $('drop').ondragleave = () => $('drop').classList.remove('armed');
 $('drop').ondrop = e => {
   e.preventDefault();
   $('drop').classList.remove('armed');
-  loadRom(e.dataTransfer.files[0]);
+  routeFile(e.dataTransfer.files[0]);
 };
-$('file').onchange = e => loadRom(e.target.files[0]);
+
+function routeFile(f) {
+  if (!f) return;
+  if (/\.sf2$/i.test(f.name)) loadSf2(f);
+  else loadRom(f);
+}
 
 async function loadRom(f) {
-  if (!f) return;
   romName = f.name;
   rom = new Uint8Array(await f.arrayBuffer());
   poolOff = S.findMarker(rom, 'SNPOOL');
@@ -131,6 +160,20 @@ function render() {
     rep.onclick = () => { replacing = i; $('wavfile').click(); };
     row.insertCell().appendChild(play);
     row.insertCell().appendChild(rep);
+    // an sf2 slot dragged here imports into this pool slot
+    row.ondragover = ev => {
+      if (!sf2samples) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = 'copy';
+      row.classList.add('target');
+    };
+    row.ondragleave = () => row.classList.remove('target');
+    row.ondrop = ev => {
+      ev.preventDefault();
+      row.classList.remove('target');
+      const idx = +ev.dataTransfer.getData('text/plain');
+      if (Number.isInteger(idx) && sf2samples && sf2samples[idx]) sf2Import(idx, i);
+    };
   });
   const used = poolSize();
   const pct = Math.min(100, used * 100 / RESERVED);
@@ -142,33 +185,118 @@ function render() {
   $('poolview').hidden = false;
 }
 
+// ------------------------------------------------------------ soundfont
 let sf2samples = null;
 
+$('sf2drop').onclick = () => $('sf2file').click();
+$('sf2drop').ondragover = e => { e.preventDefault(); $('sf2drop').classList.add('armed'); };
+$('sf2drop').ondragleave = () => $('sf2drop').classList.remove('armed');
+$('sf2drop').ondrop = e => {
+  e.preventDefault();
+  $('sf2drop').classList.remove('armed');
+  const f = e.dataTransfer.files[0];
+  if (f) loadSf2(f);
+};
+$('sf2file').onchange = e => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (f) loadSf2(f);
+};
+
+async function loadSf2(f) {
+  try {
+    sf2samples = S.sf2Parse(new Uint8Array(await f.arrayBuffer()));
+  } catch (err) {
+    status('sf2 parse failed: ' + err.message, 1);
+    return;
+  }
+  $('sf2name').textContent = f.name + ' — ' + sf2samples.length + ' samples';
+  renderSf2();
+  $('sf2view').hidden = false;
+  status(f.name + ': ' + sf2samples.length + ' samples — play to audition, ' +
+    'drag onto a pool slot to import');
+}
+
+function renderSf2() {
+  const t = $('sf2list');
+  t.innerHTML = '<tr><th>#</th><th>preset / sample</th><th>root</th>' +
+    '<th>len</th><th></th></tr>';
+  sf2samples.forEach((s, i) => {
+    const row = t.insertRow();
+    const label = s.preset ? s.preset + ' — ' + s.name : s.name;
+    row.innerHTML =
+      `<td>${i}</td><td>${label}</td><td>${s.root}</td>` +
+      `<td>${s.pcm.length}${s.loop ? ' ↻' : ''}</td>`;
+    const play = document.createElement('button');
+    play.textContent = 'play';
+    play.onclick = () => auditionSf2(i);
+    row.insertCell().appendChild(play);
+    row.draggable = true;
+    row.ondragstart = ev => {
+      ev.dataTransfer.setData('text/plain', String(i));
+      ev.dataTransfer.effectAllowed = 'copy';
+    };
+  });
+}
+
+// prep an sf2 sample through the console pipeline with the panel settings
+function sf2Prep(s) {
+  if ($('sfmode').value === 'melodic') {
+    return { prep: S.sf2Melodic(s, +$('sftrim').value || 0), rate: 32000 };
+  }
+  return { prep: S.sf2Oneshot(s, +$('sfcap').value || 160), rate: 8000 };
+}
+
+function auditionSf2(i) {
+  const s = sf2samples[i];
+  try {
+    const { prep, rate } = sf2Prep(s);
+    const brr = S.brrEncode(prep.pcm, prep.loopBlock);
+    audition({ brr, loopBlock: prep.loopBlock }, rate);
+  } catch (err) {
+    status('audition failed: ' + err.message +
+      ($('sfmode').value === 'melodic' && !s.loop ?
+        ' — one-shot samples want the one-shot mode' : ''), 1);
+  }
+}
+
+function sf2Import(sIdx, slot) {
+  const s = sf2samples[sIdx];
+  try {
+    const { prep } = sf2Prep(s);
+    const brr = S.brrEncode(prep.pcm, prep.loopBlock);
+    const name = (s.preset || s.name).toUpperCase().replace(/[^A-Z0-9 ]/g, '')
+      .slice(0, 8) || 'SF2';
+    entries[slot] = {
+      name, loopBlock: prep.loopBlock,
+      tuneSemis: prep.tuneSemis, tuneFine: prep.tuneFine, brr,
+    };
+    status('imported ' + name + ' into slot #' + slot +
+      ' (' + brr.length + ' B, tune ' + prep.tuneSemis + ':' + prep.tuneFine +
+      ($('sfmode').value === 'oneshot' ? ', 8 kHz — kit slots want tune -24' : '') + ')');
+    render();
+  } catch (err) {
+    status('sf2 import failed: ' + err.message, 1);
+  }
+}
+
+$('sfmode').onchange = () => {
+  const one = $('sfmode').value === 'oneshot';
+  $('sfcaplab').hidden = !one;
+  $('sftrimlab').hidden = one;
+};
+
+// --------------------------------------------------------- WAV replace
 $('wavfile').onchange = async e => {
   const f = e.target.files[0];
   e.target.value = '';
-  if (!f || replacing < 0) return;
-  if (/\.sf2$/i.test(f.name)) {
-    try {
-      sf2samples = S.sf2Parse(new Uint8Array(await f.arrayBuffer()));
-    } catch (err) {
-      status('sf2 parse failed: ' + err.message, 1);
-      return;
-    }
-    const sel = $('sfpick');
-    sel.innerHTML = '';
-    sf2samples.forEach((s, i) => {
-      const o = document.createElement('option');
-      o.value = i;
-      o.textContent = (s.preset || s.name) + ' — ' + s.name +
-        (s.loop ? ' (looped)' : ' (one-shot)') +
-        ', root ' + s.root + ', ' + s.pcm.length + ' smp';
-      sel.appendChild(o);
-    });
-    $('sf2view').hidden = false;
-    status(f.name + ': pick a preset for slot #' + replacing);
+  if (!f) return;
+  if (/\.sf2$/i.test(f.name)) {  // an .sf2 via replace… opens the panel
+    replacing = -1;
+    loadSf2(f);
     return;
   }
+  if (replacing < 0) return;
   try {
     const samples = await wavTo32k(f);
     const trimmed = samples.slice(0, Math.floor(samples.length / 16) * 16);
@@ -202,26 +330,30 @@ async function wavTo32k(f) {
   return out;
 }
 
-let actx = null;
-function audition(e) {
+let actx = null, playingNode = null;
+function audition(e, rate) {
+  rate = rate || 32000;
   const pcm = S.brrDecode(e.brr);
   actx = actx || new AudioContext({ sampleRate: 32000 });
   const loops = e.loopBlock !== null ? 8 : 1;
   const loopStart = e.loopBlock !== null ? e.loopBlock * 16 : 0;
   const total = pcm.length + (loops - 1) * (pcm.length - loopStart);
-  const buf = actx.createBuffer(1, total, 32000);
+  const buf = actx.createBuffer(1, total, rate);
   const ch = buf.getChannelData(0);
   let p = 0;
   for (let i = 0; i < pcm.length; i++) ch[p++] = pcm[i] / 32768;
   for (let l = 1; l < loops; l++) {
     for (let i = loopStart; i < pcm.length; i++) ch[p++] = pcm[i] / 32768;
   }
+  if (playingNode) { try { playingNode.stop(); } catch (_) {} }
   const node = actx.createBufferSource();
   node.buffer = buf;
   node.connect(actx.destination);
   node.start();
+  playingNode = node;
 }
 
+// ----------------------------------------------------------- palettes
 function bgr15ToHex(off) {
   const c = rom[off] | (rom[off + 1] << 8);
   const ch = v => {
@@ -264,39 +396,6 @@ $('pal').oninput = e => {
   rom[off] = c & 0xFF;
   rom[off + 1] = c >> 8;
   status('palette edited (snapped to 15-bit BGR) — export to keep it');
-};
-
-$('sfmode').onchange = () => {
-  const one = $('sfmode').value === 'oneshot';
-  $('sfcaplab').hidden = !one;
-  $('sftrimlab').hidden = one;
-};
-$('sfcancel').onclick = () => { $('sf2view').hidden = true; };
-$('sfimport').onclick = () => {
-  if (!sf2samples || replacing < 0) return;
-  const s = sf2samples[+$('sfpick').value];
-  try {
-    let prep;
-    if ($('sfmode').value === 'melodic') {
-      prep = S.sf2Melodic(s, +$('sftrim').value || 0);
-    } else {
-      prep = S.sf2Oneshot(s, +$('sfcap').value || 160);
-    }
-    const brr = S.brrEncode(prep.pcm, prep.loopBlock);
-    const name = (s.preset || s.name).toUpperCase().replace(/[^A-Z0-9 ]/g, '')
-      .slice(0, 8) || 'SF2';
-    entries[replacing] = {
-      name, loopBlock: prep.loopBlock,
-      tuneSemis: prep.tuneSemis, tuneFine: prep.tuneFine, brr,
-    };
-    $('sf2view').hidden = true;
-    status('imported ' + name + ' into slot #' + replacing +
-      ' (' + brr.length + ' B, tune ' + prep.tuneSemis + ':' + prep.tuneFine +
-      ($('sfmode').value === 'oneshot' ? ', 8 kHz — kit slots want tune -24' : '') + ')');
-    render();
-  } catch (err) {
-    status('sf2 import failed: ' + err.message, 1);
-  }
 };
 
 $('export').onclick = () => {

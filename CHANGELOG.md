@@ -5,6 +5,14 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- patcher.html: soundfonts now open in their own **panel beside the
+  pool** — drop an `.sf2` (on either drop zone) and every sample
+  becomes a slot with its own **play** button, auditioned through the
+  real console pipeline (root-key resample or 8 kHz one-shot, then
+  BRR encode/decode) with the panel's mode/trim/cap settings.
+  **Drag a soundfont slot onto a pool slot** to import it there — the
+  old pick-a-preset dropdown is gone.
+
 - **Sync (M12, console side) + MIDI takeover (M14, console side).**
   OPTIONS → SYNC now works: **IN** follows a sibling master one row
   per clock, **IN24** follows the 24-PPQN Ableton Link bridge (÷6) —
