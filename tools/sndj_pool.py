@@ -162,13 +162,27 @@ def sf2_samples(path):
 DRUM_KITS = [('01 808', '808'), ('02 909', '909')]
 DRUM_MS = {'BD': 200, 'SD': 170, 'CP': 170, 'CY': 195, 'HO': 160}  # else 112
 SF2_FONT = 'mario_paint'    # melodics come from this font (drums stay Seb's)
+MP_KIT = [                  # kit 2: Mario Paint one-shots (16 kHz, cap ms)
+    ('Kick',        'MP KICK', 160),
+    ('Snare',       'MP SNARE', 160),
+    ('Snap',        'MP SNAP', 160),
+    ('Woodblock 1', 'MP WOOD1', 160),
+    ('Woodblock 2', 'MP WOOD2', 160),
+    ('Pop 1',       'MP POP', 160),
+    ('Dog',         'MP DOG', 160),
+    ('Cat',         'MP CAT', 150),
+    ('Pig',         'MP PIG', 160),
+    ('Bird',        'MP BIRD', 160),
+    ('Yoshi',       'MP YOSHI', 160),
+    ('Undo Dog',    'MP UNDO', 160),
+]
 SF2_PICKS = [               # (preset name, 8-char pool name)
     ('Acoustic Guitar', 'AC GUITR'),
     ('Acoustic Bass',   'AC BASS'),
     ('Square',          'SQUARE'),
     ('Organ 1',         'ORGAN1'),
     ('Trumpet',         'TRUMPET'),
-    ('Synth Strings',   'STRINGS'),
+    ('Glockenspiel',    'GLOCKEN'),
     ('Vibraphone',      'VIBES'),
     ('Recorder',        'RECORDER'),
 ]
@@ -243,6 +257,16 @@ def build_factory():
             if len(pcm) < 16:
                 pcm = [0] * 16
             entries.append((name, pcm, None))
+    # kit 2: Mario Paint one-shots (pool 40+), 16 kHz like the drums
+    if sf2_path:
+        for preset, short, cap in MP_KIT:
+            hit = next((s for s in allsmp if s.get('preset') == preset), None)
+            if hit is None:
+                continue
+            pcm = prep_oneshot(hit['pcm'], hit['rate'], cap)
+            if len(pcm) < 16:
+                pcm = [0] * 16
+            entries.append((short, pcm, None))
     return entries
 
 

@@ -124,7 +124,7 @@ song_init:
     bne @finstr
     ; auto-populate 8-63 so every slot is playable out of the box:
     ; 8-47 SMP on pool samples 0-39, 48-55 WAV banks 0-7,
-    ; 56-57 the two kits, 58 NSE, 59-63 SMP melodics 0-4 again
+    ; 56-58 the three kits, 59 NSE, 60-63 SMP melodics 0-3 again
 @autoinstr:
     txa
     sec
@@ -144,24 +144,25 @@ song_init:
     sta es0
     bra @ai_have
 @ai_not_wav:
-    cmp #$3A
+    cmp #$3B
     bcs @ai_not_kit
     sec
     sbc #$38
     sta es0 + 1
-    lda #$01                ; 56-57: KIT 0/1
+    lda #$01                ; 56-58: KIT 0/1/2
     sta es0
     bra @ai_have
 @ai_not_kit:
+    cmp #$3B
     bne @ai_tail
-    lda #$03                ; 58: NSE
+    lda #$03                ; 59: NSE
     sta es0
     lda #$00
     sta es0 + 1
     bra @ai_have
 @ai_tail:
     sec
-    sbc #$3B                ; 59-63: melodics 0-4
+    sbc #$3C                ; 60-63: melodics 0-3
     sta es0 + 1
     lda #$00
     sta es0
@@ -194,7 +195,8 @@ song_init:
     beq @ai_done
     jmp @autoinstr
 @ai_done:
-    ; factory kits: kit 0 = 808 (pool 8-23), kit 1 = 909 (pool 24-39)
+    ; factory kits: kit 0 = 808 (pool 8-23), kit 1 = 909 (pool 24-39),
+    ; kit 2 = Mario Paint (pool 40-51, slots 12-15 empty)
     ldx #$0000
 @fkits:
     rep #$30
@@ -221,7 +223,7 @@ song_init:
     sta.l $7E0000 + SB_KITS + 2,x   ; vol
     plx
     inx
-    cpx #$0020                      ; 32 slots = kits 0 and 1
+    cpx #$002C                      ; 44 slots = kits 0, 1 + MP kit 2
     bne @fkits
     ; header: name "SONG    " then settings
     ldx #$0000

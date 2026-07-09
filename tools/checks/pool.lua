@@ -52,7 +52,7 @@ emu.addEventCallback(function()
     check(rom(POOL) == string.byte("S") and rom(POOL + 8) == 2,
       "pool v2 magic in ROM bank 1")
     local count = rom(POOL + 9)
-    check(count == 40, "factory pool has 40 samples (" .. count .. ")")
+    check(count == 52, "factory pool has 52 samples (" .. count .. ")")
     check(aram(0x1000) == 0x00 and aram(0x1001) == 0x12,
       "directory slot 0 -> silent stub")
     check(aram(0x1200) == 0x01, "silent stub BRR (END block) uploaded")
@@ -90,6 +90,11 @@ emu.addEventCallback(function()
       (slot - 1) .. " resident)")
     check(srcn_of[8] ~= nil and srcn_of[13] ~= nil,
       "the 808 kit samples made the budget")
+    check(wram(0x3280) == 40 and wram(0x3281) == 0xF4 and wram(0x3282) == 0x50,
+      "kit 2 slot 0 = MP KICK (pool 40, tune -12)")
+    check(wram(0x32AC) == 51, "kit 2 slot 11 = MP UNDO")
+    check(wram(0x32B2) == 0, "kit 2 slots 12-15 empty")
+    check(wram(0x27A0) == 1 and wram(0x27A1) == 2, "instrument 58 is KIT 2")
     -- author a kit test: instrument 7 is factory KIT 0 (the 808)
     poke(0x2000, 0)          -- grid V1r0 = chain 0
     poke(0x3700, 0)          -- chain0 e0 = phrase 0

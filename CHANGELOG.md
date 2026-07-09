@@ -3,8 +3,11 @@
 ## 0.1.0-dev (unreleased)
 
 - Factory melodics now come from the Mario Paint soundfont, picked by
-  preset: AC GUITR, AC BASS, SQUARE, ORGAN1, TRUMPET, STRINGS, VIBES,
+  preset: AC GUITR, AC BASS, SQUARE, ORGAN1, TRUMPET, GLOCKEN, VIBES,
   RECORDER. Drums stay the provided 808/909 kits.
+- Kit 2 is the Mario Paint kit: KICK, SNARE, SNAP, WOOD1/2, POP, DOG,
+  CAT, PIG, BIRD, YOSHI, UNDO DOG (16 kHz one-shots, slots 12-15
+  free); instrument 58 plays it. All 52 pool samples stay resident.
 
 - Project renamed **sndj** (in line with smsggdj/genmddj): ROM is
   build/sndj.sfc, splash and cart title updated. Save magic (SNDJ1),
