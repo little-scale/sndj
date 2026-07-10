@@ -43,7 +43,7 @@ gest({ a = true, right = true }, 4)
 gest({ a = true, right = true }, 4)
 gest({ a = true, right = true }, 4)
 gest({ a = true, up = true }, 6)
-local at_wave = t
+local at_wave = t + 20       -- long settle: shots must be run-stable
 bnudge("down", 8)                  -- sine column 0: 8 -> 7 (recompile)
 local edited = t + 10
 
