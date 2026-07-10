@@ -956,6 +956,20 @@ Commit at every milestone boundary; each has a verification gate
   CHANGELOG dated, `make dist`, tag, `gh release create` with versioned
   ROMs. Stretch queue thereafter: M-SCOPE (OUTX oscilloscope), M-STREAM
   (long-sample streaming), M-MIDI2 (hybrid EXT tracks), BIGSAVE.
+- **M-KARP — the KARP instrument type** (designed 2026-07-10; browser
+  prototype lives in patcher.html's FIR tab). Karplus-Strong on the
+  echo path — the only writable feedback loop in ARAM: the room IS the
+  string. Resonances sit at n·32000/(EDL·512+d); the note picks the
+  nearest partial n and a 2-tap interpolating FIR supplies d (0-7
+  samples of fractional delay = the fine tune, and simultaneously the
+  classic KS damping lowpass). Trigger = write feedback + the note's
+  tap pair (SCB registers, Y-command machinery), KON a pitched noise
+  burst exciter (EON on, GAIN-gated); note-off ramps feedback. INSTR
+  fields: EXCITER / DAMP / SUSTAIN / BURST. EDL stays song-level (the
+  tuning table follows it, emitted by maketables.py + mirrored in
+  sndj.js). Type names widen to 4 chars so it reads KARP. Monophonic
+  by physics; one string per song; everything else EON-off. Costs
+  2-4 KB ARAM (EDL 1-2) — a KARP song gets its sample budget back.
 
 ---
 

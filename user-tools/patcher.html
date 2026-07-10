@@ -182,6 +182,16 @@ export a patched ROM. Everything runs locally.</p>
       <button id="firclick">clicks</button>
       <button id="firstop">stop</button>
     </div>
+    <div class="row">
+      <b style="color:#ffb020">KARP</b>
+      <label>note <select id="karpnote"></select></label>
+      <label>damp <input type="range" id="karpdamp" min="16" max="127"
+        value="100" style="width:100px"></label>
+      <button class="primary" id="karppluck">pluck</button>
+      <span class="hint" id="karpinfo">the room as a string: the comb
+      rings the note's nearest partial; a 2-tap FIR adds the fractional
+      delay that pulls it into tune (and is the KS damping filter)</span>
+    </div>
   </div>
 </div>
 <div id="palview" hidden>
@@ -775,7 +785,13 @@ function firAudition(kind) {
     for (let i = 0; i < out.length; i++, n++) {
       let x = 0;
       if (kind === 'noise') x = (Math.random() * 2 - 1) * (n < 8000 ? 0.5 : 0);
-      else if (n % 16000 < 40) x = ((n & 4) ? 1 : -1) * 0.6;
+      else if (kind === 'karp') {
+        if (n < 1024) {
+          const ph = (n * karpF / 32000) % 1;
+          x = ((ph * 2 - 1) * 0.7 + (Math.random() * 2 - 1) * 0.3) *
+              (1 - n / 1024) * 0.8;
+        }
+      } else if (n % 16000 < 40) x = ((n & 4) ? 1 : -1) * 0.6;
       for (let k = 7; k > 0; k--) hist[k] = hist[k - 1];
       hist[0] = buf[w];
       let fir = 0;
@@ -795,6 +811,58 @@ $('firplay').onclick = () => firAudition('noise');
 $('firclick').onclick = () => firAudition('clicks');
 $('firstop').onclick = firStop;
 $('firefb').oninput = () => { $('firefbv').textContent = $('firefb').value; };
+
+// ---------------------------------------------------------------- KARP
+// prototype of the KARP instrument type: the echo loop is the string.
+// Resonances sit at n * 32000 / (EDL*512 + d), d = the FIR's group
+// delay (0-7 samples): pick the nearest partial n for the note, solve
+// d for the fractional pull, and voice d as a 2-tap interpolator —
+// which is simultaneously the classic KS damping lowpass.
+let karpF = 440;
+{
+  const NN = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+  const pick = $('karpnote');
+  for (let m = 36; m <= 95; m++) {
+    const o = document.createElement('option');
+    o.value = m;
+    o.textContent = NN[m % 12] + (Math.floor(m / 12) - 1);
+    pick.appendChild(o);
+  }
+  pick.value = 57;   // A-3
+}
+$('karppluck').onclick = () => {
+  const m = +$('karpnote').value;
+  const f = 440 * Math.pow(2, (m - 69) / 12);
+  const edl = Math.max(1, +$('firedl').value);
+  const base = edl * 512;
+  let n = Math.round(f * (base + 3.5) / 32000);
+  if (n < 1) n = 1;
+  let d = 32000 * n / f - base;
+  d = Math.max(0, Math.min(7, d));
+  const fEff = 32000 * n / (base + d);
+  const cents = Math.round(1200 * Math.log2(fEff / f));
+  const g = +$('karpdamp').value;
+  const i0 = Math.floor(d), fr = d - i0;
+  const taps = [0, 0, 0, 0, 0, 0, 0, 0];
+  if (i0 >= 7) {
+    taps[7] = g;
+  } else {
+    taps[i0] = Math.round(g * (1 - fr));
+    taps[i0 + 1] = Math.round(g * fr);
+  }
+  firTaps = taps;
+  firSync();
+  if (+$('firefb').value < 100) {           // a string needs sustain
+    $('firefb').value = 120;
+    $('firefbv').textContent = '120';
+  }
+  karpF = fEff;
+  firAudition('karp');
+  $('karpinfo').textContent = 'partial ' + n + ' of ' +
+    (32000 / (base + d)).toFixed(2) + ' Hz, d = ' + d.toFixed(2) +
+    ' smp, ' + (cents >= 0 ? '+' : '') + cents + ' cents off ' +
+    f.toFixed(1) + ' Hz';
+};
 
 // ------------------------------------------------------------ soundfont
 // several fonts stack in the panel: drop one after another and mix and

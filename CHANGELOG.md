@@ -5,6 +5,13 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- **KARP prototype** in the patcher's FIR tab: Karplus-Strong on the
+  echo loop (the room as a string). Pick a note, hit pluck — the comb
+  rings the note's nearest partial and a 2-tap FIR supplies the
+  fractional delay that pulls it into tune (doubling as the classic
+  KS damping filter). The console KARP instrument type is designed
+  (CLAUDE.md M-KARP); this validates the tuning math by ear first.
+
 - ECHO screen breathing room: the ledger reads as three rows (RAM /
   FREE / +ms of possible delay), and the DELAY cost (-KB and ms) sits
   on its own row under the field instead of crowding the right edge.
