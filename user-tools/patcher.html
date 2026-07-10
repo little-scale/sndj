@@ -93,7 +93,12 @@ export a patched ROM. Everything runs locally.</p>
 </div>
 <div class="cols">
 <div>
-<div class="drop small" id="drop">drop sndj.sfc here (or click)</div>
+<div class="row" style="align-items: stretch;">
+  <div class="drop small" id="drop" style="flex: 1.3;">drop sndj.sfc here (or click)</div>
+  <div class="drop small off" id="batchdrop" style="flex: 1;"
+    title="multi-select fills free slots with the current import settings">drop samples (or click)</div>
+  <input type="file" id="batchfile" hidden accept=".wav" multiple>
+</div>
 <div class="row" id="tabsbar" hidden>
   <button class="tab active" data-tab="poolview">POOL</button>
   <button class="tab" data-tab="boottab">BOOT</button>
@@ -193,11 +198,7 @@ pool, kits, boot instruments, FIR presets, palettes">export factory</button>
   </div>
 </div>
 </div>
-<div style="flex:.55">
-<div class="drop small off" id="batchdrop" title="multi-select fills free
-slots with the current import settings">drop samples (or click)</div>
-<input type="file" id="batchfile" hidden accept=".wav" multiple>
-</div>
+
 <div>
 <div class="drop small off" id="sf2drop">drop an .sf2 soundfont here (or click)</div>
 <input type="file" id="sf2file" hidden accept=".sf2">
