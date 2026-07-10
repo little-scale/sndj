@@ -16,8 +16,12 @@
   .drop.armed { border-color: #40d0c8; color: #40d0c8; }
   .drop.off { opacity: .35; cursor: default; }
   .cols { display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap; }
-  .cols > div { flex: 1 1 0; min-width: min(100%, 340px); overflow-x: auto; }
-  .cols > div:first-child { flex: 2 1 0; min-width: min(100%, 640px); }
+  /* each column scrolls on its own: the sf2 list stays put while the
+     pool scrolls to the target slot (and vice versa) during drags */
+  .cols > div { flex: 1 1 0; min-width: min(100%, 460px); overflow-x: auto;
+                max-height: calc(100vh - 3rem); overflow-y: auto;
+                position: sticky; top: 1rem; }
+  .cols > div:first-child { flex: 1.5 1 0; min-width: min(100%, 640px); }
   #pool td, #kits td { white-space: nowrap; }
   table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
   td, th { padding: .3rem .45rem; text-align: left;
