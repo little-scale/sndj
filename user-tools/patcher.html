@@ -96,11 +96,13 @@ export a patched ROM. Everything runs locally.</p>
   <button class="tab" data-tab="firview">FIR</button>
   <button class="tab" data-tab="palview">PALETTES</button>
 </div>
-<div id="poolview" hidden>
+<div id="budgets" hidden>
   <div class="bar"><div id="budget" style="width:0"></div></div>
   <p id="budgettext"></p>
   <div class="bar"><div id="aram" style="width:0"></div></div>
   <p id="aramtext"></p>
+</div>
+<div id="poolview" hidden>
   <p><button id="clearall">clear all</button></p>
   <div id="bootview" hidden>
     <p class="hint">boot instruments (the factory set NEW seeds — these
@@ -239,6 +241,7 @@ async function loadRom(f) {
   }
   kitExpand[0] = true;
   $('tabsbar').hidden = false;
+  $('budgets').hidden = false;
   $('batchdrop').classList.remove('off');
   $('sf2drop').classList.remove('off');
   selectTab('poolview');
