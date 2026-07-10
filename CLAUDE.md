@@ -455,10 +455,14 @@ share F; MIDI takeover is a SYNC option in OPTIONS, not a screen; LIVE
 is a MODE menu item, not a screen — Select still toggles the live view):
 
 ```
-[O][P][ ][W][K]      OPTIONS  PROJECT   -    WAVE   KIT
+[O][P][ ][W][H]      OPTIONS  PROJECT   -    WAVE   HELP
 [S][C][P][I][T]      SONG     CHAIN   PHRASE INSTR  TABLE
-[F][G][ ][E][F]      FILES    GROOVE    -    ECHO   FIR
+[F][G][K][E][F]      FILES    GROOVE   KIT   ECHO   FIR
 ```
+(2026-07-10: KIT moved below PHRASE — reachable from GROOVE, PHRASE
+and ECHO; HELP added above TABLE, genmddj-style: vertical entry only,
+plus the hold-A-2.5s toggle from any screen, pages from help.txt via
+tools/makehelp.py, command pages merged from tools/commands.csv.)
 
 Middle row is the composing spine (identical to the siblings). The column
 alignment is meaningful, as in genmddj: WAVE/KIT sit above INSTR/TABLE

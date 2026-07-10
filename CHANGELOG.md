@@ -3,6 +3,19 @@
 All notable changes to sndj. First release will be **v0.1**; versions
 increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
+## unreleased
+
+- **HELP screen** (genmddj-style): six generated pages — navigation,
+  editing, block ops, the data model, the full command reference
+  (merged from tools/commands.csv, one source of truth), and an about
+  page with the live version stamp. Plain d-pad turns pages. **Hold A
+  alone for ~2.5 s on any screen to toggle HELP** and again to jump
+  back where you were; the boot screen hints it. Content lives in
+  help.txt — edit it freely, `make` validates and regenerates.
+- Map: **KIT moves below PHRASE** (reachable from GROOVE, PHRASE and
+  ECHO); **HELP takes the cell above TABLE** (vertical entry only,
+  like genmddj).
+
 ## v0.1 — 2026-07-10
 
 The first release: the full console tracker (milestones M1-M14 —

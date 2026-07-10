@@ -1,0 +1,86 @@
+# sndj HELP screen -- button reference. Edit this text freely; `make`
+# validates it and regenerates build/help.inc. Rules: UPPERCASE only,
+# <= 30 chars/line, <= 22 rows/page. A blank line is a blank screen row.
+# A line with a `:` renders as an inverted title. `@VERSION` draws the
+# live version + build stamp. `@COMMANDS1` / `@COMMANDS2` insert the
+# command reference from tools/commands.csv (A-M / N-Z). `#` starts a
+# comment; `---` starts a new page. Too-wide/too-tall fails the build.
+############################## <- POSSIBLE LENGTH
+
+NAVIGATION:
+DPAD         MOVE THE CURSOR
+HOLD A +DPAD GO TO SCREENS
+A + B        PLAY THIS SCREEN
+START        PLAY / STOP ALL
+SELECT       LIVE MODE
+HOLD A 3 SEC ENTER/EXIT HELP
+
+CELL EDITING:
+TAP B        INSERT ON EMPTY
+HOLD B + L/R EDIT, SMALL STEP
+HOLD B + U/D EDIT, BIG STEP
+HOLD B TAP A CUT WITH COPY
+> TAP B,B    PASTE VALUE
+
+---
+BLOCK EDITING:
+HOLD Y TAP B SELECT BLOCK
+> DPAD       EXTEND BLOCK
+> TAP B      COPY BLOCK
+> B + A      CUT BLOCK
+> TAP B,B    PASTE ELSEWHERE
+
+MINT AND CLONE:
+TAP B,B ON EMPTY REFERENCE
+= MINT NEW PHRASE/CHAIN
+
+TAP B,B ON EXISTING
+= CLONE PHRASE/CHAIN
+
+CHANNELS:
+L / R        PREV/NEXT TRACK
+X + DPAD     MUTE / SOLO
+
+---
+RELATIONSHIPS:
+TRACKS DO NOT OWN INSTRUMENTS
+TRACKS DO NOT OWN NOTE DATA
+INSTRUMENTS, PHRASES, CHAINS
+AND TABLES ARE GLOBAL POOLS
+
+STRUCTURE:
+NOTES LIVE IN PHRASES
+PHRASES LIVE IN CHAINS
+CHAINS SIT ON TRACKS
+
+THE GROOVE IS ONE 2-STEP PAIR
+6/6 STRAIGHT - 8/4 SWING
+
+AUTOMATION:
+TABLES RUN COMMANDS PER TICK
+VIB/TRM ARE INSTRUMENT LFOS
+
+---
+COMMANDS A-M:
+IN A PHRASE / TABLE CMD CELL
+@COMMANDS1
+
+---
+COMMANDS N-Z:
+@COMMANDS2
+
+---
+SNDJ:
+@VERSION
+
+MAX:
+   64 INSTRUMENTS
+  192 PHRASES
+   96 CHAINS
+  128 SONG ROWS
+   16 SAVE SLOTS
+
+SOUND CHIP:
+S-DSP - 8 SAMPLE VOICES
+BRR + GAUSSIAN, HW ADSR
+ECHO + FIR, PITCH MOD, NOISE

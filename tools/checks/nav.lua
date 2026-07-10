@@ -1,6 +1,6 @@
--- nav.lua — the 2026-07-09 map edits: OPTIONS<->PROJECT and
--- FILES<->GROOVE link horizontally, KIT sits above TABLE (vertical),
--- and WAVE no longer links right to KIT (A+Right is bank select).
+-- nav.lua — the screen map: OPTIONS<->PROJECT and FILES<->GROOVE link
+-- horizontally, HELP sits above TABLE (vertical only), KIT sits below
+-- PHRASE between GROOVE and ECHO, and WAVE A+Right is bank select.
 --
 -- Map:  [O][P][ ][W][K]
 --       [S][C][P][I][T]
@@ -43,8 +43,8 @@ gest(88, "right")     -- SONG -> CHAIN (needs content)
 gest(96, "right")     -- CHAIN -> PHRASE
 gest(104, "right")    -- PHRASE -> INSTR
 gest(112, "right")    -- INSTR -> TABLE
-gest(120, "up")       -- TABLE -> KIT
-gest(128, "down")     -- KIT -> TABLE
+gest(120, "up")       -- TABLE -> HELP
+gest(128, "down")     -- HELP -> TABLE
 gest(136, "left")     -- TABLE -> INSTR
 gest(144, "up")       -- INSTR -> WAVE
 gest(152, "right")    -- WAVE: A+Right = bank select, NOT a screen move
@@ -79,9 +79,9 @@ emu.addEventCallback(function()
   elseif frames == 118 then
     check(wram(0x0C) == 14, "spine reached TABLE")
   elseif frames == 126 then
-    check(wram(0x0C) == 9, "TABLE A+Up -> KIT")
+    check(wram(0x0C) == 15, "TABLE A+Up -> HELP")
   elseif frames == 134 then
-    check(wram(0x0C) == 14, "KIT A+Down -> TABLE")
+    check(wram(0x0C) == 14, "HELP A+Down -> TABLE")
   elseif frames == 150 then
     check(wram(0x0C) == 7, "INSTR A+Up -> WAVE")
   elseif frames == 158 then

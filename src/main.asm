@@ -55,6 +55,7 @@
 .INCLUDE "projectscr.asm"
 .INCLUDE "firscr.asm"
 .INCLUDE "tablescr.asm"
+.INCLUDE "helpscr.asm"
 .INCLUDE "clone.asm"
 .INCLUDE "palette.asm"
 .INCLUDE "splash.asm"
@@ -77,6 +78,7 @@ main_loop:
     jsr tick_track
 
     jsr screen_update
+    jsr hint_tick
     ; chrome draws after the screen so it overlays on every screen
     jsr draw_status
     jsr draw_minimap
@@ -173,14 +175,14 @@ str_stop:    .DB "STOP", 0
 ; the mini map (sibling chrome, smsggdj letters): 3x5 at the top right,
 ; current screen accented, built screens bright, future screens dim.
 ; PHRASE and PROJECT share P; FILES and FIR share F (as on smsggdj).
-;   [O][P][ ][W][K]      OPTIONS PROJECT  -   WAVE  KIT
+;   [O][P][ ][W][H]      OPTIONS PROJECT  -   WAVE  HELP
 ;   [S][C][P][I][T]      SONG    CHAIN  PHRASE INSTR TABLE
-;   [F][G][ ][E][F]      FILES   GROOVE   -   ECHO  FIR
-minimap_chars: .DB "OP WKSCPITFG EF"
-minimap_impl:  .DB 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1
+;   [F][G][K][E][F]      FILES   GROOVE  KIT  ECHO  FIR
+minimap_chars: .DB "OP WHSCPITFGKEF"
+minimap_impl:  .DB 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
 ; ui_mode -> minimap cell index ($FF = no highlight; LIVE is a mode of
 ; SONG so it highlights S)
-minimap_pos:   .DB $FF, 7, 6, 5, 8, 10, 13, 3, 5, 4, 0, 11, 1, 14, 9
+minimap_pos:   .DB $FF, 7, 6, 5, 8, 10, 13, 3, 5, 12, 0, 11, 1, 14, 9, 4
 
 draw_minimap:
     lda ui_mode
@@ -361,6 +363,10 @@ factory_kits:
 ; KARP tuning tables (maketables.py): read with long addressing from
 ; karp_trigger — parked here to keep the code bank breathing
 .INCLUDE "karptab.inc"
+
+; the HELP pages (help.txt via tools/makehelp.py): the renderer reads
+; the byte stream with long addressing
+.INCLUDE "help.inc"
 
 ; SPC700 driver blob, uploaded via the IPL protocol at boot (read with
 ; long addressing; parked here to keep the code bank breathing)

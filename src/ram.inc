@@ -269,6 +269,11 @@ sl_step      dw      ; residency slice scan: bytes per slice (blocks*9)
 sl_addr      dw      ; residency slice scan: running ARAM address
 slice_base   ds 64   ; per-instrument alias SRCN (0 = none): the SLICE
                      ; window base, or an SMP LOOP-override entry
+help_page    db      ; HELP: current page (0-based)
+help_prev    db      ; HELP hotkey: last non-HELP screen (restored on exit)
+help_actr    db      ; HELP hotkey: lone-A hold frames
+hint_ctr     dw      ; boot hint countdown ("HOLD A TO VIEW HELP")
+help_lfc     db      ; HELP hotkey: frame_cnt at the last poll (delta base)
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

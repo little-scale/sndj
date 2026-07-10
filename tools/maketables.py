@@ -192,6 +192,31 @@ def defaults_bin():
                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
 
 
+# --- command help (tools/commands.csv: the single source of truth) ----------
+# Emits the ROM help strings for the HELP screen (and, later, the
+# MANUAL appendix + sndj.js command metadata — one file, no drift).
+def cmdhelp_inc():
+    import csv
+    rows = {}
+    with open('tools/commands.csv') as f:
+        for r in csv.DictReader(f):
+            rows[r['letter'].strip()] = (r['name'].strip(), r['short'].strip())
+    lines = ["; generated from tools/commands.csv — do not edit",
+             "; 26 fixed-width records (A-Z) x 28 chars; unused = spaces",
+             "cmd_help_blob:"]
+    for i in range(26):
+        c = chr(ord('A') + i)
+        if c in rows:
+            name, short = rows[c]
+            text = f"{name:<7}{short}"
+            assert len(text) <= 28, f"{c}: help line too long ({len(text)})"
+        else:
+            text = ""
+        lines.append(f'    .DB "{text:<28}"  ; {c}')
+    lines.append("")
+    return "\n".join(lines)
+
+
 def main(build_dir):
     sch = schemes_bin()
     with open(f'{build_dir}/schemes.bin', 'wb') as f:

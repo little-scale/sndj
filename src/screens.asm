@@ -25,11 +25,14 @@
 .DEFINE SCREEN_PROJECT 12
 .DEFINE SCREEN_FIR    13
 .DEFINE SCREEN_TABLE  14
+.DEFINE SCREEN_HELP   15
 
 ; called every frame from the main loop
 screen_update:
     lda ui_mode
-    beq @splash
+    bne @not_splash
+    jmp @splash
+@not_splash:
     ; Select: jump to LIVE; in LIVE, jump back where you came from
     rep #$20
 .ACCU 16
@@ -46,6 +49,7 @@ screen_update:
 @leave_live:
     jsr screen_reopen
 @no_select:
+    jsr help_hotkey         ; a lone A held ~2.5 s toggles HELP
     jsr nav_update
     jsr chan_update
     lda ui_mode
@@ -75,6 +79,8 @@ screen_update:
     beq @fir
     cmp #SCREEN_TABLE
     beq @table
+    cmp #SCREEN_HELP
+    beq @help
     jmp song_update
 @phrase:
     jmp phrase_update
@@ -98,6 +104,8 @@ screen_update:
     jmp fir_update
 @table:
     jmp table_update
+@help:
+    jmp help_update
 @chain:
     jmp chain_update
 @instr:
@@ -171,11 +179,16 @@ nav_update:
     jsr chain_init
     jmp @eat_far
 @down_not_proj:
-    cmp #SCREEN_KIT
-    bne @down_not_kit
-    jsr table_init
+    cmp #SCREEN_PHRASE
+    bne @down_not_phr
+    jsr kit_init            ; KIT sits below PHRASE now
     jmp @eat_far
-@down_not_kit:
+@down_not_phr:
+    cmp #SCREEN_HELP
+    bne @down_not_help
+    jsr table_init          ; HELP sits above TABLE
+    jmp @eat_far
+@down_not_help:
     cmp #SCREEN_INSTR
     bne @down_not_instr
     jsr echo_init
@@ -231,9 +244,14 @@ nav_update:
 @up_not_chain2:
     cmp #SCREEN_TABLE
     bne @up_not_table
-    jsr kit_init
+    jsr help_init           ; TABLE climbs to HELP
     bra @eat_far
 @up_not_table:
+    cmp #SCREEN_KIT
+    bne @up_not_kit
+    jsr phrase_init         ; KIT climbs back to PHRASE
+    bra @eat_far
+@up_not_kit:
     cmp #SCREEN_FIR
     bne @not_up
     jsr table_init          ; ...and FIR climbs back to TABLE
@@ -259,11 +277,17 @@ nav_update:
     ; deeper: SONG -> CHAIN -> PHRASE -> INSTR
     lda ui_mode
     cmp #SCREEN_SONG
-    beq @to_chain
+    bne @r_not_song
+    jmp @to_chain
+@r_not_song:
     cmp #SCREEN_CHAIN
-    beq @to_phrase
+    bne @r_not_chain
+    jmp @to_phrase
+@r_not_chain:
     cmp #SCREEN_PHRASE
-    beq @to_instr
+    bne @r_not_phrase
+    jmp @to_instr
+@r_not_phrase:
     cmp #SCREEN_ECHO
     bne @right_not_echo
     jsr fir_init
@@ -279,6 +303,16 @@ nav_update:
     jsr groove_init
     bra @eat_right
 @right_not_files:
+    cmp #SCREEN_GROOVE
+    bne @right_not_grv
+    jsr kit_init            ; GROOVE -> KIT along the bottom row
+    bra @eat_right
+@right_not_grv:
+    cmp #SCREEN_KIT
+    bne @right_not_kit
+    jsr echo_init           ; KIT -> ECHO
+    bra @eat_right
+@right_not_kit:
     cmp #SCREEN_INSTR
     bne @no_right
     ; follow the instrument's TABLE field
@@ -383,6 +417,16 @@ nav_update:
     jsr files_init
     bra @eat_left2
 @left_not_grv:
+    cmp #SCREEN_KIT
+    bne @left_not_kit
+    jsr groove_init         ; KIT -> GROOVE
+    bra @eat_left2
+@left_not_kit:
+    cmp #SCREEN_ECHO
+    bne @left_not_echo2
+    jsr kit_init            ; ECHO -> KIT
+    bra @eat_left2
+@left_not_echo2:
     cmp #SCREEN_FIR
     bne @left_not_fir
     jsr echo_init

@@ -68,6 +68,12 @@ Reset:
     bne +
     jsr wave_sync_all       ; compile + upload the 8 wave banks
     jsr residency_build     ; upload the samples this song references
+    rep #$20
+.ACCU 16
+    lda #180                ; ~3 s of "HOLD A TO VIEW HELP" on SONG
+    sta hint_ctr
+    sep #$20
+.ACCU 8
     jsr apu_echo_apply      ; song echo defaults -> DSP (safe reconfig)
     ; (no auto-EDL at boot: the 30 KB buffer clear leaves the driver deaf
     ; for ~20 frames, which soft-reset paths turn into missed input;

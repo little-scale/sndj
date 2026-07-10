@@ -116,9 +116,9 @@ elsewhere pastes it. Works in PHRASE, CHAIN and SONG.
 Hold **A** and tap the d-pad to move around the map:
 
 ```
-[O][P]   [W][K]      OPTIONS  PROJECT        WAVE   KIT
+[O][P]   [W][H]      OPTIONS  PROJECT        WAVE   HELP
 [S][C][P][I][T]      SONG  CHAIN  PHRASE  INSTR  TABLE
-[F][G]   [E][F]      FILES  GROOVE         ECHO   FIR
+[F][G][K][E][F]      FILES  GROOVE  KIT   ECHO   FIR
 ```
 
 The middle row is the composing spine. Columns mean something: sound
@@ -135,6 +135,7 @@ left/right.
 | **TABLE** | 16-row × 2-column per-tick command tables. |
 | **WAVE** | draw 32-sample single-cycle waves in 8 banks. |
 | **KIT** | build drum kits: 16 slots of sample + tune + volume; the kit number is the first field — nudge it to switch kits. |
+| **HELP** | the paged button + command reference. **Hold A alone for ~2.5 s on any screen** to toggle it (and again to jump back); plain d-pad turns the pages. |
 | **GROOVE** | the two-step groove pair — the song's feel. |
 | **ECHO** | the room: delay, feedback, level, per-voice sends. |
 | **FIR** | the echo filter's 8 taps, hex-editable, with presets. |
