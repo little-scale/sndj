@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>sndj spcexport</title>
+<script src="sndj.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: ui-monospace, Menlo, monospace; background: #101228;
+         color: #dee2e8; max-width: 780px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { color: #ffb020; font-size: 1.3rem; }
+  h1 small { color: #606888; font-weight: normal; }
+  h3 { color: #40d0c8; font-size: 1rem; margin-top: 1.6rem; }
+  .drop { border: 2px dashed #606888; border-radius: 8px; padding: 2rem;
+          text-align: center; color: #606888; margin: 1rem 0; cursor: pointer; }
+  .drop.hot { border-color: #40d0c8; color: #40d0c8; }
+  button { background: #2a2e48; color: #dee2e8; border: 1px solid #606888;
+           border-radius: 4px; padding: .3rem .8rem; cursor: pointer;
+           font: inherit; }
+  button:hover { border-color: #ffb020; color: #ffb020; }
+  button.primary { border-color: #40d0c8; color: #40d0c8; }
+  button:disabled { opacity: .4; cursor: default; }
+  input[type=text], input[type=number] {
+    background: #181b34; color: #dee2e8; border: 1px solid #2a2e48;
+    border-radius: 4px; padding: .25rem .5rem; font: inherit; }
+  input[type=number] { width: 5rem; }
+  label { color: #a0a8c0; margin-right: 1rem; }
+  #status { color: #40d0c8; min-height: 1.4em; margin: .6rem 0; }
+  #status.warn { color: #ff6060; }
+  #report { background: #181b34; border: 1px solid #2a2e48; border-radius: 6px;
+            padding: .8rem 1rem; white-space: pre-wrap; color: #a0a8c0; }
+  .dim { color: #606888; }
+  table { border-collapse: collapse; margin: .6rem 0; }
+  td, th { padding: .25rem .6rem; border-bottom: 1px solid #2a2e48;
+           text-align: left; }
+  th { color: #606888; font-weight: normal; }
+</style>
+</head>
+<body>
+<h1>sndj spcexport <small>— .sndj &rarr; WAV / .spc</small></h1>
+<p>Drop a <code>.sndj</code> song (or a <code>.srm</code> save and pick a
+slot) plus the matching <code>sndj.sfc</code> ROM (for its sample pool).
+<b>WAV</b> renders the song offline through the reference sequencer and the
+bit-exact S-DSP model. <b>.spc</b> captures the sequencer's DSP register
+stream for one song loop and bakes it — with the song's samples and a tiny
+SPC700 replayer — into a standard <code>.spc</code> that plays in any SPC
+player. Everything runs locally.</p>
+<div class="drop" id="zone">drop .sndj / .srm / sndj.sfc here (or click)</div>
+<input type="file" id="file" hidden>
+<div id="status" class="dim">song: — · pool: —</div>
+<div id="slots"></div>
+
+<h3>WAV render</h3>
+<p>
+  <label>length <input type="number" id="secs" value="30" min="1" max="600"> s</label>
+  <button id="loopbtn">detect loop</button>
+  <button class="primary" id="wavbtn" disabled>render WAV</button>
+</p>
+
+<h3>.spc export</h3>
+<p>
+  <label>title <input type="text" id="title" maxlength="32" placeholder="(song name)"></label>
+  <label>artist <input type="text" id="artist" maxlength="32"></label>
+  <button class="primary" id="spcbtn" disabled>export .spc</button>
+</p>
+<pre id="report" hidden></pre>
+
+<script>
+'use strict';
+// ============================================================================
+// core — DOM-free (node-tested by tools/test_spc.js)
+// ============================================================================
+const S = window.SNDJ;
+
+// ---- stream opcodes (bytes >= $80 are opcodes; the DSP has 128 registers) --
+//   rr vv        write DSP register rr (< $80) = vv
+//   $FE          wait one engine tick
+//   $FD nn       wait nn ticks
+//   $FC tt       set Timer-0 target tt (T command tempo changes)
+//   $FB          short spin (~150 us) — KOF pulse spacing
+//   $FF          jump to the loop point
+const OP_WAIT1 = 0xFE, OP_WAITN = 0xFD, OP_TEMPO = 0xFC, OP_SPIN = 0xFB,
+      OP_LOOP = 0xFF;
+const REPLAYER_ORG = 0x0200;
+
+// ---- a tiny SPC700 assembler (labels + 8-bit relative fixups) --------------
+function spcAsm(org) {
+  const out = [], labels = {}, fixups = [];
+  return {
+    here: () => org + out.length,
+    label(n) { labels[n] = org + out.length; },
+    db(...b) { out.push(...b); },
+    rel(n) { fixups.push({ at: out.length, n, rel: true }); out.push(0); },
+    end() {
+      for (const f of fixups) {
+        const t = labels[f.n];
+        if (t === undefined) throw new Error('spcAsm: no label ' + f.n);
+        const d = t - (org + f.at + 1);
+        if (d < -128 || d > 127) throw new Error('spcAsm: branch range ' + f.n);
+        out[f.at] = d & 0xFF;
+      }
+      return out;
+    },
+  };
+}
+
+// ---- the replayer: ~100 bytes at $0200 --------------------------------------
+// dp $00/$01 = stream pointer, $02 = banked ticks, $04 = wait countdown.
+// Timer 0 is the clock, exactly like the console driver.
+function buildReplayer(streamAddr, loopAddr, t0target) {
+  const A = spcAsm(REPLAYER_ORG);
+  A.db(0xCD, 0xEF);                     // mov x,#$EF
+  A.db(0xBD);                           // mov sp,x
+  A.db(0x8F, streamAddr & 0xFF, 0x00);  // mov $00,#<stream
+  A.db(0x8F, streamAddr >> 8, 0x01);    // mov $01,#>stream
+  A.db(0x8F, 0x00, 0x02);               // banked ticks = 0
+  A.db(0x8F, t0target & 0xFF, 0xFA);    // T0TARGET
+  A.db(0x8F, 0x01, 0xF1);               // CONTROL: start timer 0
+  A.label('main');
+  A.db(0x8D, 0x00);                     // mov y,#0
+  A.db(0xF7, 0x00);                     // mov a,[$00]+y
+  A.db(0x3A, 0x00);                     // incw $00
+  A.db(0x68, 0x80);                     // cmp a,#$80
+  A.db(0xB0); A.rel('special');         // bcs -> opcode
+  A.db(0xC4, 0xF2);                     // DSPADDR = reg
+  A.db(0xF7, 0x00);                     // mov a,[$00]+y
+  A.db(0x3A, 0x00);                     // incw $00
+  A.db(0xC4, 0xF3);                     // DSPDATA = val
+  A.db(0x2F); A.rel('main');
+  A.label('special');
+  A.db(0x68, OP_LOOP);  A.db(0xF0); A.rel('doloop');
+  A.db(0x68, OP_WAIT1); A.db(0xF0); A.rel('wait1');
+  A.db(0x68, OP_WAITN); A.db(0xF0); A.rel('waitn');
+  A.db(0x68, OP_TEMPO); A.db(0xF0); A.rel('tempo');
+  A.db(0x68, OP_SPIN);  A.db(0xF0); A.rel('spin');
+  A.db(0x2F); A.rel('main');            // unknown opcode: skip
+  A.label('wait1');
+  A.db(0x8F, 0x01, 0x04);               // countdown = 1
+  A.db(0x2F); A.rel('wloop');
+  A.label('waitn');
+  A.db(0xF7, 0x00);                     // countdown = next byte
+  A.db(0x3A, 0x00);
+  A.db(0xC4, 0x04);
+  A.label('wloop');
+  A.db(0xE4, 0x02);                     // banked ticks?
+  A.db(0xD0); A.rel('whave');
+  A.label('wpoll');
+  A.db(0xE4, 0xFD);                     // T0OUT (read clears)
+  A.db(0xF0); A.rel('wpoll');
+  A.db(0x60);                           // clrc
+  A.db(0x84, 0x02);                     // adc a,$02
+  A.db(0xC4, 0x02);                     // bank them
+  A.db(0x2F); A.rel('wloop');
+  A.label('whave');
+  A.db(0x8B, 0x02);                     // consume one tick
+  A.db(0x8B, 0x04);                     // countdown--
+  A.db(0xD0); A.rel('wloop');
+  A.db(0x2F); A.rel('main');
+  A.label('tempo');
+  A.db(0xF7, 0x00);                     // new T0 target
+  A.db(0x3A, 0x00);
+  A.db(0x8F, 0x00, 0xF1);               // timers off
+  A.db(0xC4, 0xFA);                     // T0TARGET = a
+  A.db(0x8F, 0x01, 0xF1);               // timer 0 back on (stage reset)
+  A.db(0x2F); A.rel('main');
+  A.label('spin');
+  A.db(0x8D, 0x30);                     // ~150 us: the KOF pulse spacing
+  A.label('sp1');
+  A.db(0xFE); A.rel('sp1');             // dbnz y,sp1
+  A.db(0x2F); A.rel('main');
+  A.label('doloop');
+  A.db(0x8F, loopAddr & 0xFF, 0x00);
+  A.db(0x8F, loopAddr >> 8, 0x01);
+  A.db(0x2F); A.rel('main');
+  return A.end();
+}
+
+// ---- capture: run the sequencer, log the register stream for one loop -------
+// The loop is structural: the first repeat of the full row-position state
+// (per-track song/chain/phrase position, pass counters, groove, tempo,
+// table state). Continuous fx phases (vibrato, slides) are excluded so
+// loops stay findable; the seam inherits the first pass's values.
+function spcCapture(block, pool, opts) {
+  opts = opts || {};
+  const maxTicks = opts.maxTicks || 120000;         // ~17 min at 150 BPM
+  let capturing = false;
+  const tickWrites = [];
+  const seq = S.seqNew(block, pool, {
+    onWrite: (r, v) => { if (capturing) tickWrites.push(r, v); },
+  });
+  const regs = new Uint8Array(seq.dsp.regs);        // boot state -> .spc header
+  const t0target = seq.samplesPerTick >> 2;         // initial Timer-0 target
+  capturing = true;
+  // stream budget: the free ARAM between the samples and the echo buffer
+  const edl = block[0x1600 + 3] & 0x0F;
+  const esaStart = (edl ? (0x100 - edl * 8) & 0xFF : 0xFF) << 8;
+  const streamAddr = Math.max(seq.sampleEnd, 0x1200 + 9);
+  const budget = esaStart - streamAddr - 4;         // headroom for the tail ops
+  const bytes = [];
+  let pendingWaits = 0;
+  const flushWaits = () => {
+    while (pendingWaits >= 2) {
+      const n = Math.min(pendingWaits, 255);
+      bytes.push(OP_WAITN, n);
+      pendingWaits -= n;
+    }
+    if (pendingWaits === 1) { bytes.push(OP_WAIT1); pendingWaits = 0; }
+  };
+  // the pass counter only matters when the song uses I/J — leaving it out
+  // otherwise finds the loop 8 passes sooner
+  let usesPasses = false;
+  for (let p = 0x2302; p < 0x5300 && !usesPasses; p += 4) {
+    if (block[p] === 9 || block[p] === 10) usesPasses = true;
+  }
+  for (let i = 0x0800; i < 0x1000 && !usesPasses; i += 4) {
+    if (block[i] === 9 || block[i] === 10 ||
+        block[i + 2] === 9 || block[i + 2] === 10) usesPasses = true;
+  }
+  const stateKey = () => {
+    let k = seq.gpos + ',' + seq.samplesPerTick + ',' +
+      seq.block[0x1000] + ',' + seq.block[0x1001];
+    for (const t of seq.tracks) {
+      k += '|' + t.songrow + ',' + t.cpos + ',' + t.prow + ',' + t.phrase +
+        ',' + (usesPasses ? t.playcnt & 7 : 0) + ',' + t.tsp + ',' + t.instr +
+        ',' + t.chord + ',' + t.fine + ',' + t.vib + ',' + t.trm +
+        ',' + t.retPer +
+        ',' + t.tbl + ',' + t.tblRow + ',' + t.tblSpd + ',' + t.tblCnt;
+    }
+    return k;
+  };
+  const seen = new Map();
+  let loopByte = 0, tick = 0, samples = 0, loopSamples = 0, loopTick = 0;
+  let truncated = false, halted = false;
+  for (; tick < maxTicks; tick++) {
+    if (seq.tickwait === 0) {                       // row tick: checkpoint
+      const key = stateKey();
+      const hit = seen.get(key);
+      if (hit !== undefined && tick > 0) {
+        flushWaits();
+        loopByte = hit.byte;
+        loopTick = hit.tick;
+        loopSamples = hit.samples;
+        break;
+      }
+      flushWaits();
+      seen.set(key, { byte: bytes.length, tick, samples });
+    }
+    tickWrites.length = 0;
+    const spt0 = seq.samplesPerTick;
+    S.seqTick(seq);
+    if (tickWrites.length || seq.koffMask || seq.konMask) flushWaits();
+    bytes.push(...tickWrites);
+    if (seq.koffMask) bytes.push(0x5C, seq.koffMask, OP_SPIN, 0x5C, 0x00);
+    if (seq.konMask) bytes.push(0x4C, seq.konMask);
+    if (seq.samplesPerTick !== spt0) {
+      bytes.push(OP_TEMPO, seq.samplesPerTick >> 2);
+    }
+    pendingWaits++;
+    samples += seq.samplesPerTick;
+    if (seq.halted) {                               // one-shot song: end in
+      flushWaits();                                 // silence, loop the wait
+      bytes.push(0x5C, 0xFF, OP_SPIN, 0x5C, 0x00);
+      loopByte = bytes.length;
+      loopTick = tick + 1;
+      loopSamples = samples;
+      bytes.push(OP_WAITN, 0xFF);
+      halted = true;
+      break;
+    }
+    if (bytes.length > budget) { truncated = true; flushWaits(); break; }
+  }
+  bytes.push(OP_LOOP);
+  return {
+    seq, regs, bytes, streamAddr, loopByte, budget, t0target,
+    truncated, halted,
+    ticks: tick, seconds: samples / 32000,
+    loopTick, loopSeconds: (samples - loopSamples) / 32000,
+    introSeconds: loopSamples / 32000,
+    fits: bytes.length <= budget,
+  };
+}
+
+// ---- assemble the .spc image --------------------------------------------------
+function buildSpc(cap, tags) {
+  if (!cap.fits) throw new Error('stream does not fit ARAM');
+  const spc = new Uint8Array(0x10200);
+  const txt = (o, s, n) => {
+    s = (s || '').slice(0, n);
+    for (let i = 0; i < s.length; i++) spc[o + i] = s.charCodeAt(i) & 0x7F;
+  };
+  txt(0x00, 'SNES-SPC700 Sound File Data v0.30', 33);
+  spc[0x21] = 26; spc[0x22] = 26;
+  spc[0x23] = 26;                       // ID666 tags present
+  spc[0x24] = 30;                       // minor version
+  spc[0x25] = REPLAYER_ORG & 0xFF;      // PC
+  spc[0x26] = REPLAYER_ORG >> 8;
+  spc[0x2B] = 0xEF;                     // SP
+  txt(0x2E, tags.title, 32);
+  txt(0x4E, tags.game || 'sndj', 32);
+  txt(0x6E, 'sndj spcexport', 16);
+  txt(0x7E, tags.comment || 'register-log capture', 32);
+  txt(0x9E, tags.date || '', 11);
+  txt(0xA9, String(Math.min(999, Math.ceil(cap.seconds))), 3);
+  txt(0xAC, '10000', 5);                // fade ms
+  txt(0xB1, tags.artist || '', 32);
+  // 64 KB ARAM: the sequencer's image + replayer + stream
+  const aram = new Uint8Array(cap.seq.aram);
+  const streamBytes = Uint8Array.from(cap.bytes);
+  const rep = buildReplayer(cap.streamAddr, cap.streamAddr + cap.loopByte,
+    cap.t0target);
+  aram.set(rep, REPLAYER_ORG);
+  aram.set(streamBytes, cap.streamAddr);
+  spc.set(aram, 0x100);
+  spc.set(cap.regs, 0x10100);           // DSP registers: the boot state
+  return spc;
+}
+
+// ---- reference decoder (what the replayer must do; used by the tests) -------
+function streamDecode(bytes, loopByte, maxEvents) {
+  const events = [];
+  let p = 0, tick = 0, loops = 0;
+  while (events.length < maxEvents) {
+    const b = bytes[p++];
+    if (b < 0x80) { events.push([tick, b, bytes[p++]]); continue; }
+    if (b === OP_WAIT1) { tick++; continue; }
+    if (b === OP_WAITN) { tick += bytes[p++]; continue; }
+    if (b === OP_TEMPO) { events.push([tick, -1, bytes[p++]]); continue; }
+    if (b === OP_SPIN) continue;
+    if (b === OP_LOOP) { p = loopByte; if (++loops > 8) break; continue; }
+    break;
+  }
+  return events;
+}
+
+const SPCX = { spcAsm, buildReplayer, spcCapture, buildSpc, streamDecode,
+  REPLAYER_ORG };
+if (typeof module !== 'undefined' && module.exports) module.exports = SPCX;
+
+// ============================================================================
+// UI
+// ============================================================================
+if (typeof document !== 'undefined') (() => {
+
+const $ = id => document.getElementById(id);
+let pool = null, song = null, songName = '';
+
+function status() {
+  $('status').textContent =
+    'song: ' + (song ? songName : '—') +
+    ' · pool: ' + (pool ? pool.filter(p => p.name !== '-').length + ' samples' : '—');
+  const ready = !!(song && pool);
+  $('wavbtn').disabled = !ready;
+  $('spcbtn').disabled = !ready;
+}
+function note(msg, bad) {
+  const e = $('status');
+  e.textContent = msg;
+  e.className = bad ? 'warn' : 'dim';
+}
+function report(t) { const e = $('report'); e.textContent = t; e.hidden = false; }
+function dl(bytes, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function take(f) {
+  const buf = new Uint8Array(await f.arrayBuffer());
+  const lower = f.name.toLowerCase();
+  const magic = String.fromCharCode(...buf.slice(0, 5));
+  if (lower.endsWith('.sfc') || lower.endsWith('.smc')) {
+    const off = S.findMarker(buf, 'SNDJPOOL') - 8;
+    if (off < 0) { note(f.name + ': no SNDJPOOL block', true); return; }
+    pool = S.poolParse(buf.slice(off));
+    $('slots').innerHTML = '';
+  } else if (lower.endsWith('.sndj') || magic === 'SNDJ1' && buf.length < 0x4000) {
+    try {
+      const parsed = S.sndjFileParse(buf);
+      song = S.fromImage(S.rleUnpack(parsed.packed, 0x5300));
+      songName = parsed.name || f.name.replace(/\.sndj$/i, '');
+      $('title').placeholder = songName;
+      $('slots').innerHTML = '';
+    } catch (e) { note(f.name + ': ' + e.message, true); return; }
+  } else {                              // cart save: pick a slot
+    const img = new Uint8Array(S.SRM_SIZE);
+    img.set(buf.slice(0, S.SRM_SIZE));
+    const parsed = S.srmParse(img);
+    if (!parsed.valid) { note(f.name + ': not an SNDJ1 save', true); return; }
+    const used = parsed.slots.filter(s => !s.empty);
+    if (!used.length) { note(f.name + ': no songs in this save', true); return; }
+    $('slots').innerHTML = '<table><tr><th>slot</th><th>name</th><th></th></tr>' +
+      used.map(s => '<tr><td>' + s.index + '</td><td>' + s.name +
+        '</td><td><button data-s="' + s.index + '">use</button></td></tr>')
+      .join('') + '</table>';
+    window.__srmSlots = used;
+    status();
+    return;
+  }
+  status();
+}
+$('slots').onclick = e => {
+  const si = e.target.dataset.s;
+  if (si === undefined) return;
+  const s = window.__srmSlots.find(x => x.index === +si);
+  try {
+    song = S.fromImage(S.rleUnpack(s.packed, 0x5300));
+    songName = s.name;
+    $('title').placeholder = songName;
+  } catch (err) { note('slot ' + si + ': ' + err.message, true); return; }
+  status();
+};
+
+// ---- WAV -------------------------------------------------------------------
+$('loopbtn').onclick = () => {
+  if (!song || !pool) { note('drop a song and the ROM first', true); return; }
+  const cap = spcCapture(new Uint8Array(song), pool);
+  const secs = Math.min(600, Math.ceil(cap.introSeconds + cap.loopSeconds + 2));
+  $('secs').value = secs;
+  report(`loop detected: ${cap.loopTick === 0 ? 'whole song' : 'intro ' +
+    cap.introSeconds.toFixed(1) + ' s, then'} ${cap.loopSeconds.toFixed(1)} s loop` +
+    ` (${cap.ticks} ticks)${cap.truncated ? ' ⚠ capped' : ''}` +
+    `${cap.halted ? ' — song halts (one-shot)' : ''}\nWAV length set to ${secs} s.`);
+};
+$('wavbtn').onclick = () => {
+  const secs = Math.max(1, Math.min(600, +$('secs').value || 30));
+  note('rendering ' + secs + ' s…');
+  setTimeout(() => {
+    const t0 = performance.now();
+    const ren = S.seqRender(new Uint8Array(song), pool, secs);
+    // gentle 1 s fade at the tail so loops don't cut
+    const n = ren.l.length, fade = Math.min(32000, n);
+    for (let i = 0; i < fade; i++) {
+      const g = (fade - i) / fade;
+      ren.l[n - fade + i] = ren.l[n - fade + i] * g;
+      ren.r[n - fade + i] = ren.r[n - fade + i] * g;
+    }
+    dl(S.wavBuild(ren.l, ren.r, 32000),
+      (songName || 'song').toLowerCase().replace(/[^a-z0-9]/g, '') + '.wav');
+    note('WAV rendered (' + Math.round(performance.now() - t0) + ' ms)');
+  }, 30);
+};
+
+// ---- .spc ------------------------------------------------------------------
+$('spcbtn').onclick = () => {
+  note('capturing…');
+  setTimeout(() => {
+    const cap = spcCapture(new Uint8Array(song), pool);
+    const kb = v => (v / 1024).toFixed(1) + ' KB';
+    if (!cap.fits) {
+      report(`✗ the register log does not fit ARAM
+stream: ${kb(cap.bytes.length)} · free between samples and echo: ${kb(cap.budget)}
+Trim the song (shorter loop, fewer command sweeps) or lower the echo EDL.`);
+      note('capture too large — see the report', true);
+      return;
+    }
+    const today = new Date();
+    const date = String(today.getMonth() + 1).padStart(2, '0') + '/' +
+      String(today.getDate()).padStart(2, '0') + '/' + today.getFullYear();
+    const spc = buildSpc(cap, {
+      title: $('title').value || songName,
+      artist: $('artist').value,
+      date,
+    });
+    dl(spc, (songName || 'song').toLowerCase().replace(/[^a-z0-9]/g, '') + '.spc');
+    report(`.spc exported — plays in any SPC player
+loop: ${cap.loopTick === 0 ? 'whole song' : 'intro ' + cap.introSeconds.toFixed(1) +
+  ' s +'} ${cap.loopSeconds.toFixed(1)} s (${cap.ticks} ticks)` +
+  `${cap.halted ? ' — one-shot song, ends in silence' : ''}
+register log: ${kb(cap.bytes.length)} at $${cap.streamAddr.toString(16).toUpperCase()}` +
+  ` (budget ${kb(cap.budget)})
+samples end: $${cap.seq.sampleEnd.toString(16).toUpperCase()} · replayer: $0200` +
+  `${cap.truncated ? '\n⚠ loop search capped — the log loops from the top' : ''}`);
+    note('.spc exported');
+  }, 30);
+};
+
+// ---- intake ----------------------------------------------------------------
+const zone = $('zone'), inp = $('file');
+zone.onclick = () => inp.click();
+inp.onchange = () => { if (inp.files[0]) take(inp.files[0]); inp.value = ''; };
+['dragenter', 'dragover'].forEach(e => zone.addEventListener(e, ev => {
+  ev.preventDefault();
+  zone.classList.add('hot');
+}));
+['dragleave', 'drop'].forEach(e => zone.addEventListener(e, ev => {
+  ev.preventDefault();
+  zone.classList.remove('hot');
+}));
+zone.addEventListener('drop', ev => {
+  if (ev.dataTransfer.files[0]) take(ev.dataTransfer.files[0]);
+});
+status();
+
+})();
+</script>
+</body>
+</html>

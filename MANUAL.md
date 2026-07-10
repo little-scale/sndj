@@ -539,6 +539,14 @@ everything runs locally:
   model of the console's BRR + Gaussian playback, so what you hear in
   the browser is what the cart plays.
 - **savetool.html** — song manager for cart saves (§12).
+- **spcexport.html** — share your songs: drop a `.sndj` (or a cart
+  save and pick a slot) plus the ROM, and export either a **WAV**
+  (the whole song rendered offline through the console-sound model,
+  with a loop detector to size the render) or a standard **`.spc`**
+  file that plays in any SPC player — your song's samples plus its
+  register stream for one full loop, replayed by a tiny program baked
+  into the file. If a busy song's log doesn't fit the 64 KB, the
+  report says so and by how much.
 - **als2sndj.html** — Ableton / MIDI / MML converter, both directions:
   drop an `.als` Live Set or `.mid` (first 8 tracks → V1–V8, tempo →
   TMPO, velocities → `X`, note ends → `OFF`), get a `.sndj`; drop a

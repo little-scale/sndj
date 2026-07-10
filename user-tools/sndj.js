@@ -762,6 +762,7 @@ function dspNew(aram) {
 
 function dspWrite(d, reg, val) {
   reg &= 0x7F; val &= 0xFF;
+  if (d.onWrite) d.onWrite(reg, val);           // register-log hook (spcexport)
   d.regs[reg] = val;
   if (reg === 0x4C) d.newKon = val;
   else if (reg === 0x7C) d.regs[0x7C] = 0;      // any ENDX write clears it
@@ -1132,16 +1133,17 @@ function seqAramBuild(block, pool) {
       aram[slotAddr + 1 + p + (p >= 8 ? 1 : 0)] = (s0 << 4) | s1;
     }
   }
-  return { aram, poolMap, sliceBase };
+  return { aram, poolMap, sliceBase, sampleEnd: cursor };
 }
 
 // ---- construction: boot + song load + engine_go -----------------------------
 function seqNew(block, pool, opts) {
   opts = opts || {};
-  const { aram, poolMap, sliceBase } = seqAramBuild(block, pool);
+  const { aram, poolMap, sliceBase, sampleEnd } = seqAramBuild(block, pool);
   const d = dspNew(aram);
+  if (opts.onWrite) d.onWrite = opts.onWrite;
   const seq = {
-    block, pool, aram, dsp: d, poolMap, sliceBase,
+    block, pool, aram, dsp: d, poolMap, sliceBase, sampleEnd,
     trig: { voice: 0, id: 0, type: 0, note: 0, semis: 0, fine: 0 },
     lastPitch: 0,
     engNoise: 0, engNon: 0, engEon: 0, engPmon: 0,

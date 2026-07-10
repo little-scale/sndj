@@ -5,6 +5,16 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- **spcexport.html**: `.sndj` → **WAV** (offline render through the
+  reference sequencer + S-DSP model, with structural loop detection
+  to size the render) and → **`.spc`** (the sequencer's DSP register
+  stream for one song loop + the song's samples + a ~100-byte SPC700
+  replayer, in a standard 66048-byte file any SPC player runs — the
+  SCB architecture as an export format). ARAM budget is reported;
+  over-budget songs get a clear ✗, never a silent truncation. The
+  hand-assembled replayer is executed and verified event-for-event
+  by a micro-interpreter in `make test` (tools/test_spc.js).
+
 - **The reference sequencer** (`sndj.js`): a JS mirror of the console
   engine — tick pipeline, groove, all six instrument types (SMP, KIT,
   WAV, NSE, SLICE, KARP), the full A–Z executor, tables, GRP/chord
