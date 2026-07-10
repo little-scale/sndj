@@ -81,11 +81,11 @@ export a patched ROM. Everything runs locally.</p>
     <option value="oneshot">one-shot (8 kHz kit drum)</option>
   </select>
   <label id="sftrimlab">trim semis <input type="number" id="sftrim" value="0"
-    min="-24" max="24" style="width:3.5rem"></label>
+    min="0" max="36" style="width:3.5rem"></label>
   <label id="sfcaplab">cap ms <input type="number" id="sfcap" value="160"
     min="20" max="500" style="width:4rem"></label>
   <span class="hint" style="cursor:help; text-decoration:underline dotted"
-    title="melodic: a smpl/sf2 loop imports in tune (root key honoured); without one the whole file loops. Trim +12/+24 stores the data an octave/two lower (half/quarter size) and bakes the compensating tune into the slot automatically — playback pitch is unchanged, just darker. One-shots: soundfont slots resample to 8 kHz (capped at cap ms), WAVs keep full length; either way the storage rate is baked into the pool tune, so kit-slot tunes stay purely musical. The → column in the soundfont list shows each sample's fate under the current settings.">?</span>
+    title="melodic: a smpl/sf2 loop imports in tune (root key honoured); without one the whole file loops. Trim +12/+24/+36 stores the data one/two/three octaves lower (half/quarter/eighth size) and bakes the compensating tune into the slot automatically — playback pitch is unchanged, just darker. One-shots: soundfont slots resample to 8 kHz (capped at cap ms), WAVs keep full length; either way the storage rate is baked into the pool tune, so kit-slot tunes stay purely musical. The → column in the soundfont list shows each sample's fate under the current settings.">?</span>
 </div>
 <div class="cols">
 <div>
