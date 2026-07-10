@@ -5,6 +5,13 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- PHRASE shows **sample names on kit rows**: when a row's instrument
+  is a KIT, the note cell reads the first three letters of the slot's
+  pool sample (silent slots read `---`) — a pitch means nothing there.
+- Fixed: the ECHO screen's EON gate toggles drew invisibly (only the
+  ACCENT attribute carries the inverted glyph bank; HILITE spaces are
+  blank). Solid cells now render.
+
 - The committed factory is now a single **`samples/factory.sndjfact`**
   (patcher's export-factory file): the build reads its pool and kits
   directly, replacing pool.bin/kits.bin. Round two of Seb's factory:

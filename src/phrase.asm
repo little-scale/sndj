@@ -947,13 +947,20 @@ phrase_draw:
     lda.l $7E0000 + SB_PHRASES + 3,x
     sta str_buf + 35
 
-    ; NOTE cell
+    ; NOTE cell — kit rows read as sample names (the note picks a
+    ; slot, so the slot's pool name says more than a pitch)
     stz tmp0                ; column counter
     lda #3
     sta text_x
     jsr cell_attr
+    jsr row_is_kit
+    bcc @plain_note
+    jsr draw_kit_name
+    bra @note_drawn
+@plain_note:
     lda str_buf + 32
     jsr draw_note
+@note_drawn:
 
     ; INSTR cell
     inc tmp0
@@ -1051,6 +1058,101 @@ cell_attr:
     rts
 
 draw_dashes2:
+    lda #'-' - 32
+    jsr text_puttile
+    lda #'-' - 32
+    jmp text_puttile
+
+; carry set when the fetched row (str_buf+32 note, +33 instr) is a
+; sounding note on a KIT-type instrument
+row_is_kit:
+    lda str_buf + 32
+    beq @no
+    cmp #NOTE_OFF
+    beq @no
+    lda str_buf + 33
+    cmp #INSTR_NONE
+    beq @no
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR,x
+    and #$03
+    cmp #$01
+    bne @no
+    sec
+    rts
+@no:
+    clc
+    rts
+
+; the kit row's slot -> 3 chars of its pool sample's name ("---" = empty)
+draw_kit_name:
+    ; kit id (X still = the instrument record from row_is_kit)
+    lda.l $7E0000 + SB_INSTR + 1,x
+    and #$0F
+    rep #$30
+.ACCU 16
+    and #$00FF
+    xba
+    lsr
+    lsr                     ; kit * 64
+    sta tmp2
+    sep #$20
+.ACCU 8
+    lda str_buf + 32
+    dec a
+    and #$0F                ; slot from the note, as kit_trigger maps it
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    clc
+    adc tmp2
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_KITS + 2,x   ; vol 0 = empty slot
+    beq @empty
+    lda.l $7E0000 + SB_KITS,x
+    and #$3F
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl                     ; pool entry * 16
+    tax
+    sep #$20
+.ACCU 8
+    lda.l POOL_ROM + 16,x
+    sec
+    sbc #32
+    phx
+    jsr text_puttile
+    plx
+    lda.l POOL_ROM + 17,x
+    sec
+    sbc #32
+    phx
+    jsr text_puttile
+    plx
+    lda.l POOL_ROM + 18,x
+    sec
+    sbc #32
+    jmp text_puttile
+@empty:
+    lda #'-' - 32
+    jsr text_puttile
     lda #'-' - 32
     jsr text_puttile
     lda #'-' - 32

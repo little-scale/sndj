@@ -319,7 +319,7 @@ echo_draw:
     beq @gate_shut
     rep #$20
 .ACCU 16
-    lda #ATTR_HILITE
+    lda #ATTR_ACCENT        ; the one attr with the inverted glyph bank
     sta text_attr
     sep #$20
 .ACCU 8
