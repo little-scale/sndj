@@ -216,6 +216,7 @@ init_video:
     ; palette: build CGRAM + the gradient from the persisted scheme
     jsr palette_boot
     jsr sync_boot
+    jsr options_boot        ; button timing (KEY DELAY/RATE, TAP WIN)
 
     ; font -> BG3 chr
     ldx #VRAM_BG3_CHR

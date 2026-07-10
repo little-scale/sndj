@@ -5,6 +5,18 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- **Button timing is yours now** — three new OPTIONS fields, all
+  persisted on the cart: **KEY DELAY** (frames before d-pad
+  auto-repeat, 4–30), **KEY RATE** (frames between repeats, 1–8) and
+  **TAP WIN** (the B double-tap window for paste/mint/clone, 10–40).
+  genmddj hardcodes these; sndj sets the family precedent.
+  New regression: `checks/options.lua` (edits, clamps, SRAM bytes).
+- Screen layout pass: OPTIONS and PROJECT blocks up 3 rows and left
+  a column; the KIT grid left a column and down a row; the TABLE
+  grid left a column. The OPTIONS **PALETTE** value is now just the
+  scheme number — the old 4-char name read a table that had moved to
+  ROM bank 6 with a bank-0 read and drew garbage.
+
 - **spcexport.html**: **listen** in the browser (streaming playback
   through the console-sound model), `.sndj` → **WAV** (offline render
   with structural loop detection to size it — this IS the "make wav"

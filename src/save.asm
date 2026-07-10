@@ -53,6 +53,14 @@ sram_check:
     sta.l SRAM_MAGIC0 + 4
     lda #$02
     sta.l SRAM_MAGIC0 + 5
+    ; seed the button-timing option bytes (garbage reads as defaults
+    ; anyway — options_boot range-checks — but fresh carts start clean)
+    lda #14
+    sta.l $70000A           ; KEY DELAY
+    lda #3
+    sta.l $70000B           ; KEY RATE
+    lda #24
+    sta.l $70000C           ; TAP WIN
     ldx #$0000
     lda #$FF
 @slots:

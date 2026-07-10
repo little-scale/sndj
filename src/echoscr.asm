@@ -555,7 +555,7 @@ echo_draw:
     lda #21
     sta text_y
     phx
-    lda.w fir_presets,x
+    lda.l fir_presets,x
     jsr text_hex8
     plx
     inx

@@ -184,8 +184,10 @@ phrase_update:
     lda frame_cnt
     sec
     sbc tap_timer
-    cmp #25                 ; double-tap = 24 frames (~400 ms), genmddj's feel
+    cmp.w opt_tapwin        ; double-tap window (OPTIONS: TAP WIN)
+    beq +
     bcs @single
++
     stz tap_live            ; the pair is consumed
     jsr phrase_paste        ; B double-tap = paste the block clipboard
     bra @dpad_cursor
@@ -1274,7 +1276,7 @@ draw_note:
     tax
     sep #$20
 .ACCU 8
-    lda.w note_semi2,x
+    lda.l note_semi2,x
     lsr                     ; semitone 0..11
     rep #$20
 .ACCU 16
@@ -1299,7 +1301,7 @@ draw_note:
     tax
     sep #$20
 .ACCU 8
-    lda.w note_shift,x      ; 7 - octave
+    lda.l note_shift,x      ; 7 - octave
     eor #$FF
     clc
     adc #8                  ; octave = 7 - shift

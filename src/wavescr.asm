@@ -237,7 +237,7 @@ wave_stamp:
     tax
     sep #$20
 .ACCU 8
-    lda.w default_waves,x
+    lda.l default_waves,x
     pha
     lda es2
     jsr wv_addr

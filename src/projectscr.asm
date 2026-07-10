@@ -195,9 +195,9 @@ project_draw:
 @rows:
     lda ui_cnt
     clc
-    adc #8
+    adc #5
     sta text_y
-    lda #2
+    lda #1
     sta text_x
     ; labels stay dim; the VALUE carries the cursor accent
     rep #$20
@@ -218,8 +218,8 @@ project_draw:
     sep #$20
 .ACCU 8
     jsr text_puts
-    ; value at x12 (accent under the cursor)
-    lda #12
+    ; value at x11 (accent under the cursor)
+    lda #11
     sta text_x
     lda ui_cnt
     cmp pj_cur

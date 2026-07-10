@@ -371,7 +371,7 @@ apu_fir_preset:
     stz trig_id             ; tap counter (borrow; safe outside triggers)
 @copy:
     phx                     ; ROM table index
-    lda.w fir_presets,x
+    lda.l fir_presets,x
     pha
     lda trig_id
     rep #$30
@@ -557,15 +557,15 @@ note_pitch_raw:
     tax
     sep #$20
 .ACCU 8
-    lda.w note_shift,x
+    lda.l note_shift,x
     sta tmp1
     stz tmp1 + 1
-    lda.w note_semi2,x
+    lda.l note_semi2,x
     rep #$30
 .ACCU 16
     and #$00FF
     tax
-    lda.w pitch_octave7,x
+    lda.l pitch_octave7,x
     ldy tmp1
     beq @shifted
 @shift:

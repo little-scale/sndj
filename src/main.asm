@@ -296,31 +296,6 @@ font_data_end:
 pal_schemes:
     .INCBIN "schemes.bin"
 
-; factory defaults (the boot instruments), marker-wrapped so browser
-; tools can re-voice a built ROM without a toolchain: 12 instrument
-; types, 12 samples/banks/kits, 12 extras (record byte 7: SLICES-1
-; high nibble, EON bit 0). maketables.py extracts the rows from
-; samples/factory.sndjfact.
-    .DB "SNDEF2"
-factory_instr_type: .INCBIN "defaults.bin" SKIP 0 READ 12
-factory_instr_smp:  .INCBIN "defaults.bin" SKIP 12 READ 12
-factory_instr_x7:   .INCBIN "defaults.bin" SKIP 24 READ 12
-
-
-; 8 factory FIR curves x 8 taps, marker-wrapped so firdesign.html patches
-    .DB "SNFIR0"
-fir_presets:
-    .DB $7F, $00, $00, $00, $00, $00, $00, $00   ; 0 FLAT (pass-through)
-    .DB $58, $30, $12, $08, $00, $00, $00, $00   ; 1 DARK (lowpass hall)
-    .DB $70, $E8, $18, $F4, $00, $00, $00, $00   ; 2 BRIGHT (presence)
-    .DB $40, $00, $00, $40, $00, $00, $00, $00   ; 3 COMB
-    .DB $20, $30, $40, $30, $20, $10, $08, $04   ; 4 SOFT (smeared)
-    .DB $4C, $21, $12, $09, $05, $03, $02, $01   ; 5 DKC HALL (decay tail)
-    .DB $60, $A0, $40, $D0, $20, $E8, $10, $F8   ; 6 METAL (alternating)
-    .DB $7F, $00, $00, $00, $00, $00, $00, $00   ; 7 USER (starts flat)
-
-; pitch/note tables (single tuning source: tools/maketables.py)
-.INCLUDE "tables.inc"
 
 
 
@@ -359,6 +334,33 @@ logo_data_end:
     .DB "SNKIT0"
 factory_kits:
     .INCBIN "kits.bin"
+
+; factory defaults (the boot instruments), marker-wrapped so browser
+; tools can re-voice a built ROM without a toolchain: 12 instrument
+; types, 12 samples/banks/kits, 12 extras (record byte 7: SLICES-1
+; high nibble, EON bit 0). maketables.py extracts the rows from
+; samples/factory.sndjfact. Read with long addressing (bank 6).
+    .DB "SNDEF2"
+factory_instr_type: .INCBIN "defaults.bin" SKIP 0 READ 12
+factory_instr_smp:  .INCBIN "defaults.bin" SKIP 12 READ 12
+factory_instr_x7:   .INCBIN "defaults.bin" SKIP 24 READ 12
+
+; 8 factory FIR curves x 8 taps, marker-wrapped so firdesign.html patches
+; them in place; read with long addressing (bank 6)
+    .DB "SNFIR0"
+fir_presets:
+    .DB $7F, $00, $00, $00, $00, $00, $00, $00   ; 0 FLAT (pass-through)
+    .DB $58, $30, $12, $08, $00, $00, $00, $00   ; 1 DARK (lowpass hall)
+    .DB $70, $E8, $18, $F4, $00, $00, $00, $00   ; 2 BRIGHT (presence)
+    .DB $40, $00, $00, $40, $00, $00, $00, $00   ; 3 COMB
+    .DB $20, $30, $40, $30, $20, $10, $08, $04   ; 4 SOFT (smeared)
+    .DB $4C, $21, $12, $09, $05, $03, $02, $01   ; 5 DKC HALL (decay tail)
+    .DB $60, $A0, $40, $D0, $20, $E8, $10, $F8   ; 6 METAL (alternating)
+    .DB $7F, $00, $00, $00, $00, $00, $00, $00   ; 7 USER (starts flat)
+
+; pitch/note tables (single tuning source: tools/maketables.py);
+; read with long addressing — parked here to keep the code bank breathing
+.INCLUDE "tables.inc"
 
 ; KARP tuning tables (maketables.py): read with long addressing from
 ; karp_trigger — parked here to keep the code bank breathing

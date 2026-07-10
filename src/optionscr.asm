@@ -1,17 +1,26 @@
 ; optionscr.asm — the OPTIONS screen (device settings, persist in the
-; reserved SRAM header bytes). One live field for now:
+; reserved SRAM header bytes $700007..).
 ;
-;   PALETTE  — B-hold + left/right cycles the 8 schemes (applies
-;              instantly, persists in SRAM)
+;   PALETTE    B + left/right cycles the 8 schemes (applied instantly)
+;   CLONE      SLIM / DEEP chain cloning
+;   VIDEO      detected console standard (display only — pitch and
+;              tempo ride the region-free APU crystal)
+;   SYNC       OFF/OUT/PULSE/IN/MIDI/IN24
+;   KEY DELAY  frames before d-pad auto-repeat kicks in (4-30)
+;   KEY RATE   frames between repeats (1-8)
+;   TAP WIN    B double-tap (paste) window, frames (10-40)
 ;
-; VIDEO shows the detected console standard (display only — pitch and
-; tempo ride the region-free APU crystal); SYNC arrives with M12.
+; genmddj hardcodes its button timing (repeat 16/4, double-tap 24);
+; sndj exposes it here per CLAUDE.md §16 — everything persists.
 ; Reached with A+Up from SONG.
 
 .ACCU 8
 .INDEX 16
 
-.DEFINE OPT_FIELDS 4
+.DEFINE OPT_FIELDS 7
+.DEFINE OPT_KDELAY_DEF 14
+.DEFINE OPT_KRATE_DEF  3
+.DEFINE OPT_TAPWIN_DEF 24
 
 options_init:
     lda #SCREEN_OPTIONS
@@ -124,8 +133,13 @@ options_update:
     sta.l $700009
     jmp options_draw
 @not_sync:
-    ; PALETTE (field 0) edits
     lda opt_cur
+    cmp #$04
+    bcc @pal_maybe
+    jmp opt_timing_edit     ; fields 4-6: the button-timing numbers
+@pal_maybe:
+    ; PALETTE (field 0) edits (field 2 VIDEO is display-only)
+    cmp #$00
     bne @b_done
     rep #$20
 .ACCU 16
@@ -192,9 +206,9 @@ options_draw:
 @rows:
     lda ui_cnt
     clc
-    adc #8
+    adc #5
     sta text_y
-    lda #2
+    lda #1
     sta text_x
     rep #$20
 .ACCU 16
@@ -214,8 +228,8 @@ options_draw:
     sep #$20
 .ACCU 8
     jsr text_puts
-    ; value at x12 (accent under the cursor)
-    lda #12
+    ; value at x11 (accent under the cursor)
+    lda #11
     sta text_x
     lda ui_cnt
     cmp opt_cur
@@ -263,41 +277,16 @@ options_draw:
     jmp @next
 @not_video:
     lda ui_cnt
-    bne @fixed
-    ; PALETTE: index + 4-char name
+    bne @not_pal
+    ; PALETTE: just the scheme number
     lda opt_pal
     clc
     adc #'0' - 32
     jsr text_puttile
-    lda #' ' - 32
-    jsr text_puttile
-    ; name chars (text_puttile clobbers X: fetch each by index)
-    stz sv_run
-@pname:
-    lda opt_pal
-    rep #$30
-.ACCU 16
-    and #$00FF
-    asl
-    asl                     ; * 4
-    sta tmp2
-    lda sv_run
-    and #$00FF
-    clc
-    adc tmp2
-    tax
-    sep #$20
-.ACCU 8
-    lda.w pal_names,x
-    sec
-    sbc #32
-    jsr text_puttile
-    inc sv_run
-    lda sv_run
-    cmp #$04
-    bne @pname
     bra @next
-@fixed:
+@not_pal:
+    cmp #$03
+    bne @timing_v
     ; SYNC (field 3): the live mode name
     lda opt_sync
     rep #$30
@@ -310,6 +299,25 @@ options_draw:
     sep #$20
 .ACCU 8
     jsr text_puts
+    bra @next
+@timing_v:
+    ; fields 4-6: the timing numbers, decimal frames
+    sec
+    sbc #$04
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w opt_kdelay,x
+    rep #$30
+.ACCU 16
+    and #$00FF
+    sta tmp0
+    sep #$20
+.ACCU 8
+    jsr text_dec3
 @next:
     inc ui_cnt
     lda ui_cnt
@@ -325,9 +333,9 @@ options_draw:
     cmp #SYNC_MIDI
     beq @mon
     ; not a monitored mode: blank the line (stale RX text otherwise)
-    lda #2
+    lda #1
     sta text_x
-    lda #14
+    lda #13
     sta text_y
     rep #$20
 .ACCU 16
@@ -338,9 +346,9 @@ options_draw:
     ldx #str_o_blank
     jmp text_puts
 @mon:
-    lda #2
+    lda #1
     sta text_x
-    lda #14
+    lda #13
     sta text_y
     rep #$20
 .ACCU 16
@@ -375,7 +383,97 @@ options_draw:
 @rows_far:
     jmp @rows
 
+; --- fields 4-6: B + left/right nudges the number, clamped + persisted ---------
+opt_timing_edit:
+    sec
+    sbc #$04
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_LEFT
+    sep #$20
+.ACCU 8
+    beq @try_right
+    lda #$01
+    sta b_used
+    lda.w opt_kdelay,x
+    dec a
+    cmp.w opt_t_min,x
+    bcs @store
+    lda.w opt_t_min,x
+    bra @store
+@try_right:
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_RIGHT
+    sep #$20
+.ACCU 8
+    beq @done
+    lda #$01
+    sta b_used
+    lda.w opt_kdelay,x
+    inc a
+    cmp.w opt_t_max,x
+    bcc @store
+    lda.w opt_t_max,x
+@store:
+    sta.w opt_kdelay,x
+    ; persist next to the other option bytes
+    pha
+    lda.l $700000
+    cmp #'S'
+    bne @no_sram
+    pla
+    sta.l $70000A,x
+    bra @done
+@no_sram:
+    pla
+@done:
+    jmp options_draw
+
+; --- boot: timing options from the SRAM stub (out-of-range = defaults) ---------
+options_boot:
+    lda #OPT_KDELAY_DEF
+    sta.w opt_kdelay
+    lda #OPT_KRATE_DEF
+    sta.w opt_krate
+    lda #OPT_TAPWIN_DEF
+    sta.w opt_tapwin
+    lda.l $700000
+    cmp #'S'
+    bne @done
+    lda.l $700004
+    cmp #'1'
+    bne @done
+    ldx #$0000
+@field:
+    lda.l $70000A,x
+    cmp.w opt_t_min,x
+    bcc @skip
+    cmp.w opt_t_max,x
+    beq @take
+    bcs @skip
+@take:
+    sta.w opt_kdelay,x
+@skip:
+    inx
+    cpx #$0003
+    bne @field
+@done:
+    rts
+
+opt_t_min: .DB 4,  1, 10
+opt_t_max: .DB 30, 8, 40
+
 opt_labels: .DW str_o_pal, str_o_clone, str_o_vid, str_o_sync
+            .DW str_o_kdel, str_o_krat, str_o_tapw
 sync_names: .DW str_o_soff, str_o_sout, str_o_spul, str_o_sin, str_o_smid, str_o_s24
 
 str_options: .DB "OPTIONS", 0
@@ -394,5 +492,8 @@ str_o_spul:  .DB "PULSE", 0
 str_o_sin:   .DB "IN   ", 0
 str_o_smid:  .DB "MIDI ", 0
 str_o_s24:   .DB "IN24 ", 0
+str_o_kdel:  .DB "KEY DELAY", 0
+str_o_krat:  .DB "KEY RATE", 0
+str_o_tapw:  .DB "TAP WIN", 0
 str_o_rx:    .DB "RX ", 0
 str_o_blank: .DB "                ", 0

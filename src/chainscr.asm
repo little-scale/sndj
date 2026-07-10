@@ -188,20 +188,24 @@ chain_update:
 .ACCU 8
     bne @b_held
     lda b_down
-    beq @cursor
+    beq @cur_tramp
     stz b_down
     lda b_used
-    bne @cursor
+    bne @cur_tramp
     lda tap_live
     beq @single             ; no pending first tap (moved / new screen)
     lda frame_cnt
     sec
     sbc tap_timer
-    cmp #25                 ; double-tap = 24 frames (~400 ms), genmddj's feel
+    cmp.w opt_tapwin        ; double-tap window (OPTIONS: TAP WIN)
+    beq +
     bcs @single
++
     stz tap_live            ; the pair is consumed
     jsr chain_dtap          ; paste / mint / clone
     bra @draw
+@cur_tramp:
+    jmp @cursor
 @single:
     lda frame_cnt
     sta tap_timer

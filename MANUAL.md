@@ -461,6 +461,9 @@ console's sound chip, using the ROM's own samples.
 | **CLONE** | SLIM / DEEP chain cloning (§4) |
 | **VIDEO** | readout of the console standard — NTSC 60 Hz / PAL 50 Hz. Display only: pitch and tempo come from the audio crystal and never change. |
 | **SYNC** | clock sync / MIDI takeover mode (§13a) |
+| **KEY DELAY** | frames a d-pad direction is held before it auto-repeats (4–30, default 14) |
+| **KEY RATE** | frames between auto-repeats once rolling (1–8, default 3 — lower = faster) |
+| **TAP WIN** | the B double-tap (paste / mint / clone) window in frames (10–40, default 24) |
 
 Options persist on the cart across power cycles.
 

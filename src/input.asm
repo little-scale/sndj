@@ -5,8 +5,8 @@
 .ACCU 8
 .INDEX 16
 
-.DEFINE DAS_DELAY 14        ; frames before auto-repeat kicks in
-.DEFINE DAS_RATE  3         ; frames between repeats
+; delay/rate live in opt_kdelay/opt_krate (OPTIONS: KEY DELAY / KEY RATE;
+; defaults 14/3 set by options_boot)
 
 input_update:
     rep #$30
@@ -42,11 +42,11 @@ input_update:
     lda frame_cnt
     sta das_last_fc
     lda das_cnt
-    cmp #DAS_DELAY
+    cmp.w opt_kdelay
     bcc @done
     ; fire a repeat
     sec
-    sbc #DAS_RATE
+    sbc.w opt_krate
     sta das_cnt
     rep #$20
 .ACCU 16

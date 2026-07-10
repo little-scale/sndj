@@ -17,7 +17,7 @@
 waves_seed:
     ldx #$0000
 @copy:
-    lda.w default_waves,x
+    lda.l default_waves,x
     sta.l $7E0000 + SB_WAVES,x
     inx
     cpx #$0100

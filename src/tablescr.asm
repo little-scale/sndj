@@ -31,7 +31,7 @@ table_init:
     ldx #str_table
     jsr text_puts
     ; ruler (the family grid: header y4, rows from y5)
-    lda #4
+    lda #3
     sta text_x
     lda #4
     sta text_y
@@ -298,8 +298,7 @@ table_draw:
     clc
     adc #5
     sta text_y
-    lda #1
-    sta text_x
+    stz text_x
     rep #$20
 .ACCU 16
     lda #ATTR_DIM
@@ -317,10 +316,10 @@ table_draw:
     ; x for the cmd cell: col 0 -> 4, col 2 -> 10
     lda tmp0
     beq @c0
-    lda #10
+    lda #9
     bra @cx
 @c0:
-    lda #4
+    lda #3
 @cx:
     sta text_x
     jsr tb_attr
@@ -339,10 +338,10 @@ table_draw:
     lda tmp0
     cmp #$01
     beq @v1
-    lda #12
+    lda #11
     bra @vx
 @v1:
-    lda #6
+    lda #5
 @vx:
     sta text_x
     jsr tb_attr
@@ -354,7 +353,7 @@ table_draw:
     cmp #$04
     bne @cells
     ; running-position marker (any live track inside this table)
-    lda #15
+    lda #14
     sta text_x
     jsr tb_head
     inc ui_cnt

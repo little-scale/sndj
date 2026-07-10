@@ -25,9 +25,9 @@ kit_init:
 .ACCU 8
     ldx #str_kit
     jsr text_puts
-    lda #4
-    sta text_x
     lda #3
+    sta text_x
+    lda #4
     sta text_y
     rep #$20
 .ACCU 16
@@ -369,10 +369,9 @@ kit_draw:
 @rows:
     lda ui_cnt
     clc
-    adc #4
+    adc #5
     sta text_y
-    lda #1
-    sta text_x
+    stz text_x
     rep #$20
 .ACCU 16
     lda #ATTR_DIM
@@ -401,14 +400,14 @@ kit_draw:
     lda.l $7E0002,x
     sta.w str_buf + 30
     ; SAMPLE cell
-    lda #4
+    lda #3
     sta text_x
     stz es3
     jsr kt_attr
     lda.w str_buf + 28
     jsr text_hex8
     ; TUNE cell
-    lda #8
+    lda #7
     sta text_x
     lda #$01
     sta es3
@@ -416,7 +415,7 @@ kit_draw:
     lda.w str_buf + 29
     jsr text_hex8
     ; VOL cell
-    lda #12
+    lda #11
     sta text_x
     lda #$02
     sta es3

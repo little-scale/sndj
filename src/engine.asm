@@ -106,7 +106,7 @@ song_init:
     tay
     sep #$20
 .ACCU 8
-    lda.w factory_instr_type,x
+    lda.l factory_instr_type,x
     phx
     rep #$30
 .ACCU 16
@@ -115,9 +115,24 @@ song_init:
 .ACCU 8
     sta.l $7E0000 + SB_INSTR,x      ; type
     ply
-    lda.w factory_instr_smp,y
+    ; bank-6 rows: long addressing is X-indexed only, so juggle
+    phx
+    rep #$30
+.ACCU 16
+    tyx
+    sep #$20
+.ACCU 8
+    lda.l factory_instr_smp,x
+    plx
     sta.l $7E0000 + SB_INSTR + 1,x  ; sample / bank / kit
-    lda.w factory_instr_x7,y
+    phx
+    rep #$30
+.ACCU 16
+    tyx
+    sep #$20
+.ACCU 8
+    lda.l factory_instr_x7,x
+    plx
     sta.l $7E0000 + SB_INSTR + 7,x  ; SLICES-1 nibble + EON
     lda.l $7E0000 + SB_INSTR,x
     cmp #$04
@@ -208,7 +223,7 @@ song_init:
     ; FIR taps seed from preset 0 (FLAT)
     ldx #$0000
 @ftaps:
-    lda.w fir_presets,x
+    lda.l fir_presets,x
     sta.l $7E0000 + SB_HEADER + SH_FIRTAPS,x
     inx
     cpx #$0008

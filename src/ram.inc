@@ -274,6 +274,10 @@ help_prev    db      ; HELP hotkey: last non-HELP screen (restored on exit)
 help_actr    db      ; HELP hotkey: lone-A hold frames
 hint_ctr     dw      ; boot hint countdown ("HOLD A TO VIEW HELP")
 help_lfc     db      ; HELP hotkey: frame_cnt at the last poll (delta base)
+opt_kdelay   db      ; OPTIONS timing: frames before d-pad auto-repeat (4-30)
+opt_krate    db      ; OPTIONS timing: frames between repeats (1-8)
+opt_tapwin   db      ; OPTIONS timing: B double-tap window, frames (10-40)
+                     ; (the three stay consecutive: OPTIONS indexes them)
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;
