@@ -971,7 +971,29 @@ track_trigger_note:
 @not_kit:
     cmp #$03
     bne @not_nse
+    ; the instrument's CLOCK field (byte 1) pins the rate; 0 follows
+    ; the note, so noise stays playable chromatically by default
+    phx
+    lda trig_id
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR + 1,x
+    plx
+    cmp #$00                ; plx set the flags; re-test the clock byte
+    beq @clk_note
+    dec a
+    bra @clk_have
+@clk_note:
     lda trig_note
+@clk_have:
     and #$1F
     sta eng_noise
     tay

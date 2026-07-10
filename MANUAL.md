@@ -185,7 +185,7 @@ sound. An instrument's **TYPE** decides what the voice does:
 | **SMP** | a BRR sample from the ROM pool (melodic, looped or one-shot) |
 | **KIT** | a drum kit: the note row picks a slot (C-4 = slot 0, C#4 = slot 1, wrapping every 16) |
 | **WAV** | a drawn 32-sample wavetable loop from the WAVE screen |
-| **NSE** | the DSP noise generator; the note sets the noise clock |
+| **NSE** | the DSP noise generator; the note sets the noise clock, or the instrument's CLOCK field pins it |
 
 Any type can go on any of the 8 voices — there are no special
 channels. Eight kits at once is legal. The factory set is deliberately

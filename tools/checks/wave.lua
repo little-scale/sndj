@@ -35,7 +35,7 @@ end
 
 gest({ start = true }, 4)          -- SONG
 local play = t + 2
-t = play + 60
+t = play + 80
 local stop = t
 gest({ start = true }, 6)          -- stop
 -- navigate to WAVE: CHAIN -> PHRASE -> INSTR -> A+Up
@@ -77,8 +77,14 @@ emu.addEventCallback(function()
     poke(0x2413, 0xCA)
     poke(0x2414, 0x50)
     poke(0x2415, 0x50)
-    poke(0x2420, 3)          -- instr 2: type NSE
+    poke(0x2420, 3)          -- instr 2: type NSE (clock follows the note)
     poke(0x2421, 0)
+    poke(0x2430, 3)          -- instr 3: type NSE, CLOCK pinned to 11
+    poke(0x2431, 0x0C)
+    poke(0x2432, 0x2F)
+    poke(0x2433, 0xCA)
+    poke(0x2434, 0x50)
+    poke(0x2435, 0x50)
     poke(0x2422, 0x2F)
     poke(0x2423, 0xCA)
     poke(0x2424, 0x50)
@@ -96,6 +102,8 @@ emu.addEventCallback(function()
     poke(0x4321, 2)
     poke(0x4322, 3)          -- C00: chord off before the NSE row
     poke(0x4323, 0)
+    poke(0x4328, 49)         -- r10: C-4 on the pinned-clock NSE (instr 3)
+    poke(0x4329, 3)
     poke(0x4330, 49)
     poke(0x4331, 1)
   elseif frames == play + 8 then
@@ -112,6 +120,10 @@ emu.addEventCallback(function()
   elseif frames == play + 56 then
     check(dsp(0x3D) == 0x01, "NSE set the voice's NON bit")
     check(dsp(0x6C) % 32 == 23, "noise clock follows the note (G-4 -> 23)")
+  elseif frames == play + 72 then
+    -- row 10: instr 3's CLOCK field pins rate 11; the C-4 note (16) loses
+    check(dsp(0x6C) % 32 == 11,
+      "instrument CLOCK pins the noise rate (11, note ignored)")
   elseif frames == at_wave then
     check(wram(0x0C) == 7, "A+Up from INSTR opened WAVE")
     local out = os.getenv("SNDJ_WAVE_SHOT")

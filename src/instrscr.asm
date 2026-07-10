@@ -53,7 +53,7 @@ if_row:
 if_vis:
     .DB $0F              ; INSTR number
     .DB $0F              ; TYPE
-    .DB $07              ; SAMPLE (NSE has none)
+    .DB $0F              ; SAMPLE / KIT / BANK / CLOCK
     .DB $0F, $0F, $0F, $0F   ; envelope: hardware ADSR applies to all
     .DB $0D, $0D         ; VOL L/R (KIT: the slot's vol rules)
     .DB $0F              ; ECHO
@@ -73,6 +73,7 @@ if_l0:  .DB "TYPE", 0
 if_l1:  .DB "SAMPLE", 0
 if_l1k: .DB "KIT   ", 0
 if_l1w: .DB "BANK  ", 0
+if_l1n: .DB "CLOCK ", 0
 if_l2:  .DB "ATTACK", 0
 if_l3:  .DB "DECAY", 0
 if_l4:  .DB "SUS LVL", 0
@@ -177,7 +178,8 @@ if_desc:
     sta str_buf + 38        ; byte offset
     lda.w if_fields + 1,x
     sta str_buf + 39        ; shift
-    ; the SAMPLE field's range follows the type: KIT 0-15, WAV bank 0-7
+    ; the SAMPLE field's range follows the type: KIT 0-15, WAV bank
+    ; 0-7, NSE clock 0-32 (0 = follow the note)
     lda if_cur
     cmp #$02
     bne @max_ok
@@ -189,8 +191,14 @@ if_desc:
     bra @max_ok
 @not_kitmax:
     cmp #$04                ; WAV
-    bne @max_ok
+    bne @not_wavmax
     lda #7
+    sta str_buf + 37
+    bra @max_ok
+@not_wavmax:
+    cmp #$08                ; NSE
+    bne @max_ok
+    lda #32
     sta str_buf + 37
 @max_ok:
     rep #$30
@@ -511,7 +519,7 @@ instr_draw:
     sep #$20
 .ACCU 8
 @label:
-    ; the SAMPLE row reads KIT / BANK on those types
+    ; the SAMPLE row reads KIT / BANK / CLOCK on those types
     lda ui_cnt
     cmp #$02
     bne @lab_std
@@ -522,8 +530,13 @@ instr_draw:
     bra @lab_put
 @not_klab:
     cmp #$04
-    bne @lab_std
+    bne @not_wlab
     ldx #if_l1w
+    bra @lab_put
+@not_wlab:
+    cmp #$08
+    bne @lab_std
+    ldx #if_l1n
     bra @lab_put
 @lab_std:
     lda ui_cnt
@@ -595,6 +608,27 @@ instr_draw:
     jmp @next
 @not_tbl_v:
     lda ui_cnt
+    cmp #$02
+    bne @not_clk_v
+    jsr if_typebit
+    cmp #$08
+    bne @not_clk_v
+    ; NSE CLOCK: 0 = follow the note, else the fixed rate (value-1)
+    lda str_buf + 33
+    bne @clk_fixed
+    phx
+    ldx #str_if_note
+    jsr text_puts
+    plx
+    jmp @next
+@clk_fixed:
+    dec a
+    jsr text_hex8
+    lda #' ' - 32
+    jsr text_puttile
+    jmp @next
+@not_clk_v:
+    lda ui_cnt
     bne @not_num_v
     ; INSTR: the edited instrument's number
     lda ed_instr
@@ -650,3 +684,4 @@ str_if_blank: .DB "                   ", 0
 str_if_on:  .DB "ON ", 0
 str_if_off: .DB "OFF", 0
 str_if_nil: .DB "-- ", 0
+str_if_note: .DB "NOTE", 0
