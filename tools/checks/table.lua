@@ -1,11 +1,13 @@
 -- table.lua — instrument tables: TBL picks the table (>= 32 = nil),
--- TBS clocks it (n ticks/row; 0 = advance per note), both command
--- columns run the shared executor, and H hops the table's own rows.
+-- TBS clocks it (n ticks/row; 0 = advance per note). A row is
+-- (V, TSP, CMD, VAL): voice level, signed transpose, ONE command
+-- through the shared executor; zero = no change. H hops the table.
 --
--- Table 0 (all factory instruments point at it; empty = no-op):
---   row 0: P00 | E01   pan hard left + echo send, same tick
---   row 1: M30         master volume $30
---   row 2: H01         hop -> rows 1-2 loop forever
+-- Table 0:
+--   row 0: V20          level $20 on the voice
+--   row 1: M30          master volume $30 (the command column)
+--   row 2: TSP +12      pitch doubles (an octave up off the note)
+--   row 3: H02          hop -> rows 2-3 loop forever
 --
 -- WRAM: tables at $2800 (64/table, 4/row); trk_tbl $2FF, row $307.
 
@@ -13,6 +15,7 @@ local frames = 0
 local _booted = false
 local fails = 0
 local pad = {}
+local base_pitch = 0
 
 local function wram(addr) return emu.read(addr, emu.memType.snesWorkRam) end
 local function poke(a, v) emu.write(a, v, emu.memType.snesWorkRam) end
@@ -60,36 +63,36 @@ emu.addEventCallback(function()
     poke(0x241C, 0xFF)       -- instr 1 TBL nil (factory default, explicit)
     poke(0x242C, 1)          -- instr 2: TBL = 1
     poke(0x242D, 0)          -- TBS = note-sync
-    -- table 1: M values per note
-    poke(0x2840, 13)
-    poke(0x2841, 0x10)
-    poke(0x2844, 13)
-    poke(0x2845, 0x20)
+    -- table 1: M values per note (CMD col = bytes 2/3)
+    poke(0x2842, 13)
+    poke(0x2843, 0x10)
+    poke(0x2846, 13)
+    poke(0x2847, 0x20)
     -- table 0
-    poke(0x2800, 16)         -- P
-    poke(0x2801, 0x00)
-    poke(0x2802, 5)          -- E (column 2, same tick)
-    poke(0x2803, 0x01)
-    poke(0x2804, 13)         -- M
-    poke(0x2805, 0x30)
-    poke(0x2808, 8)          -- H
-    poke(0x2809, 0x01)
+    poke(0x2800, 0x20)       -- row 0: V $20
+    poke(0x2806, 13)         -- row 1: M $30 (the command column)
+    poke(0x2807, 0x30)
+    poke(0x2809, 12)         -- row 2: TSP +12
+    poke(0x280E, 8)          -- row 3: H02
+    poke(0x280F, 0x02)
   elseif frames == 44 then
     pad = { start = true }
   elseif frames == 46 then
     pad = {}
-  elseif frames == 52 then
+  elseif frames == 48 then
     check(wram(0x2FF) == 0, "trigger started the instrument's table 0")
-    check(dsp(0x00) == 0x7F and dsp(0x01) == 0x00,
-      "row 0 col 1: P00 panned hard left")
-    check(dsp(0x4D) ~= 0 and (dsp(0x4D) % 2) == 1,
-      "row 0 col 2: E01 raised the echo send the same tick")
+    check(dsp(0x00) == 0x20 and dsp(0x01) == 0x20,
+      "row 0: V20 retargeted the voice level")
+    base_pitch = dsp(0x02) + dsp(0x03) * 256
   elseif frames == 58 then
     check(dsp(0x0C) == 0x30 and dsp(0x1C) == 0x30,
-      "row 1: M30 set master volume")
+      "row 1: M30 set master volume (the command column)")
+    local p = dsp(0x02) + dsp(0x03) * 256
+    check(math.abs(p - base_pitch * 2) <= 2,
+      "row 2: TSP +12 doubled the pitch (" .. base_pitch .. " -> " .. p .. ")")
   elseif frames == 70 then
     local r = wram(0x307)
-    check(r == 1 or r == 2, "H01 keeps the table looping rows 1-2 (row=" ..
+    check(r == 2 or r == 3, "H02 keeps the table looping rows 2-3 (row=" ..
       r .. ")")
   elseif frames == 78 then
     -- row 4 triggered instr 1: TBL nil ends the running table

@@ -508,7 +508,8 @@ INSTR/TABLE (the room below the voices), MIDI sits above PHRASE
   channel assignment, mono/poly pool mode, PC→instrument table, activity
   lights. Entering the screen does not enable the mode; OPTIONS → MIDI does.
 - **FILES** — SRAM slots: save/load/erase, slot names, used/free bytes.
-- **PROJECT** — song-level: TMPO readout, transpose, echo defaults, NEW.
+- **PROJECT** — song-level: TMPO readout, transpose, echo defaults.
+  (NEW moved to FILES — LOAD on the empty row, 2026-07-11.)
 - **OPTIONS** — persistent device settings: VIDEO 50/60 (display only —
   pitch and tempo are region-free on SNES, surface that proudly as
   `CLOCK: N/A (APU XTAL)`), SYNC mode, MIDI on/off, palette, font, key

@@ -48,7 +48,7 @@ press means.** There are no simultaneous-press timing windows.
 |--------|------|
 | **d-pad** | move the cursor |
 | **B** | *edit*: tap = insert / act · hold + d-pad = nudge the value under the cursor (left/right small, up/down big) · double-tap = paste / clone · hold B + tap **A** = cut |
-| **Y** | *context*: hold + ←/→ = previous/next channel · hold + ↑/↓ = page / previous-next phrase, instrument or table (on those screens) · Y+B = block select |
+| **Y** | *context*: hold + ←/→ = previous/next channel · hold + ↑/↓ = previous/next chain, phrase, kit or table (on those screens) · Y+B = block select |
 | **A** | *screens*: hold + d-pad = navigate the screen map · **A+B** = contextual play (see below) |
 | **Start** | play / stop the whole song, from any screen |
 | **L / R** | channel left / right (shortcut for Y+←/→) |
@@ -132,14 +132,14 @@ left/right.
 | **CHAIN** | 16 phrase slots + per-slot transpose. |
 | **PHRASE** | 16 rows × NOTE · INSTR · CMD · VALUE. The actual notes. |
 | **INSTR** | instrument editor (SMP/KIT/WAV/NSE), envelope, vol, pan, echo, table. |
-| **TABLE** | 16-row × 2-column per-tick command tables. |
+| **TABLE** | 16-row per-tick automation: level, transpose and a command per row. |
 | **WAVE** | draw 32-sample single-cycle waves in 8 banks. |
-| **KIT** | build drum kits: 16 slots of sample + tune + volume; the kit number is the first field — nudge it to switch kits. |
+| **KIT** | build drum kits: 16 slots of sample + tune + volume; **Y + ↑/↓** pages between kits (the same gesture that pages chains, phrases and tables). |
 | **HELP** | the paged button + command reference. **Hold A alone for ~2.5 s on any screen** to toggle it (and again to jump back); plain d-pad turns the pages. |
 | **GROOVE** | the two-step groove pair — the song's feel. |
 | **ECHO** | the room: delay, feedback, level, per-voice sends. |
 | **FIR** | the echo filter's 8 taps, hex-editable, with presets. |
-| **PROJECT** | song name, BPM, transpose, LIVE mode, NEW (a fresh song opens the delay to whatever audio RAM allows). |
+| **PROJECT** | song name, BPM, transpose, LIVE mode. (A fresh song: FILES → LOAD on the empty row.) |
 | **FILES** | save / load / rename songs in cart SRAM. |
 | **OPTIONS** | device settings: palette, cloning depth, video readout, SYNC / MIDI takeover (§13a). |
 
@@ -305,15 +305,22 @@ an instrument).
 
 ## 6. Tables
 
-A table is 16 rows × **two** command columns, run per tick while the
-voice plays — automation that belongs to the instrument, not the
-phrase. Both columns use the exact same command letters as PHRASE.
-`H` inside a table hops to a table row, making loops:
+A table is 16 rows of **V · TSP · CMD**, run per tick while the voice
+plays — automation that belongs to the instrument, not the phrase:
+
+- **V** — set the voice's level (01–7F, like the `X` command)
+- **TSP** — transpose the playing note by signed semitones
+- **CMD** — one command + value, the exact PHRASE letters
+
+`00` in any column means "no change", so blank rows are silent
+passthroughs. `H` in the command column hops to a table row, making
+loops:
 
 ```
-row 0  P00 | E01     hard left, echo on
-row 1  M30 |         duck the master
-row 2  H01 |         loop rows 1-2
+row 0  V20  --  ---     pull the voice down
+row 1  --   --  M30     duck the master
+row 2  --  +0C  ---     up an octave
+row 3  --   --  H02     loop rows 2-3
 ```
 
 D, I and J are row-scoped and do nothing inside tables.

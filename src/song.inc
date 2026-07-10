@@ -27,7 +27,7 @@
 .DEFINE INSTR_SZ      16
 
 .DEFINE TABLE_COUNT   32
-.DEFINE TABLE_SZ      64               ; 16 rows * (cmd,val)*2 columns
+.DEFINE TABLE_SZ      64               ; 16 rows * (V, TSP, CMD, VAL)
 
 .DEFINE GROOVE_COUNT  16
 .DEFINE GROOVE_SZ     16

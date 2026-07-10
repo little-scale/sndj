@@ -1,8 +1,9 @@
 -- project.lua — the PROJECT screen: A+Up from CHAIN; TSP/MODE
 -- edit the song header; TSP transposes triggers; MODE=LIVE makes the
--- S map position open the launcher; NEW wipes after a confirm tap.
+-- S map position open the launcher. NEW is NOT here (FILES owns it:
+-- LOAD on the empty row) — the cursor wraps after 4 fields.
 --
--- WRAM: ui_mode $0C, header at $3600 (GROOVE +0, TSP +1, MODE +17),
+-- WRAM: ui_mode $0C, pj_cur $2DB, header at $3600 (TSP +1, MODE +17),
 -- phrase 0 row 0 at $4300.
 
 local frames = 0
@@ -53,10 +54,8 @@ local script = {
   -- play with TSP +12 (zero-tune sample poked below)
   [100] = { start = true }, [102] = {},
   [130] = { start = true }, [132] = {},        -- stop
-  -- down -> NEW, tap, tap to confirm
-  [138] = { down = true }, [140] = {},
-  [144] = { b = true }, [146] = {},
-  [152] = { b = true }, [154] = {},
+  -- cursor is on MODE already; one Down wraps to NAME (no NEW field)
+  [140] = { down = true }, [142] = {},
 }
 
 emu.addEventCallback(function() emu.setInput(pad, 0) end, emu.eventType.inputPolled)
@@ -85,12 +84,11 @@ emu.addEventCallback(function()
     local p = dsp(0x02) + dsp(0x03) * 256
     check(p == 0x1000, "song transpose +12 raised C-4 an octave ($" ..
       string.format("%04X", p) .. ")")
-  elseif frames == 230 then
-    -- NEW blocks the main loop for ~30 frames (wave + residency
-    -- rebuild); sample well after it finishes
-    check(wram(0x4300) == 0, "NEW (tap + confirm) wiped the phrase")
-    check(wram(0x3602) == 0xD7, "NEW re-seeded the song block (magic)")
-    check(wram(0x3611) == 0, "NEW reset MODE to SONG")
+  elseif frames == 138 then
+    check(wram(0x2DB) == 3, "cursor sits on MODE (field 3, the last)")
+  elseif frames == 148 then
+    check(wram(0x2DB) == 0, "no NEW field: the cursor wraps after MODE")
+    check(wram(0x4300) == 49, "the song survived (NEW lives on FILES)")
     if fails == 0 then
       print("ALL PASS project.lua")
       emu.stop(0)

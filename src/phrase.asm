@@ -252,7 +252,7 @@ phrase_update:
     jmp phrase_draw
 
 phrase_draw_hdr:
-    lda #8
+    lda #7
     sta text_x
     lda #1
     sta text_y

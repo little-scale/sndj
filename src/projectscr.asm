@@ -7,14 +7,14 @@
 ;   TSP     song transpose, signed semitones (applied at trigger)
 ;   MODE    SONG or LIVE — in LIVE the S map position opens the
 ;           launcher view
-;   NEW     wipe to a fresh song (tap B, then tap again to confirm)
 ;
+; (NEW lives on the FILES screen — LOAD on the empty row.)
 ; Reached with A+Up from CHAIN.
 
 .ACCU 8
 .INDEX 16
 
-.DEFINE PJ_FIELDS 5
+.DEFINE PJ_FIELDS 4
 
 project_init:
     lda #SCREEN_PROJECT
@@ -71,21 +71,6 @@ project_update:
     lda b_down
     beq @cursor
     stz b_down
-    lda b_used
-    bne @cursor
-    ; B tap: only NEW acts on a tap (armed, then confirmed)
-    lda pj_cur
-    cmp #$04
-    bne @tap_done
-    lda pj_arm
-    bne @do_new
-    lda #$01
-    sta pj_arm
-    bra @tap_done
-@do_new:
-    stz pj_arm
-    jsr song_renew
-@tap_done:
     jmp project_draw
 @b_held:
     rep #$20
@@ -108,7 +93,7 @@ project_update:
     sep #$20
 .ACCU 8
     beq @nu
-    stz pj_arm              ; moving the cursor disarms NEW
+    stz pj_arm
     lda pj_cur
     dec a
     bpl @up_ok
@@ -285,8 +270,7 @@ project_draw:
     jsr text_hex8
     jmp @next
 @not_tsp:
-    cmp #$03
-    bne @not_mode
+    ; MODE (field 3)
     lda.l $7E0000 + SB_HEADER + SH_MODE
     beq @m_song
     ldx #str_pj_live
@@ -294,23 +278,6 @@ project_draw:
     jmp @next
 @m_song:
     ldx #str_pj_song
-    jsr text_puts
-    jmp @next
-@not_mode:
-    ; NEW: show the armed state
-    lda pj_arm
-    beq @calm
-    rep #$20
-.ACCU 16
-    lda #ATTR_ACCENT
-    sta text_attr
-    sep #$20
-.ACCU 8
-    ldx #str_pj_sure
-    jsr text_puts
-    bra @next
-@calm:
-    ldx #str_pj_tap
     jsr text_puts
 @next:
     inc ui_cnt
@@ -322,7 +289,7 @@ project_draw:
     rts
 
 pj_labels: .DW str_pj_name, str_pj_tmpo, str_pj_tsp
-           .DW str_pj_mode, str_pj_new
+           .DW str_pj_mode
 
 str_project: .DB "PROJECT", 0
 str_pj_name: .DB "NAME", 0
@@ -330,8 +297,5 @@ str_pj_tmpo: .DB "TMPO", 0
 str_pj_grv:  .DB "GROOVE", 0
 str_pj_tsp:  .DB "TSP", 0
 str_pj_mode: .DB "MODE", 0
-str_pj_new:  .DB "NEW", 0
 str_pj_song: .DB "SONG ", 0
 str_pj_live: .DB "LIVE ", 0
-str_pj_tap:  .DB "        ", 0
-str_pj_sure: .DB "SURE?   ", 0

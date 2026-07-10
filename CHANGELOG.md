@@ -5,6 +5,25 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- **Tables are now V · TSP · CMD** (was two command columns): per
+  tick a table row can set the voice level (01-7F, X-style), bend
+  the playing note by signed semitones, and run one command. $00 =
+  no change per column, so old blank tables stay no-ops; the byte
+  layout changed (SAVEFORMAT.md updated in step). The reference
+  sequencer mirrors it; `checks/table.lua` covers V, TSP (exact
+  octave doubling) and the command column.
+- **KIT number is a readout again**, not a field — **Y+↑/↓ pages
+  kits**, the same family gesture that pages chains, phrases and
+  tables. Slots start at the top row.
+- Y-paging on CHAIN/PHRASE no longer leaves a stale digit in the
+  title (the "CHAIN 000" look — the redraw was one column right of
+  the first draw).
+- PROJECT drops **NEW** (FILES owns it: LOAD on the empty row);
+  MODE is the last field.
+- INSTR block up a row and left a column; a breathing row between
+  SYNC and the timing fields on OPTIONS; TABLE VAL reads as dashes
+  until its command exists.
+
 - **Button timing is yours now** — three new OPTIONS fields, all
   persisted on the cart: **KEY DELAY** (frames before d-pad
   auto-repeat, 4–30), **KEY RATE** (frames between repeats, 1–8) and

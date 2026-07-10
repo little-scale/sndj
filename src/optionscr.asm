@@ -208,6 +208,11 @@ options_draw:
     clc
     adc #5
     sta text_y
+    lda ui_cnt
+    cmp #$04
+    bcc +
+    inc text_y              ; a breathing row between SYNC and the timing set
++
     lda #1
     sta text_x
     rep #$20

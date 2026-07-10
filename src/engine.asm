@@ -2189,8 +2189,10 @@ karp_trigger:
     sec
     rts
 
-; --- per-tick table step: run both command columns through the shared
-; executor, then advance (H inside a table hops its own rows) ------------------
+; --- per-tick table step: one row = V (voice level, X-style), TSP
+; (signed semitones off the playing note) and one CMD/VAL through the
+; shared executor, then advance (H inside a table hops its own rows).
+; Zero = no change in every column, so blank tables stay no-ops. ---------------
 track_table:
     lda.w trk_tbl,x
     cmp #$FF
@@ -2244,7 +2246,25 @@ track_table:
     sta es1
     sep #$20
 .ACCU 8
-    ; column 1
+    ; V column (byte 0): retarget the voice's live level, X-style
+    phx
+    rep #$30
+.ACCU 16
+    lda es1
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_TABLES,x
+    plx
+    cmp #$00                ; plx clobbers the flags: re-test
+    beq @no_v
+    and #$7F
+    sta.w trk_voll,x
+    sta.w trk_volr,x
+    jsr track_vol_write
+@no_v:
+    ; TSP column (byte 1): signed semitones off the playing note; the
+    ; result becomes the new base pitch (vibrato rides it)
     phx
     rep #$30
 .ACCU 16
@@ -2253,11 +2273,31 @@ track_table:
     sep #$20
 .ACCU 8
     lda.l $7E0000 + SB_TABLES + 1,x
-    sta es0                 ; val
-    lda.l $7E0000 + SB_TABLES,x
     plx
-    jsr table_exec
-    ; column 2
+    cmp #$00
+    beq @no_tsp
+    clc
+    adc.w trk_note,x
+    cmp #NOTE_MAX
+    bcc @tsp_ok
+    lda #NOTE_MAX - 1
+@tsp_ok:
+    pha
+    txa
+    sta trig_voice
+    phx
+    jsr track_tune_load
+    plx
+    pla
+    phx
+    jsr note_pitch          ; calc + write on trig_voice
+    plx
+    lda last_pitch
+    sta.w trk_pitch_lo,x
+    lda last_pitch + 1
+    sta.w trk_pitch_hi,x
+@no_tsp:
+    ; the command column (bytes 2, 3)
     phx
     rep #$30
 .ACCU 16
@@ -2266,7 +2306,7 @@ track_table:
     sep #$20
 .ACCU 8
     lda.l $7E0000 + SB_TABLES + 3,x
-    sta es0
+    sta es0                 ; val
     lda.l $7E0000 + SB_TABLES + 2,x
     plx
     jsr table_exec

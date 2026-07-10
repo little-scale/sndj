@@ -1812,7 +1812,7 @@ function seqFxTrm(seq, t) {
   dspWrite(seq.dsp, t * 16 + 1, side(trk.volr) & 0xFF);
 }
 
-// ---- per-tick table step -------------------------------------------------------
+// ---- per-tick table step: V / TSP / one CMD (zero = no change) ---------------
 function seqTrackTable(seq, t) {
   const trk = seq.tracks[t], b = seq.block;
   if (trk.tbl === 0xFF) return;
@@ -1824,7 +1824,22 @@ function seqTrackTable(seq, t) {
     trk.tblCnt = trk.tblSpd;
   }
   const o = SEQ_SB.TABLES + trk.tbl * 64 + trk.tblRow * 4;
-  seqTableExec(seq, t, b[o], b[o + 1]);
+  const v = b[o];
+  if (v) {                              // V: retarget the live level, X-style
+    trk.voll = v & 0x7F;
+    trk.volr = v & 0x7F;
+    seqVolWrite(seq, t);
+  }
+  const tsp = b[o + 1];
+  if (tsp) {                            // TSP: semitones off the playing note
+    let n = (trk.note + i8(tsp)) & 0xFF;
+    if (n >= SEQ_NOTE_MAX) n = SEQ_NOTE_MAX - 1;
+    seq.trig.voice = t;
+    seqTrackTuneLoad(seq, t);
+    const p = seqPitchCalc(seq, n);
+    seqPitchWrite(seq, p);
+    trk.pitch = p & 0xFFFF;             // the new base: vibrato rides it
+  }
   seqTableExec(seq, t, b[o + 2], b[o + 3]);
   trk.tblRow = (trk.tblRow + 1) & 0x0F;
 }

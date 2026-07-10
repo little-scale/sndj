@@ -580,9 +580,9 @@ instr_draw:
 @no_gap:
     lda.w str_buf + 26
     clc
-    adc #4
+    adc #3
     sta text_y
-    lda #2
+    lda #1
     sta text_x
     ; labels stay dim; the VALUE carries the cursor accent
     rep #$20
@@ -632,13 +632,13 @@ instr_draw:
     ; pad the label to the value column (labels of any length overdraw)
 @lab_pad:
     lda text_x
-    cmp #12
+    cmp #11
     bcs @lab_padded
     lda #' ' - 32
     jsr text_puttile
     bra @lab_pad
 @lab_padded:
-    lda #12
+    lda #11
     sta text_x
     lda ui_cnt
     cmp if_cur
@@ -806,7 +806,7 @@ instr_draw:
 .ACCU 8
 @val_pad:
     lda text_x
-    cmp #18
+    cmp #17
     bcs @val_padded
     lda #' ' - 32
     jsr text_puttile
@@ -825,7 +825,7 @@ instr_draw:
     ; blank everything below the last field (layouts shrink)
     lda.w str_buf + 26
 @tb:
-    cmp #24
+    cmp #25
     bcs @done
     pha
     jsr if_blank_row
@@ -835,12 +835,12 @@ instr_draw:
 @done:
     rts
 
-; blank content row A (0-based; y = A + 4)
+; blank content row A (0-based; y = A + 3)
 if_blank_row:
     clc
-    adc #4
+    adc #3
     sta text_y
-    lda #2
+    lda #1
     sta text_x
     rep #$20
 .ACCU 16

@@ -554,7 +554,7 @@ chain_cell_cut:
     rts
 
 chain_hdr:
-    lda #7
+    lda #6
     sta text_x
     lda #1
     sta text_y

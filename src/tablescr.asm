@@ -1,11 +1,13 @@
-; tablescr.asm — the TABLE screen: 16 rows x two (CMD, VAL) columns of
-; per-tick automation, sharing the phrase command executor. An
-; instrument's TABLE field starts its table from the top at every
-; trigger; H inside a table hops the table's own rows.
+; tablescr.asm — the TABLE screen: 16 rows x (V, TSP, CMD+VAL) of
+; per-tick automation — the family table shape: a voice level, a signed
+; transpose, and ONE command through the shared phrase executor. Zero
+; means "no change" in every column. An instrument's TABLE field starts
+; its table from the top at every trigger; H inside a table hops the
+; table's own rows.
 ;
-;   B tap        insert the last command letter + value (val col: value)
+;   B tap        insert (V: $40 · TSP: +12 · CMD: last letter + value)
 ;   B + d-pad    nudge (letters step; values L/R = 1, U/D = 16)
-;   B + A        cut the cell
+;   B + A        cut the cell (back to "no change")
 ;   Y + up/down  previous / next table
 ;
 ; Reached with A+Right from INSTR (follows the instrument's TABLE id).
@@ -148,12 +150,23 @@ table_update:
     stz b_down
     lda b_used
     bne @cursor
-    ; tap: insert the buffer for this column class
+    ; tap: insert a sensible starter for the column
     jsr tb_addr
     lda tb_x
-    and #$01
+    bne @tap_not_v
+    lda #$40                ; V: a mid level
+    sta.l $7E0000,x
+    jmp @draw
+@tap_not_v:
+    cmp #$01
+    bne @tap_not_tsp
+    lda #12                 ; TSP: +1 octave
+    sta.l $7E0000,x
+    jmp @draw
+@tap_not_tsp:
+    cmp #$02
     bne @tap_val
-    lda ed_lastcmd
+    lda ed_lastcmd          ; CMD: the last letter + its value
     sta.l $7E0000,x
     lda ed_lastval
     sta.l $7E0000 + 1,x
@@ -250,8 +263,27 @@ tb_nudge:
     sta es3 + 1
     jsr tb_addr
     lda tb_x
-    and #$01
-    bne @val
+    cmp #$02
+    beq @cmd
+    cmp #$03
+    beq @val
+    cmp #$00
+    beq @vcol
+    ; TSP: free signed wrap (like kit TUNE)
+    lda.l $7E0000,x
+    clc
+    adc es3 + 1
+    sta.l $7E0000,x
+    rts
+@vcol:
+    ; V: level 00-7F ($00 = no change)
+    lda.l $7E0000,x
+    clc
+    adc es3 + 1
+    and #$7F
+    sta.l $7E0000,x
+    rts
+@cmd:
     ; command letter: step 0-26 with wrap (U/D also step by 1)
     lda es3 + 1
     bmi @cmd_dn
@@ -307,20 +339,37 @@ table_draw:
 .ACCU 8
     lda ui_cnt
     jsr text_hex8
-    ; the four cells: cmd val cmd val at x4/x6, x10/x12
+    ; the four cells: V (x3), TSP (x6), CMD letter (x10), VAL (x11)
     stz tmp0                ; col
 @cells:
     lda tmp0
-    and #$01
-    bne @val_cell
-    ; x for the cmd cell: col 0 -> 4, col 2 -> 10
+    cmp #$02
+    beq @cmd_cell
+    cmp #$03
+    beq @val_cell
+    ; V / TSP: hex, or -- when zero (no change)
     lda tmp0
-    beq @c0
-    lda #9
-    bra @cx
-@c0:
+    beq @vx0
+    lda #6
+    bra @hx
+@vx0:
     lda #3
-@cx:
+@hx:
+    sta text_x
+    jsr tb_attr
+    jsr tb_cell
+    cmp #$00
+    beq @h_empty
+    jsr text_hex8
+    bra @next
+@h_empty:
+    lda #'-' - 32
+    jsr text_puttile
+    lda #'-' - 32
+    jsr text_puttile
+    bra @next
+@cmd_cell:
+    lda #10
     sta text_x
     jsr tb_attr
     jsr tb_cell
@@ -335,18 +384,23 @@ table_draw:
     jsr text_puttile
     bra @next
 @val_cell:
-    lda tmp0
-    cmp #$01
-    beq @v1
     lda #11
-    bra @vx
-@v1:
-    lda #5
-@vx:
     sta text_x
     jsr tb_attr
+    ; VAL reads as dashes while its command cell is empty (phrase style)
+    dec tmp0                ; peek the CMD byte
+    jsr tb_cell
+    inc tmp0
+    cmp #$00
+    beq @v_empty
     jsr tb_cell
     jsr text_hex8
+    bra @next
+@v_empty:
+    lda #'-' - 32
+    jsr text_puttile
+    lda #'-' - 32
+    jsr text_puttile
 @next:
     inc tmp0
     lda tmp0
@@ -460,4 +514,4 @@ tb_head:
     jmp text_puttile
 
 str_table:  .DB "TABLE ", 0
-str_truler: .DB "C1 V1  C2 V2", 0
+str_truler: .DB "V  TSP CMD", 0
