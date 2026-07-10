@@ -410,7 +410,33 @@ if_cur_fix:
     rts
 
 if_nudge:
-    lda #4                  ; U/D magnitude
+    ; big step (U/D): the high nibble for byte fields, an octave for
+    ; the semitone offsets, 4 for short ranges; L/R always steps 1
+    lda if_cur
+    cmp #13
+    bcc @mag_std
+    cmp #16
+    bcs @mag_std
+    lda #12                 ; OFS 1-3: semitones
+    bra @mag_have
+@mag_std:
+    lda if_cur
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.w if_fields + 3,x   ; the field's max
+    cmp #16
+    bcc @mag_small
+    lda #16
+    bra @mag_have
+@mag_small:
+    lda #4
+@mag_have:
     sta tmp2
     jsr nudge_delta         ; -> tmp1+1 (nudge_delta uses tmp2 as magnitude)
     lda tmp1 + 1
@@ -434,12 +460,14 @@ if_nudge:
     jsr if_get_x
     clc
     adc str_buf + 35
-    ; max 255 marks a signed byte field: wrap freely, no clamp
+    ; power-of-two ranges WRAP (nibble editing); the rest clamp
     pha
     lda str_buf + 37
-    cmp #$FF
+    inc a
+    and str_buf + 37
     bne @clamped
     pla
+    and str_buf + 37
     bra @store
 @clamped:
     pla
@@ -500,18 +528,7 @@ instr_draw:
     jsr text_puts
     jmp @next
 @shown:
-    ; label attr: accent under cursor
-    lda ui_cnt
-    cmp if_cur
-    bne @dim
-    rep #$20
-.ACCU 16
-    lda #ATTR_ACCENT
-    sta text_attr
-    sep #$20
-.ACCU 8
-    bra @label
-@dim:
+    ; labels stay dim; the VALUE carries the cursor accent
     rep #$20
 .ACCU 16
     lda #ATTR_DIM

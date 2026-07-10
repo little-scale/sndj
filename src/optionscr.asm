@@ -196,20 +196,9 @@ options_draw:
     sta text_y
     lda #2
     sta text_x
-    lda ui_cnt
-    cmp opt_cur
-    bne @dim
     rep #$20
 .ACCU 16
-    lda #ATTR_ACCENT
-    sta text_attr
-    sep #$20
-.ACCU 8
-    bra @label
-@dim:
-    rep #$20
-.ACCU 16
-    lda #ATTR_DIM
+    lda #ATTR_DIM           ; labels stay dim; values carry the cursor
     sta text_attr
     sep #$20
 .ACCU 8
@@ -225,18 +214,30 @@ options_draw:
     sep #$20
 .ACCU 8
     jsr text_puts
-    ; value at x12
+    ; value at x12 (accent under the cursor)
     lda #12
     sta text_x
     lda ui_cnt
-    cmp #$01
-    bne @not_clone_v
+    cmp opt_cur
+    bne @val_plain
+    rep #$20
+.ACCU 16
+    lda #ATTR_ACCENT
+    sta text_attr
+    sep #$20
+.ACCU 8
+    bra @val_done
+@val_plain:
     rep #$20
 .ACCU 16
     lda #ATTR_TEXT
     sta text_attr
     sep #$20
 .ACCU 8
+@val_done:
+    lda ui_cnt
+    cmp #$01
+    bne @not_clone_v
     lda opt_clone
     beq @slim
     ldx #str_o_deep
@@ -251,12 +252,6 @@ options_draw:
     cmp #$02
     bne @not_video
     ; VIDEO: the detected console standard (tempo is region-free)
-    rep #$20
-.ACCU 16
-    lda #ATTR_TEXT
-    sta text_attr
-    sep #$20
-.ACCU 8
     lda video_pal
     beq @ntsc
     ldx #str_o_pal50
@@ -269,13 +264,7 @@ options_draw:
 @not_video:
     lda ui_cnt
     bne @fixed
-    ; PALETTE: index + 4-char name (text attr)
-    rep #$20
-.ACCU 16
-    lda #ATTR_TEXT
-    sta text_attr
-    sep #$20
-.ACCU 8
+    ; PALETTE: index + 4-char name
     lda opt_pal
     clc
     adc #'0' - 32
@@ -310,12 +299,6 @@ options_draw:
     bra @next
 @fixed:
     ; SYNC (field 3): the live mode name
-    rep #$20
-.ACCU 16
-    lda #ATTR_TEXT
-    sta text_attr
-    sep #$20
-.ACCU 8
     lda opt_sync
     rep #$30
 .ACCU 16

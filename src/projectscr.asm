@@ -135,7 +135,20 @@ project_update:
     jmp project_draw
 
 pj_nudge:
+    ; big step per field: TMPO = 16, transpose = an octave, others 4
+    lda pj_cur
+    cmp #$01
+    bne @not_tmpo
+    lda #16
+    bra @mag_have
+@not_tmpo:
+    cmp #$03
+    bne @mag_4
+    lda #12
+    bra @mag_have
+@mag_4:
     lda #4
+@mag_have:
     sta tmp2
     jsr nudge_delta         ; -> tmp1+1
     lda tmp1 + 1

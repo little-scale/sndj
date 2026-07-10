@@ -145,7 +145,23 @@ ef_addr:
     rts
 
 ef_nudge:
+    ; big step: high nibble for byte fields, 4 for short ranges
+    lda if_cur
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.w ef_fields + 1,x   ; max
+    cmp #16
+    bcc @mag_small
+    lda #16
+    bra @mag_have
+@mag_small:
     lda #4
+@mag_have:
     sta tmp2
     jsr nudge_delta         ; delta -> tmp1+1
     lda tmp1 + 1
@@ -188,12 +204,11 @@ ef_nudge:
     lda.l $7E0000,x
     clc
     adc es0
-    ; free byte fields (max 255) wrap; others clamp
-    ldy #$0000
-    cpy #$0000              ; (keep flags sane)
+    ; power-of-two ranges wrap (nibble editing); others clamp
     pha
     lda es0 + 1
-    cmp #$FF
+    inc a
+    and es0 + 1
     beq @wrap
     pla
     cmp es0 + 1
@@ -209,6 +224,7 @@ ef_nudge:
     bra @store
 @wrap:
     pla
+    and es0 + 1
 @store:
     sta.l $7E0000,x
     ; apply: EDL (field 0) walks the safe reconfig; the FIR field (5)
@@ -257,24 +273,12 @@ echo_draw:
     sta text_y
     lda #2
     sta text_x
-    lda ui_cnt
-    cmp if_cur
-    bne @dim
     rep #$20
 .ACCU 16
-    lda #ATTR_ACCENT
+    lda #ATTR_DIM           ; labels stay dim; the VALUE carries the cursor
     sta text_attr
     sep #$20
 .ACCU 8
-    bra @label
-@dim:
-    rep #$20
-.ACCU 16
-    lda #ATTR_DIM
-    sta text_attr
-    sep #$20
-.ACCU 8
-@label:
     lda ui_cnt
     rep #$30
 .ACCU 16
@@ -286,15 +290,27 @@ echo_draw:
     sep #$20
 .ACCU 8
     jsr text_puts
-    ; value
+    ; value (accent under the cursor)
     lda #14
     sta text_x
+    lda ui_cnt
+    cmp if_cur
+    bne @val_plain
+    rep #$20
+.ACCU 16
+    lda #ATTR_ACCENT
+    sta text_attr
+    sep #$20
+.ACCU 8
+    bra @val_go
+@val_plain:
     rep #$20
 .ACCU 16
     lda #ATTR_TEXT
     sta text_attr
     sep #$20
 .ACCU 8
+@val_go:
     lda ui_cnt
     jsr ef_addr
     lda.l $7E0000,x

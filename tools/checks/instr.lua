@@ -56,12 +56,10 @@ for _ = 1, 13 do gest({ down = true }) end -- field 13 = GRP (NUM leads the list
 chord({ right = true })                   -- GRP 0 -> 1
 chord({ right = true })                   -- GRP 1 -> 2
 gest({ down = true })                     -- OFS1
-chord({ up = true })                      -- +4
+for _ = 1, 4 do chord({ right = true }) end -- +4 (L/R steps 1; U/D = octave)
 gest({ down = true })                     -- OFS2
-chord({ up = true })                      -- +4
-chord({ right = true })                   -- +1
-chord({ right = true })                   -- +1
-chord({ right = true })                   -- +1 -> 7
+chord({ up = true })                      -- +12
+for _ = 1, 5 do chord({ left = true }) end  -- -5 -> 7
 local shot_at = t - 2
 local after_edit = t + 4
 gest({ a = true, left = true })           -- back to PHRASE

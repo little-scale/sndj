@@ -267,7 +267,15 @@ kit_audition:
     rts
 
 kt_nudge:
-    lda #8
+    ; big step per column: sample = 16, tune = an octave, vol = 16
+    lda kt_col
+    cmp #$01
+    bne @mag_16
+    lda #12
+    bra @mag_have
+@mag_16:
+    lda #16
+@mag_have:
     sta tmp2
     jsr nudge_delta         ; delta -> tmp1+1
     lda tmp1 + 1

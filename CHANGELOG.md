@@ -5,6 +5,14 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- **One nudge grammar everywhere**: B + left/right steps any field by
+  1 (the low nibble); B + up/down steps the high nibble (±16) on byte
+  fields, an octave (±12) on semitone fields (notes, transpose, chord
+  offsets, kit tune), ±4 on short ranges — and power-of-two ranges
+  wrap instead of clamping. INSTR/ECHO/KIT/PROJECT all follow.
+- Field screens highlight the **value** under the cursor, not the
+  label (ECHO, INSTR, OPTIONS).
+
 - Fixed: **double-tap (paste / mint / clone) was humanly impossible** —
   the window was 6 frames (100 ms); it's now genmddj's 24 (~400 ms),
   with a pending-tap flag so the generous window can't misfire: any

@@ -32,16 +32,16 @@ local script = {
   [34] = { a = true },
   [36] = { a = true, up = true },
   [38] = {},                                   -- PROJECT
-  -- down x3 -> TSP, nudge up (+4) x3 = +12
+  -- down x3 -> TSP, one nudge up = +12 (an octave)
   [44] = { down = true }, [46] = {},
   [48] = { down = true }, [50] = {},
   [52] = { down = true }, [54] = {},
   [58] = { b = true },
-  [60] = { b = true, up = true },
+  [60] = { b = true, up = true },   -- +12
   [62] = { b = true },
-  [64] = { b = true, up = true },
+  [64] = { b = true },
   [66] = { b = true },
-  [68] = { b = true, up = true },
+  [68] = { b = true },
   [70] = { b = true },
   [72] = {},
   -- down -> MODE, toggle to LIVE

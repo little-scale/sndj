@@ -64,8 +64,11 @@ are shortcuts to things the core grammar can already do.
   used instrument with them; commands bring their letter *and* last
   value). On an empty **note** cell, B-hold + any d-pad tap inserts
   straight away, so entry and nudging are one gesture.
-- **Nudge**: hold B, tap d-pad. Left/right = fine step (semitone,
-  ±1); up/down = big step (octave, ±16).
+- **Nudge**: hold B, tap d-pad. **Left/right always steps by 1**
+  (the low nibble); **up/down steps the high nibble** (±16) on byte
+  parameters, an **octave** (±12) on anything in semitones (notes,
+  transpose, chord offsets, kit tune), and ±4 on short ranges.
+  Power-of-two ranges wrap around; the rest clamp.
 - **Delete / cut**: hold B, tap **A**. Cutting a note also clears its
   instrument column; the cut cell goes to the clipboard.
 - **Paste / mint / clone**: double-tap B. On a cell whose kind
