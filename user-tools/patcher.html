@@ -139,24 +139,24 @@ export a patched ROM. Everything runs locally.</p>
 <div>
 <div class="drop small" id="sf2drop">drop an .sf2 soundfont here (or click)</div>
 <input type="file" id="sf2file" hidden accept=".sf2">
+<div class="row">
+  <select id="sfmode">
+    <option value="auto">auto (loop &rarr; melodic, else one-shot)</option>
+    <option value="melodic">melodic (looped, in tune)</option>
+    <option value="oneshot">one-shot (8 kHz kit drum)</option>
+  </select>
+  <label id="sftrimlab">trim semis <input type="number" id="sftrim" value="0"
+    min="-24" max="24" style="width:3.5rem"></label>
+  <label id="sfcaplab">cap ms <input type="number" id="sfcap" value="160"
+    min="20" max="500" style="width:4rem"></label>
+</div>
+<p class="hint">these import settings govern soundfont slots AND WAV
+replaces. Melodic: a smpl-chunk loop imports in tune (root key
+honoured); without one the whole file loops. Trim +12/+24 resamples
+the data down an octave/two (half/quarter size) — pair it with tune
+-12/-24 on the pool slot. One-shots resample to 8 kHz, capped.</p>
 <div id="sf2view" hidden>
   <h1><small id="sf2name">soundfont</small></h1>
-  <div class="row">
-    <select id="sfmode">
-      <option value="auto">auto (loop &rarr; melodic, else one-shot)</option>
-      <option value="melodic">melodic (looped, in tune)</option>
-      <option value="oneshot">one-shot (8 kHz kit drum)</option>
-    </select>
-    <label id="sftrimlab">trim semis <input type="number" id="sftrim" value="0"
-      min="-24" max="24" style="width:3.5rem"></label>
-    <label id="sfcaplab">cap ms <input type="number" id="sfcap" value="160"
-      min="20" max="500" style="width:4rem"></label>
-  </div>
-  <p class="hint">play auditions through the real BRR pipeline with the
-  settings above; drag a row onto a pool slot to import it there. The
-  mode also governs WAV replaces: a .wav with a smpl-chunk loop imports
-  melodic (root key honoured); melodic without one loops the whole
-  file.</p>
   <table id="sf2list"></table>
 </div>
 </div>
