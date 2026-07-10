@@ -5,6 +5,10 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- ECHO's RAM/FREE ledger also reads the free space as **time**: a
+  `+NNNms` readout of how much longer the delay could get from here
+  (2 KB steps, capped by the register's 15).
+
 - patcher: one tuning rule everywhere — **the pool tune fully encodes
   a sample's storage rate** (8 kHz sf2 one-shots now bake -24 there
   too), and **kit slots default to tune 0**, staying purely musical.

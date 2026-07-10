@@ -391,10 +391,47 @@ echo_draw:
     bcs @free_ok
     lda #$0000              ; floor at/below the samples: nothing free
 @free_ok:
+    pha                     ; free bytes survive fl_kb's tmp scratch
     sta tmp0
     sep #$20
 .ACCU 8
     jsr fl_kb
+    ; ...and as time: how much LONGER the delay could get from here
+    ; (free / 2 KB steps, capped by the register's 15) * 16 ms
+    rep #$30
+.ACCU 16
+    pla
+    xba
+    and #$00FF
+    lsr
+    lsr
+    lsr                     ; free >> 11 = spare 2 KB steps
+    sep #$20
+.ACCU 8
+    sta tmp2
+    lda.l $7E0000 + SB_HEADER + SH_EDL
+    and #$0F
+    eor #$0F                ; 15 - EDL = register headroom
+    cmp tmp2
+    bcs @steps_ok
+    sta tmp2
+@steps_ok:
+    lda tmp2
+    asl
+    asl
+    asl
+    asl                     ; * 16 ms (<= 240)
+    sta tmp0
+    stz tmp0 + 1
+    lda #' ' - 32
+    jsr text_puttile
+    lda #'+' - 32
+    jsr text_puttile
+    jsr text_dec3
+    lda #'M' - 32
+    jsr text_puttile
+    lda #'S' - 32
+    jsr text_puttile
     ; current FIR preset taps, read-only
     lda #2
     sta text_x

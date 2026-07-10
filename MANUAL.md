@@ -298,7 +298,8 @@ instrument:
 - **ECHO screen** — EDL sets the delay (0–240 ms in 16 ms steps).
   The screen shows what each step costs (`-12KB` beside DELAY) plus a
   live **RAM / FREE ledger** — how much audio RAM the song's resident
-  samples hold versus what the current delay leaves free — and won't
+  samples hold, what the current delay leaves free, and how many
+  **+ms** of extra delay that free space could still buy — and won't
   let the buffer grow into your samples. Feedback, return level L/R,
   and per-voice send toggles live here too.
 - **FIR screen** — the 8 filter taps as signed hex bytes. Eight
