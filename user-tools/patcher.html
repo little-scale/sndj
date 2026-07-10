@@ -139,6 +139,9 @@ export a patched ROM. Everything runs locally.</p>
 <div>
 <div class="drop small" id="sf2drop">drop an .sf2 soundfont here (or click)</div>
 <input type="file" id="sf2file" hidden accept=".sf2">
+<h1><small>import settings</small> <span class="hint">&mdash; applied to
+the <b>next</b> sample you import (a drag from the list below, or a pool
+slot's replace&hellip;)</span></h1>
 <div class="row">
   <select id="sfmode">
     <option value="auto">auto (loop &rarr; melodic, else one-shot)</option>
@@ -150,11 +153,11 @@ export a patched ROM. Everything runs locally.</p>
   <label id="sfcaplab">cap ms <input type="number" id="sfcap" value="160"
     min="20" max="500" style="width:4rem"></label>
 </div>
-<p class="hint">these import settings govern soundfont slots AND WAV
-replaces. Melodic: a smpl-chunk loop imports in tune (root key
+<p class="hint">melodic: a smpl/sf2 loop imports in tune (root key
 honoured); without one the whole file loops. Trim +12/+24 resamples
 the data down an octave/two (half/quarter size) — pair it with tune
--12/-24 on the pool slot. One-shots resample to 8 kHz, capped.</p>
+-12/-24 on the pool slot. One-shots resample to 8 kHz, capped. Each
+row below shows the fate the current settings give it.</p>
 <div id="sf2view" hidden>
   <h1><small id="sf2name">soundfont</small></h1>
   <table id="sf2list"></table>
@@ -734,11 +737,11 @@ async function loadSf2(f) {
 function renderSf2() {
   const t = $('sf2list');
   t.innerHTML = '<tr><th>#</th><th>preset / sample</th><th>root</th>' +
-    '<th>len</th><th></th></tr>';
+    '<th>len</th><th>&rarr;</th><th></th></tr>';
   sf2fonts.forEach((font, fi) => {
     const hdr = t.insertRow();
     const hc = hdr.insertCell();
-    hc.colSpan = 4;
+    hc.colSpan = 5;
     hc.innerHTML = '<b>' + (font.collapsed ? '\u25B8' : '\u25BE') + ' ' +
       font.name + '</b>' + (font.collapsed ?
         ' <span class="hint">(' + font.samples.length + ' samples)</span>' : '');
@@ -759,9 +762,13 @@ function renderSf2() {
     font.samples.forEach((s, i) => {
       const row = t.insertRow();
       const label = s.preset ? s.preset + ' — ' + s.name : s.name;
+      const m = $('sfmode').value;
+      const fate = (m === 'oneshot' || (m === 'auto' && !s.loop))
+        ? '1shot' : 'melodic';
       row.innerHTML =
         `<td>${i}</td><td>${label}</td><td>${s.root}</td>` +
-        `<td>${s.pcm.length}${s.loop ? ' ↻' : ''}</td>`;
+        `<td>${s.pcm.length}${s.loop ? ' ↻' : ''}</td>` +
+        `<td class="hint">${fate}</td>`;
       const play = document.createElement('button');
       play.textContent = 'play';
       play.onclick = () => auditionSf2(fi, i);
@@ -826,6 +833,7 @@ $('sfmode').onchange = () => {
   const m = $('sfmode').value;
   $('sfcaplab').hidden = m === 'melodic';
   $('sftrimlab').hidden = m === 'oneshot';
+  if (sf2Loaded()) renderSf2();     // the per-row fate tags follow
 };
 
 // --------------------------------------------------------- WAV replace
