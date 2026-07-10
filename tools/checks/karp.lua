@@ -4,10 +4,11 @@
 -- exciter wave bank at the comb partial's exact pitch with a fast
 -- burst envelope and a forced echo send.
 --
--- Instrument: type 5, bank 2 (saw), DAMP 8 (g = 71), BURST 6,
--- SUSTAIN $70. EDL 1 table:
---   A-5 (idx 69): pitch $0E00, tap pair at 0 -> C0 = 71
---   C-6 (idx 72): pitch $10C5, pair at 6/7 -> C6 = 1, C7 = 70
+-- Instrument: type 5, bank 2 (saw), DAMP 8 (side 14, pair 99),
+-- BURST 6, SUSTAIN $70. The tap total is always 127: SUSTAIN owns
+-- ring time, DAMP colors. EDL 1 table:
+--   A-5 (idx 69): pitch $0E00, i0 0 fr 0 -> C0 113, C2 14
+--   C-6 (idx 72): pitch $10C5, i0 6 fr 255 -> C5 14, C6 1, C7 112
 
 local frames = 0
 local _booted = false
@@ -76,16 +77,19 @@ emu.addEventCallback(function()
       "feedback = SUSTAIN ($%02X)", dsp(0x0D)))
     check(dsp(0x4D) & 1 == 1, "echo send forced on for the exciter")
     local t = firtaps()
-    check(t[0] == 71 and t[1] == 0 and t[7] == 0,
-      "A-5 taps: C0 = g (71), rest clear (" .. t[0] .. "/" .. t[1] .. ")")
+    check(t[0] == 113 and t[1] == 0 and t[2] == 14 and t[7] == 0,
+      "A-5 taps: pair+left at C0, side at C2 (" .. t[0] .. "/" .. t[2] .. ")")
+    check(t[0] + t[1] + t[2] == 127, "tap total 127: DAMP never changes gain")
   elseif frames == 94 then
     -- row 4: C-6 — the fractional pair lands at taps 6/7
     local p = dsp(0x02) + dsp(0x03) * 256
     check(p == 0x10C5, string.format(
       "C-6 excites partial 17, pulled 7 samples ($%04X)", p))
     local t = firtaps()
-    check(t[6] == 1 and t[7] == 70 and t[0] == 0,
-      "C-6 taps: fractional pair at 6/7 (" .. t[6] .. "/" .. t[7] .. ")")
+    check(t[5] == 14 and t[6] == 1 and t[7] == 112 and t[0] == 0,
+      "C-6 taps: side 5, pair 6/7 with the right side merged (" ..
+      t[5] .. "/" .. t[6] .. "/" .. t[7] .. ")")
+    check(t[5] + t[6] + t[7] == 127, "tap total 127 at the top edge too")
     check(wram(0x16) == 1, "still playing (no runaway)")
     if fails == 0 then
       print("ALL PASS karp.lua")

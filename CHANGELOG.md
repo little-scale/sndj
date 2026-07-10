@@ -5,6 +5,15 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- KARP's **DAMP is a true tone control now**: the tap kernel always
+  sums to 127, so SUSTAIN alone sets how long the string rings and
+  DAMP only moves brightness (smoothing sides spread around the
+  tuning pair — dark strings lose treble faster, the classic KS
+  filter). Previously DAMP scaled overall gain and was nearly
+  indistinguishable from SUSTAIN. The FIR-tab prototype uses the
+  same kernel. Tip: VOL L/R is the dry pick — 00 for pure string,
+  level on ECHO L/R.
+
 - **New instrument type: KARP** — Karplus-Strong on the echo loop.
   The note rings the room's nearest partial (exciter = any wave bank,
   fired as a burst at the partial's exact pitch) and a per-note 2-tap

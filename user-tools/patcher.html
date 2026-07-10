@@ -841,15 +841,17 @@ $('karppluck').onclick = () => {
   d = Math.max(0, Math.min(7, d));
   const fEff = 32000 * n / (base + d);
   const cents = Math.round(1200 * Math.log2(fEff / f));
+  // console kernel: total always 127 (feedback owns ring time); DAMP
+  // spreads smoothing sides around the tuning pair (dark = wider)
   const g = +$('karpdamp').value;
-  const i0 = Math.floor(d), fr = d - i0;
+  const side = Math.round((127 - g) * 30 / 111);
+  const pair = 127 - 2 * side;
+  const i0 = Math.min(6, Math.floor(d)), fr = Math.max(0, d - i0);
   const taps = [0, 0, 0, 0, 0, 0, 0, 0];
-  if (i0 >= 7) {
-    taps[7] = g;
-  } else {
-    taps[i0] = Math.round(g * (1 - fr));
-    taps[i0 + 1] = Math.round(g * fr);
-  }
+  taps[i0] = Math.round(pair * (1 - fr));
+  taps[i0 + 1] = pair - taps[i0];
+  taps[Math.max(i0 - 1, 0)] += side;
+  taps[Math.min(i0 + 2, 7)] += side;
   firTaps = taps;
   firSync();
   if (+$('firefb').value < 100) {           // a string needs sustain

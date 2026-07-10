@@ -255,9 +255,15 @@ of audio RAM) and point a KARP instrument at an exciter:
 - **BANK** — the wave that plucks the string (saw = bright pick,
   sine = soft thumb, the gritty bank = snap). It fires as a fast
   burst at the exact frequency of the note's nearest room partial.
-- **DAMP** — string material: low = dead nylon, high = ringing steel.
+- **DAMP** — string material: low = dark nylon (the treble dies
+  fast), high = bright steel. It never changes how long the string
+  rings — that's SUSTAIN's job alone.
 - **BURST** — how long the pluck seed lasts.
 - **SUSTAIN** — the loop feedback: how long the string rings.
+- **Hear the string, not the pick**: VOL L/R is the *dry exciter*
+  level — set it to 00 for pure string and put the string's volume
+  on the ECHO screen's ECHO L / ECHO R. All four fields apply on the
+  very next note.
 - The note picks the nearest partial of the room and a 2-tap FIR
   pulls it into tune. Chromatic from about **F#6 at DELAY 1 / F#5 at
   DELAY 2**; below that, notes land on the room's harmonic series —

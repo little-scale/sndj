@@ -2024,12 +2024,8 @@ karp_trigger:
     sep #$20
 .ACCU 8
     lda.l $7E0000 + SB_INSTR + 2,x
-    and #$0F                ; DAMP 0-15 -> loop gain 7..127
-    asl
-    asl
-    asl
-    ora #$07
-    sta es1                 ; g
+    and #$0F                ; DAMP 0-15: brightness (tone, not gain)
+    sta es1
     lda.l $7E0000 + SB_INSTR + 3,x
     and #$7F
     pha                     ; SUSTAIN (feedback)
@@ -2061,41 +2057,94 @@ karp_trigger:
     lda.l karp_tab + 1,x
     sta last_pitch + 1
     jsr voice_pitch_write
-    ; the 2-tap pair: tap[i0] = g - m, tap[i0+1] = m, m = g*frac >> 8
+    ; build the taps in str_buf: the tuning pair at (i0, i0+1) flanked
+    ; by DAMP's smoothing sides — the total is always 127, so SUSTAIN
+    ; alone owns ring time and DAMP only colors the loop (dark = the
+    ; treble dies faster, the classic KS damping filter)
     rep #$30
 .ACCU 16
-    ldx es0
+    ldx es0                 ; table offset
     sep #$20
 .ACCU 8
     lda.l karp_tab + 3,x
-    sta.w WRMPYA
-    lda es1
-    sta.w WRMPYB            ; 8 machine cycles until the product
+    sta.w WRMPYA            ; frac, parked in the multiplier
     lda.l karp_tab + 2,x
-    sta es0                 ; i0 (the table offset is consumed)
-    nop
-    lda.w RDMPYH            ; m
-    sta es0 + 1
-    ; write all 8 FIR coefficients (pair set, the rest cleared)
+    pha                     ; i0 (8-bit push; the offset is consumed)
+    ; side = (15 - DAMP) * 2 (0..30); pair = 127 - 2*side (127..67)
+    lda #15
+    sec
+    sbc es1
+    asl
+    sta es1                 ; side
+    asl
+    eor #$FF
+    sec
+    adc #127                ; 127 - 2*side
+    sta es0                 ; pair total
+    sta.w WRMPYB            ; m = pair * frac >> 8 (8 cycles to cook)
+    stz.w str_buf
+    stz.w str_buf + 1
+    stz.w str_buf + 2
+    stz.w str_buf + 3
+    stz.w str_buf + 4
+    stz.w str_buf + 5
+    stz.w str_buf + 6
+    stz.w str_buf + 7
+    lda.w RDMPYH
+    sta es0 + 1             ; m
+    pla                     ; i0 (0-6)
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda es0
+    sec
+    sbc es0 + 1             ; pair - m
+    sta.w str_buf,x
+    lda es0 + 1
+    sta.w str_buf + 1,x
+    ; left side at i0-1 (merges into the pair at the bottom edge)
+    cpx #$0000
+    beq @lmerge
+    lda.w str_buf - 1,x
+    clc
+    adc es1
+    sta.w str_buf - 1,x
+    bra @lside_ok
+@lmerge:
+    lda.w str_buf
+    clc
+    adc es1
+    sta.w str_buf
+@lside_ok:
+    ; right side at i0+2 (merges into tap 7 at the top edge)
+    cpx #$0006
+    bcs @rmerge
+    lda.w str_buf + 2,x
+    clc
+    adc es1
+    sta.w str_buf + 2,x
+    bra @rside_ok
+@rmerge:
+    lda.w str_buf + 7
+    clc
+    adc es1
+    sta.w str_buf + 7
+@rside_ok:
+    ; ship all 8 coefficients
     lda #$00
     sta es1 + 1             ; tap counter
 @taps:
     lda es1 + 1
-    cmp es0
-    bne @not_t0
-    lda es1
-    sec
-    sbc es0 + 1             ; g - m
-    bra @tap_have
-@not_t0:
-    dec a
-    cmp es0
-    bne @tap_zero
-    lda es0 + 1             ; m
-    bra @tap_have
-@tap_zero:
-    lda #$00
-@tap_have:
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w str_buf,x
     tay
     lda es1 + 1
     asl
