@@ -5,6 +5,12 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- **12 factory boot instruments** (was 8): NEW seeds instruments 0-11
+  from the factory rows and their samples load into audio RAM at
+  boot; the patcher's boot editor voices all 12. The factory
+  container is SNDJFACT v3 (12-byte rows); v1/v2 files still import,
+  the new slots defaulting to SMP on sample 0.
+
 - **New instrument type: SLICE** — chop any pool sample (a breakbeat,
   a vocal) into 2-16 equal parts for free: slices are audio-RAM
   directory aliases into the sample the song already loaded. The note
