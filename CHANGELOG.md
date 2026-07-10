@@ -5,6 +5,12 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- patcher: **trim now works on every import and compensates itself** —
+  it stores the data N semitones lower-rate (half size per octave) and
+  bakes the offsetting tune into the pool slot, so playback pitch is
+  unchanged with no manual pairing. Dragged loop-less WAVs previously
+  took a legacy path that ignored trim entirely (full-rate, tune 0).
+
 - WAV imports aren't one-shot-only anymore: a `.wav` carrying a
   sampler (`smpl`) loop imports **melodic** through the same in-tune
   pipeline as soundfont presets (loop points exact, root key

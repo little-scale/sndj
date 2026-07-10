@@ -85,7 +85,7 @@ export a patched ROM. Everything runs locally.</p>
   <label id="sfcaplab">cap ms <input type="number" id="sfcap" value="160"
     min="20" max="500" style="width:4rem"></label>
   <span class="hint" style="cursor:help; text-decoration:underline dotted"
-    title="melodic: a smpl/sf2 loop imports in tune (root key honoured); without one the whole file loops. Trim +12/+24 resamples the data down an octave/two (half/quarter size) — pair it with tune -12/-24 on the pool slot. One-shots resample to 8 kHz, capped at cap ms. The → column in the soundfont list shows each sample's fate under the current settings.">?</span>
+    title="melodic: a smpl/sf2 loop imports in tune (root key honoured); without one the whole file loops. Trim +12/+24 stores the data an octave/two lower (half/quarter size) and bakes the compensating tune into the slot automatically — playback pitch is unchanged, just darker. Soundfont one-shots resample to 8 kHz capped at cap ms (kit slots add their own -24); WAV one-shots keep full length. The → column in the soundfont list shows each sample's fate under the current settings.">?</span>
 </div>
 <div class="cols">
 <div>
@@ -830,9 +830,10 @@ function sf2Import(fi, sIdx, slot) {
     const brr = S.brrEncode(prep.pcm, prep.loopBlock);
     const name = (s.preset || s.name).toUpperCase().replace(/[^A-Z0-9 ]/g, '')
       .slice(0, 8) || 'SF2';
+    const t = mode === 'melodic' ? (+$('sftrim').value || 0) : 0;
     entries[slot] = {
       name, loopBlock: prep.loopBlock,
-      tuneSemis: prep.tuneSemis, tuneFine: prep.tuneFine, brr,
+      tuneSemis: prep.tuneSemis - t, tuneFine: prep.tuneFine, brr,
     };
     status('imported ' + name + ' into slot #' + slot + ' as ' + mode +
       ' (' + brr.length + ' B, tune ' + prep.tuneSemis + ':' + prep.tuneFine +
@@ -885,25 +886,32 @@ async function wavReplace(f, slot) {
         corr: 0,
         loop: (info && info.loop) ? info.loop : [0, pcm.length],
       };
-      const prep = S.sf2Melodic(s, +$('sftrim').value || 0);
+      const t = +$('sftrim').value || 0;
+      const prep = S.sf2Melodic(s, t);
       const brr = S.brrEncode(prep.pcm, prep.loopBlock);
       entries[replacing] = {
         name, loopBlock: prep.loopBlock,
-        tuneSemis: prep.tuneSemis, tuneFine: prep.tuneFine, brr,
+        tuneSemis: prep.tuneSemis - t, tuneFine: prep.tuneFine, brr,
       };
       status(`replaced #${replacing} with ${name} as melodic (` +
         brr.length + ' B, loop@' + prep.loopBlock + ', tune ' +
-        prep.tuneSemis + ':' + prep.tuneFine +
+        (prep.tuneSemis - t) + ':' + prep.tuneFine +
         ((info && info.loop) ? ', smpl loop + root ' + s.root
           : ', whole-file loop') + ')');
     } else {
-      const samples = await wavTo32k(f);
+      // trim stores the data lower-rate and bakes the compensating tune,
+      // so the slot plays at the original pitch with 1/2 or 1/4 the bytes
+      const t = +$('sftrim').value || 0;
+      const rate = Math.max(8000, Math.min(96000,
+        Math.round(32000 / Math.pow(2, t / 12))));
+      const samples = await wavToRate(f, rate);
       const trimmed = samples.slice(0, Math.floor(samples.length / 16) * 16);
       if (!trimmed.length) throw new Error('WAV too short');
       const brr = S.brrEncode(trimmed, null);
-      entries[replacing] = { name, loopBlock: null, brr };
-      status(`replaced #${replacing} with ${name} ` +
-        `(${trimmed.length} samples, ${brr.length} bytes BRR, one-shot)`);
+      entries[replacing] = { name, loopBlock: null, brr,
+        tuneSemis: -t, tuneFine: 0 };
+      status(`replaced #${replacing} with ${name} (${brr.length} B one-shot` +
+        (t ? ', trim ' + t + ' baked: tune ' + (-t) : '') + ')');
     }
     render();
   } catch (err) {
@@ -963,12 +971,12 @@ async function wavDecode(buf, rate) {
   return out;
 }
 
-async function wavTo32k(f) {
+async function wavToRate(f, rate) {
   const buf = await f.arrayBuffer();
-  const ctx = new OfflineAudioContext(1, 1, 32000);
+  const ctx = new OfflineAudioContext(1, 1, rate);
   const decoded = await ctx.decodeAudioData(buf);
   const src = decoded.getChannelData(0);
-  const ratio = decoded.sampleRate / 32000;
+  const ratio = decoded.sampleRate / rate;
   const n = Math.floor(src.length / ratio);
   const out = new Array(n);
   for (let i = 0; i < n; i++) {
