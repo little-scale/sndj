@@ -299,6 +299,48 @@ echo_draw:
     jsr ef_addr
     lda.l $7E0000,x
     jsr text_hex8
+    ; EON row: the eight channel gates as toggles (solid = open)
+    lda ui_cnt
+    cmp #$04
+    bne @no_gates
+    lda #18
+    sta text_x
+    stz sv_run
+@gate:
+    lda sv_run
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_HEADER + SH_EON
+    and.w bit_for_track,x
+    beq @gate_shut
+    rep #$20
+.ACCU 16
+    lda #ATTR_HILITE
+    sta text_attr
+    sep #$20
+.ACCU 8
+    lda #' ' - 32           ; inverted space = a solid cell
+    jsr text_puttile
+    bra @gate_next
+@gate_shut:
+    rep #$20
+.ACCU 16
+    lda #ATTR_DIM
+    sta text_attr
+    sep #$20
+.ACCU 8
+    lda #'-' - 32
+    jsr text_puttile
+@gate_next:
+    inc sv_run
+    lda sv_run
+    cmp #$08
+    bne @gate
+@no_gates:
     ; EDL row: show the live ARAM trade (EDL * 2 KB)
     lda ui_cnt
     bne @no_cost
