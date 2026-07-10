@@ -5,6 +5,12 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- Map: **TABLE and FIR link vertically** (A+Down / A+Up) — the FIR
+  screen sits directly below TABLE in its column.
+- KIT: the **kit number is the first field** (INSTR grammar) — cursor
+  up to it and nudge to edit any kit in place; Y+left/right still
+  pages. The number reads plain until the cursor lands on it.
+
 - TABLE and FIR grids start at the family height (header y4, rows
   from y5) — same as PHRASE and INSTR.
 - PROJECT highlights and navigates the **values**, not the labels

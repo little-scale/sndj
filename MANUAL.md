@@ -134,7 +134,7 @@ left/right.
 | **INSTR** | instrument editor (SMP/KIT/WAV/NSE), envelope, vol, pan, echo, table. |
 | **TABLE** | 16-row × 2-column per-tick command tables. |
 | **WAVE** | draw 32-sample single-cycle waves in 8 banks. |
-| **KIT** | build drum kits: 16 slots of sample + tune + volume. |
+| **KIT** | build drum kits: 16 slots of sample + tune + volume; the kit number is the first field — nudge it to switch kits. |
 | **GROOVE** | ticks-per-row patterns — grooves ARE the tempo. |
 | **ECHO** | the room: delay, feedback, level, per-voice sends. |
 | **FIR** | the echo filter's 8 taps, hex-editable, with presets. |

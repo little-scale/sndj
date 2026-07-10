@@ -1,7 +1,9 @@
-; kitscr.asm — the KIT screen: 16 slots x (SAMPLE, TUNE, VOL).
-; B+d-pad nudges the cell (L/R = 1, U/D = 8); B tap auditions the slot;
-; Y+left/right pages between the 16 kits. Sample edits rebuild the
-; resident set so new drums are audible immediately.
+; kitscr.asm — the KIT screen: the kit NUMBER as the first field (row 0,
+; nudge it to edit any kit in place — INSTR grammar), then 16 slots x
+; (SAMPLE, TUNE, VOL). B+d-pad nudges the cell (L/R = 1, U/D = big);
+; B tap auditions the slot; Y+left/right still pages between kits.
+; Sample edits rebuild the resident set so new drums are audible
+; immediately.
 
 .ACCU 8
 .INDEX 16
@@ -37,7 +39,8 @@ kit_init:
     jsr text_puts
     rts
 
-; X = song-block offset of the cursor's slot byte (kit*64 + slot*4 + col)
+; X = song-block offset of the cursor's slot byte (kit*64 + slot*4 + col);
+; kt_row 0 is the kit-number field, so slot = kt_row - 1
 kt_addr:
     rep #$30
 .ACCU 16
@@ -49,6 +52,7 @@ kt_addr:
     sta es1
     lda kt_row
     and #$00FF
+    dec a
     asl
     asl                     ; * 4
     clc
@@ -164,7 +168,9 @@ kit_update:
     beq @nu
     lda kt_row
     dec a
-    and #$0F
+    bpl @up_ok
+    lda #16
+@up_ok:
     sta kt_row
 @nu:
     rep #$20
@@ -176,7 +182,10 @@ kit_update:
     beq @nd
     lda kt_row
     inc a
-    and #$0F
+    cmp #17
+    bcc @dn_ok
+    lda #$00
+@dn_ok:
     sta kt_row
 @nd:
     rep #$20
@@ -209,6 +218,10 @@ kit_audition:
     lda eng_playing
     beq +
     rts
++
+    lda kt_row
+    bne +
+    rts                     ; the number field has nothing to play
 +
     stz trig_voice
     lda kt_col
@@ -267,6 +280,22 @@ kit_audition:
     rts
 
 kt_nudge:
+    ; row 0: the kit number itself (L/R 1, U/D 4, wrapping)
+    lda kt_row
+    bne @slot_field
+    lda #4
+    sta tmp2
+    jsr nudge_delta
+    lda tmp1 + 1
+    bne @kit_have
+    rts
+@kit_have:
+    clc
+    adc ed_kit
+    and #(KIT_COUNT - 1)
+    sta ed_kit
+    rts
+@slot_field:
     ; big step per column: sample = 16, tune = an octave, vol = 16
     lda kt_col
     cmp #$01
@@ -312,17 +341,28 @@ kt_nudge:
     rts
 
 kit_draw:
-    ; kit number in the header
+    ; the kit number: the first field (accent under the cursor)
     lda #5
     sta text_x
     lda #1
     sta text_y
+    lda kt_row
+    bne @num_plain
     rep #$20
 .ACCU 16
-    lda #ATTR_HILITE
+    lda #ATTR_ACCENT
     sta text_attr
     sep #$20
 .ACCU 8
+    bra @num_go
+@num_plain:
+    rep #$20
+.ACCU 16
+    lda #ATTR_TEXT
+    sta text_attr
+    sep #$20
+.ACCU 8
+@num_go:
     lda ed_kit
     jsr text_hex8
     stz ui_cnt
@@ -391,9 +431,10 @@ kit_draw:
 @done:
     rts
 
-; attr for cell (col es3, row ui_cnt)
+; attr for cell (col es3, slot row ui_cnt; the cursor's slot = kt_row-1)
 kt_attr:
     lda ui_cnt
+    inc a
     cmp kt_row
     bne @plain
     lda es3

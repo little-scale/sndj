@@ -164,7 +164,7 @@ nav_update:
     cmp #SCREEN_CHAIN
     bne @down_not_chain
     jsr groove_init
-    bra @eat_far
+    jmp @eat_far
 @down_not_chain:
     cmp #SCREEN_PROJECT
     bne @down_not_proj
@@ -179,8 +179,13 @@ nav_update:
     cmp #SCREEN_INSTR
     bne @down_not_instr
     jsr echo_init
-    bra @eat_far
+    jmp @eat_far
 @down_not_instr:
+    cmp #SCREEN_TABLE
+    bne @down_not_tbl
+    jsr fir_init            ; TABLE sits directly above FIR on the map
+    jmp @eat_far
+@down_not_tbl:
     cmp #SCREEN_WAVE
     bne @not_down
     jsr instr_init
@@ -225,8 +230,13 @@ nav_update:
     bra @eat_far
 @up_not_chain2:
     cmp #SCREEN_TABLE
-    bne @not_up
+    bne @up_not_table
     jsr kit_init
+    bra @eat_far
+@up_not_table:
+    cmp #SCREEN_FIR
+    bne @not_up
+    jsr table_init          ; ...and FIR climbs back to TABLE
 @eat_far:
     rep #$20
 .ACCU 16
