@@ -210,10 +210,12 @@ residency_build:
     inc res_scan            ; 256 slots: loop until the counter wraps
     lda res_scan
     bne @kit_slot
-    ; scan instruments again: SLICE (type 4) alias windows — n consecutive
-    ; directory entries pointing into the blob's resident data at equal,
-    ; block-aligned divisions. slice_base[instr] = the window's first SRCN
-    ; (0 = no window: silent stub). Zero extra sample bytes.
+    ; scan instruments again for per-instrument directory aliases —
+    ; slice_base[instr] = the alias SRCN (0 = none). Two kinds:
+    ;   SLICE (type 4): n consecutive entries at equal block-aligned
+    ;   divisions of the blob; SMP with a LOOP override (rec7 bits 1-2):
+    ;   one entry re-pointing the loop (whole-sample or the stub).
+    ; Zero extra sample bytes either way.
     ldx #$0000
     lda #$00
 @sb_clr:
@@ -237,8 +239,88 @@ residency_build:
     lda.l $7E0000 + SB_INSTR,x
     and #$07
     cmp #$04
-    beq @sl_do
+    bne @not_slice_t
+    jmp @sl_do
+@not_slice_t:
+    cmp #$00
+    beq @lo_maybe           ; SMP: LOOP override -> one alias entry
 @sl_skip:
+    jmp @sl_next
+@lo_maybe:
+    lda.l $7E0000 + SB_INSTR + 7,x
+    lsr
+    and #$03                ; 0 = pool default, 1 = loop, 2 = one-shot
+    beq @sl_skip
+    sta sl_n                ; the mode
+    lda.l $7E0000 + SB_INSTR + 1,x
+    and #$3F
+    sta sl_blob
+    jsr res_mark            ; blob resident (clobbers X)
+    lda sl_blob
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w pool_map,x
+    beq @sl_skip
+    pha
+    lda res_slot
+    cmp #DIR_SLOT_MAX
+    bcc @lo_fits
+    pla
+    bra @sl_skip
+@lo_fits:
+    pla
+    ; blob start + its own loop word (the stub when it's a one-shot)
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    tax
+    lda.w res_dir,x
+    sta sl_addr             ; start
+    lda.w res_dir + 2,x
+    sta sl_step             ; blob loop
+    ; the alias entry
+    lda res_slot
+    and #$00FF
+    asl
+    asl
+    clc
+    adc #res_dir
+    tay
+    lda sl_addr
+    sta.w $0000,y
+    lda sl_n
+    and #$00FF
+    cmp #$0002
+    beq @lo_off
+    ; ON: keep a real loop; a one-shot blob loops whole (start)
+    lda sl_step
+    cmp #ARAM_SAMPLES
+    bne @lo_have
+    lda sl_addr
+    bra @lo_have
+@lo_off:
+    lda #ARAM_SAMPLES
+@lo_have:
+    sta.w $0002,y
+    sep #$20
+.ACCU 8
+    ; publish the alias as this instrument's SRCN
+    lda res_scan
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda res_slot
+    sta.w slice_base,x
+    inc res_slot
     jmp @sl_next
 @sl_do:
     lda.l $7E0000 + SB_INSTR + 7,x
@@ -261,7 +343,9 @@ residency_build:
     sep #$20
 .ACCU 8
     lda.w pool_map,x
-    beq @sl_skip
+    bne @sl_have_srcn
+    jmp @sl_next
+@sl_have_srcn:
     ; window must fit the directory (slots res_slot .. res_slot+n-1 < 56)
     pha
     lda res_slot
@@ -270,7 +354,7 @@ residency_build:
     cmp #(DIR_SLOT_MAX + 1)
     bcc @sl_fits
     pla
-    bra @sl_skip
+    jmp @sl_next
 @sl_fits:
     pla
     ; base ARAM start = the blob's directory entry
@@ -334,7 +418,9 @@ residency_build:
 .ACCU 16
     lda sl_addr
     sta.w $0000,y           ; start
-    sta.w $0002,y           ; loop (unused: slices are one-shots)
+    lda #ARAM_SAMPLES
+    sta.w $0002,y           ; slices are one-shots: loop into the stub
+    lda sl_addr
     clc
     adc sl_step
     sta sl_addr
@@ -485,7 +571,11 @@ res_mark:
     adc res_cursor
     bra @loop_set
 @oneshot:
-    lda res_cursor
+    ; one-shots "loop" into the silent stub: every sample uploads with
+    ; LOOP+END on its final block (patched below), so loop-or-not is
+    ; purely the directory's choice — per-instrument aliases can then
+    ; flip it without touching the shared data
+    lda #ARAM_SAMPLES
 @loop_set:
     sta.w $0002,y
     lda res_cursor
@@ -494,6 +584,42 @@ res_mark:
     sta res_cursor
     sep #$20
 .ACCU 8
+    jsr apu_upload_block
+    bcs @up_fail
+    ; patch the END block's header: OR in the LOOP bit. The mailbox
+    ; moves 3-byte rounds, so re-send the header plus its two data
+    ; bytes (up_src still points at the ROM data, up_len is intact)
+    rep #$30
+.ACCU 16
+    lda up_len
+    sec
+    sbc #$0009
+    tay
+    sep #$20
+.ACCU 8
+    lda [up_src],y
+    ora #$02
+    sta.w str_buf
+    iny
+    lda [up_src],y
+    sta.w str_buf + 1
+    iny
+    lda [up_src],y
+    sta.w str_buf + 2
+    rep #$30
+.ACCU 16
+    lda res_cursor
+    sec
+    sbc #$0009
+    sta up_dest
+    lda #$0003
+    sta up_len
+    lda #str_buf
+    sta up_src
+    sep #$20
+.ACCU 8
+    lda #$7E
+    sta up_src + 2
     jsr apu_upload_block
     bcs @up_fail
     plx

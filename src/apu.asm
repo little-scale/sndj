@@ -765,6 +765,22 @@ apply_instrument:
     adc #56
     bra @srcn
 @not_wav:
+    ; SMP: a per-instrument alias (the LOOP override) wins over the
+    ; shared pool entry
+    lda trig_type
+    bne @from_pool
+    phx
+    lda trig_id
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w slice_base,x
+    plx
+    bne @srcn
+@from_pool:
     ; SMP/NSE: the sample field is a POOL index -> resident SRCN
     lda.l $7E0000 + SB_INSTR + 1,x
     and #$3F

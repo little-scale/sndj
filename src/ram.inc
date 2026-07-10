@@ -267,7 +267,8 @@ sl_n         db      ; residency slice scan: slices in this window
 sl_blob      db      ; residency slice scan: blob pool index
 sl_step      dw      ; residency slice scan: bytes per slice (blocks*9)
 sl_addr      dw      ; residency slice scan: running ARAM address
-slice_base   ds 64   ; per-instrument SLICE window base SRCN (0 = none)
+slice_base   ds 64   ; per-instrument alias SRCN (0 = none): the SLICE
+                     ; window base, or an SMP LOOP-override entry
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

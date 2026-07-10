@@ -80,7 +80,12 @@ emu.addEventCallback(function()
           break
         end
         for k = 0, 8 do
-          if aram(cursor + k) ~= rom(POOL + e.off + k) then
+          local expect = rom(POOL + e.off + k)
+          -- uploads force LOOP onto the final block header (loop-or-not
+          -- is the directory's choice); a 1-block sample's first header
+          -- IS its final one
+          if k == 0 and e.blocks == 1 then expect = expect | 2 end
+          if aram(cursor + k) ~= expect then
             all_ok = false
             print(string.format("  slot %d: byte %d mismatch", slot, k))
             break
@@ -96,6 +101,16 @@ emu.addEventCallback(function()
     check(slot - 1 == 23, "boot set = instr 0-6 + kit 0 exactly (23 samples)")
     check(srcn_of[7] ~= nil and srcn_of[12] ~= nil,
       "the factory kit samples made the budget")
+    -- loop ownership: data always ends LOOP+END; a one-shot's directory
+    -- entry loops into the silent stub instead
+    local e7 = pool_entry(7)
+    local s7 = srcn_of[7]
+    local st7 = aram(0x1000 + s7 * 4) + aram(0x1001 + s7 * 4) * 256
+    check(aram(st7 + (e7.blocks - 1) * 9) ==
+      (rom(POOL + e7.off + (e7.blocks - 1) * 9) | 2),
+      "uploads force LOOP+END on the final block")
+    check(aram(0x1002 + s7 * 4) + aram(0x1003 + s7 * 4) * 256 == 0x1200,
+      "one-shot directory entries loop into the silent stub")
     check(wram(0x3200) == 7 and wram(0x3201) == 0xE8 and wram(0x3202) == 0x50,
       "kit 0 slot 0 = kick (pool 7, tune -24)")
     check(wram(0x3242) == 0 and wram(0x3282) == 0,

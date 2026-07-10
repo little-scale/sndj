@@ -216,6 +216,11 @@ screen's RAM/FREE line shows the live balance).
 - **VOL L / R** — signed! A negative volume inverts that side's
   phase: instant width. (The `U` command does this per row.)
 - **FINE** — signed fine-tune, 1/256ths of a semitone.
+- **LOOP** (SMP) — **POOL** plays the sample as it was imported;
+  **ON** forces a loop (a one-shot loops whole — drones and textures
+  from any hit); **OFF** forces one-shot (a looped pad becomes a
+  stab). Per *instrument*, not per sample: the same pool sample can
+  loop on one instrument and stab on another, for free.
 - **ECHO** — ON/OFF: does this *sound* want the room? The voice only
   sends when this is ON **and** the channel's gate is open in ECHO's
   EON MASK (open by default) — so one instrument can be wet on one

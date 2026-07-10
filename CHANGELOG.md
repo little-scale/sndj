@@ -5,6 +5,15 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- **Per-instrument LOOP override** (SMP): a new INSTR field — POOL /
+  ON / OFF. Force a looped import to play one-shot (pad becomes stab)
+  or a one-shot to loop whole (hit becomes drone), per instrument,
+  with the same pool sample doing both at once. Under the hood every
+  sample now uploads with LOOP+END on its final block and loop-or-not
+  is purely the ARAM directory's choice: one-shots loop into the
+  silent stub, and an override costs one alias directory entry —
+  zero extra sample RAM.
+
 - Patcher SLICES tab: **every cut is draggable** — the space between
   the trim handles divides equally, then each orange boundary nudges
   onto the transient by hand. Custom cuts bake by padding each slice

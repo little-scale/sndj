@@ -25,7 +25,9 @@ phrase growth moves nothing else. Save/load is a straight copy.
 Instrument record (16 bytes): type (0 SMP, 1 KIT, 2 WAV, 3 NSE,
 4 SLICE), sample, ADSR1 (low 7 bits), ADSR2, vol L, vol R, fine-tune
 (signed 1/256 semitone, interpolated between pitch-table entries),
-flags (bit 0 = EON echo send; bits 4-7 = SLICES-1 for the SLICE type),
+flags (bit 0 = EON echo send; bits 1-2 = the SMP LOOP override:
+0 pool default / 1 force loop / 2 force one-shot; bits 4-7 = SLICES-1
+for the SLICE type),
 GRP span, GRP offsets x3, TABLE (byte 12, >= 32 = none), TBS (byte 13,
 ticks per table row, 0 = note-sync), VIB (byte 14, vibrato speed/depth
 nibbles), TRM (byte 15, tremolo speed/depth nibbles).
