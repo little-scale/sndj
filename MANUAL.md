@@ -539,9 +539,10 @@ everything runs locally:
   model of the console's BRR + Gaussian playback, so what you hear in
   the browser is what the cart plays.
 - **savetool.html** — song manager for cart saves (§12).
-- **spcexport.html** — share your songs: drop a `.sndj` (or a cart
-  save and pick a slot) plus the ROM, and export either a **WAV**
-  (the whole song rendered offline through the console-sound model,
+- **spcexport.html** — listen to and share your songs: drop a
+  `.sndj` (or a cart save and pick a slot) plus the ROM. A **listen**
+  button plays the song right there through the console-sound model;
+  then export either a **WAV** (the whole song rendered offline,
   with a loop detector to size the render) or a standard **`.spc`**
   file that plays in any SPC player — your song's samples plus its
   register stream for one full loop, replayed by a tiny program baked

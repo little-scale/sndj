@@ -5,9 +5,11 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
-- **spcexport.html**: `.sndj` → **WAV** (offline render through the
-  reference sequencer + S-DSP model, with structural loop detection
-  to size the render) and → **`.spc`** (the sequencer's DSP register
+- **spcexport.html**: **listen** in the browser (streaming playback
+  through the console-sound model), `.sndj` → **WAV** (offline render
+  with structural loop detection to size it — this IS the "make wav"
+  of sndj: browser-side, no emulator, no CLI) and → **`.spc`** (the
+  sequencer's DSP register
   stream for one song loop + the song's samples + a ~100-byte SPC700
   replayer, in a standard 66048-byte file any SPC player runs — the
   SCB architecture as an export format). ARAM budget is reported;

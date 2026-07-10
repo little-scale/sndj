@@ -284,11 +284,12 @@ Adding a file = add an `.INCLUDE` *and* a Makefile prerequisite.
   fetched separately, not committed). Golden images live in
   `tools/goldens/`; `make shot-diff` pixel-compares. Screens are static text
   UIs — goldens are cheap and catch layout regressions instantly.
-- **`make wav`** — headless audio render of the bundled demo song to WAV via
-  the emulator, N seconds, for A/B listening and (later) automated spectral
-  sanity checks (e.g. "echo on adds energy after 100 ms" — coarse asserts
-  only; audio DSP is verified by the BRR/driver unit paths, not by FFT
-  golden files).
+- **`make wav`** — ⚖ SETTLED (Seb, 2026-07-11): **superseded by the
+  browser path.** WAV renders happen in `user-tools/spcexport.html`
+  (listen + render through the sndj.js reference sequencer + S-DSP model,
+  ~100x realtime, structural loop detection) — no emulator render target,
+  no CLI mirror. An emulator-capture A/B against the reference sequencer
+  remains a candidate `make check` regression, not a render tool.
 
 ### 4.4 Real hardware loop
 
@@ -325,7 +326,7 @@ make check      # emulator-in-the-loop Lua assertions (agent ground truth)
 make test       # host-side unit tests (sndj.js, BRR, RLE mirror, JS lint)
 make shot       # headless screenshot -> build/shot.png
 make shot-diff  # compare against tools/goldens/
-make wav        # headless N-second audio render of the demo song
+                # (WAV renders: user-tools/spcexport.html — browser, no target)
 make demo       # self-playing attract build (sndj-demo.sfc)
 make dist       # version-only release ROMs for the GitHub release
 make clean

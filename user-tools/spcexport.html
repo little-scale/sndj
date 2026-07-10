@@ -50,8 +50,9 @@ player. Everything runs locally.</p>
 <div id="status" class="dim">song: — · pool: —</div>
 <div id="slots"></div>
 
-<h3>WAV render</h3>
+<h3>listen &amp; WAV render</h3>
 <p>
+  <button class="primary" id="playbtn" disabled>&#9654; listen</button>
   <label>length <input type="number" id="secs" value="30" min="1" max="600"> s</label>
   <button id="loopbtn">detect loop</button>
   <button class="primary" id="wavbtn" disabled>render WAV</button>
@@ -342,7 +343,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = SPCX;
 if (typeof document !== 'undefined') (() => {
 
 const $ = id => document.getElementById(id);
-let pool = null, song = null, songName = '';
+let pool = null, song = null, songName = '', player = null;
 
 function status() {
   $('status').textContent =
@@ -351,6 +352,14 @@ function status() {
   const ready = !!(song && pool);
   $('wavbtn').disabled = !ready;
   $('spcbtn').disabled = !ready;
+  $('playbtn').disabled = !ready;
+  $('playbtn').innerHTML = player ? '&#9632; stop' : '&#9654; listen';
+}
+function stopPlayer() {
+  if (!player) return;
+  player.stop();
+  player = null;
+  status();
 }
 function note(msg, bad) {
   const e = $('status');
@@ -367,6 +376,7 @@ function dl(bytes, name) {
 }
 
 async function take(f) {
+  stopPlayer();
   const buf = new Uint8Array(await f.arrayBuffer());
   const lower = f.name.toLowerCase();
   const magic = String.fromCharCode(...buf.slice(0, 5));
@@ -403,12 +413,69 @@ async function take(f) {
 $('slots').onclick = e => {
   const si = e.target.dataset.s;
   if (si === undefined) return;
+  stopPlayer();
   const s = window.__srmSlots.find(x => x.index === +si);
   try {
     song = S.fromImage(S.rleUnpack(s.packed, 0x5300));
     songName = s.name;
     $('title').placeholder = songName;
   } catch (err) { note('slot ' + si + ': ' + err.message, true); return; }
+  status();
+};
+
+// ---- listen: the sequencer streaming into WebAudio ---------------------------
+// Renders ~0.5 s ahead of the playhead (the model runs ~100x realtime)
+// and schedules gapless buffers; loops like the console until stopped.
+$('playbtn').onclick = () => {
+  if (player) { stopPlayer(); return; }
+  if (!song || !pool) return;
+  const seq = S.seqNew(new Uint8Array(song), pool);
+  const ctx = new (window.AudioContext || window.webkitAudioContext)(
+    { sampleRate: 32000 });
+  let at = ctx.currentTime + 0.15;
+  let stopped = false, timer = null;
+  const sources = [];
+  const pump = () => {
+    if (stopped) return;
+    while (at - ctx.currentTime < 1.5 && !seq.halted) {
+      let n = 0;
+      const chunks = [];
+      while (n < 16000 && !seq.halted) {
+        const g = S.seqTickRun(seq);
+        chunks.push(g);
+        n += g.l.length;
+      }
+      if (!n) break;
+      const buf = ctx.createBuffer(2, n, 32000);
+      const L = buf.getChannelData(0), R = buf.getChannelData(1);
+      let o = 0;
+      for (const g of chunks) {
+        for (let i = 0; i < g.l.length; i++) {
+          L[o + i] = g.l[i] / 32768;
+          R[o + i] = g.r[i] / 32768;
+        }
+        o += g.l.length;
+      }
+      const srcNode = ctx.createBufferSource();
+      srcNode.buffer = buf;
+      srcNode.connect(ctx.destination);
+      srcNode.start(at);
+      at += n / 32000;
+      sources.push(srcNode);
+      if (sources.length > 8) sources.shift();
+    }
+    if (seq.halted && at - ctx.currentTime <= 0) { stopPlayer(); return; }
+    timer = setTimeout(pump, 250);
+  };
+  player = {
+    stop() {
+      stopped = true;
+      clearTimeout(timer);
+      for (const srcNode of sources) { try { srcNode.stop(); } catch (e) {} }
+      ctx.close();
+    },
+  };
+  pump();
   status();
 };
 
