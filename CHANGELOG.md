@@ -5,6 +5,12 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- The committed factory is now a single **`samples/factory.sndjfact`**
+  (patcher's export-factory file): the build reads its pool and kits
+  directly, replacing pool.bin/kits.bin. Round two of Seb's factory:
+  kit 0 filled to 16 slots with the new -EDIT drum set (boot 34.6 KB,
+  echo ceiling EDL 12 / 192 ms).
+
 - **Echo routing is a real gate now**: a voice sends to the room only
   when its instrument's ECHO flag is on **and** its channel's bit in
   the EON MASK is open (masks previously got overwritten by every

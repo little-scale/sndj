@@ -62,7 +62,8 @@ emu.addEventCallback(function()
     -- instruments 0-6 (samples 0-6, in scan order) then kit 0's slots
     -- (samples 16-25); everything else stays in ROM until referenced
     local order = { 0, 1, 2, 3, 4, 5, 6,
-                    7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 }
+                    7, 8, 9, 10, 11, 12, 13, 14,
+                    15, 20, 21, 19, 22, 16, 17, 23 }
     local cursor = 0x1200 + 9
     local all_ok = true
     local slot = 1
@@ -92,7 +93,7 @@ emu.addEventCallback(function()
     end
     check(all_ok, "residency: the boot set uploads in reference order (" ..
       (slot - 1) .. " resident)")
-    check(slot - 1 == 18, "boot set = instr 0-6 + kit 0 exactly (18 samples)")
+    check(slot - 1 == 23, "boot set = instr 0-6 + kit 0 exactly (23 samples)")
     check(srcn_of[7] ~= nil and srcn_of[12] ~= nil,
       "the factory kit samples made the budget")
     check(wram(0x3200) == 7 and wram(0x3201) == 0xE8 and wram(0x3202) == 0x50,

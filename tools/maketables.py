@@ -115,9 +115,15 @@ FACTORY_KITS = [(16, 10)]  # (first pool sample, count)
 
 
 def kits_bin():
-    # a committed samples/kits.bin (extracted from a patched ROM) is the
-    # factory truth, like samples/pool.bin; else generate from the table
+    # the committed factory (.sndjfact from patcher.html) is the truth;
+    # a bare kits.bin also works; else generate from the table
     import os.path
+    if os.path.exists('samples/factory.sndjfact'):
+        with open('samples/factory.sndjfact', 'rb') as f:
+            d = f.read()
+        assert d[:8] == b'SNDJFACT' and d[8] == 1, 'factory.sndjfact: bad magic'
+        plen = d[12] | (d[13] << 8) | (d[14] << 16)
+        return d[16 + plen:16 + plen + 1024]
     if os.path.exists('samples/kits.bin'):
         with open('samples/kits.bin', 'rb') as f:
             data = f.read()

@@ -21,7 +21,9 @@ the resample, so they carry 0/0).
 
 Factory content ("game authentic"): melodic samples extracted from
 soundfonts/*.sf2 plus two drum kits from samples/ (808, 909), trimmed and
-resampled to 32 kHz. If samples/pool.bin exists it is used verbatim.
+resampled to 32 kHz. If samples/factory.sndjfact exists (the committed
+factory, exported by patcher.html) its pool section is used verbatim;
+a bare samples/pool.bin also works.
 """
 import math
 import os
@@ -349,10 +351,24 @@ def build_pool(entries):
     return img
 
 
+def factory_pool():
+    """the pool section of the committed .sndjfact, if present"""
+    fact = os.path.join(ROOT, 'samples', 'factory.sndjfact')
+    if not os.path.exists(fact):
+        return None
+    d = open(fact, 'rb').read()
+    assert d[:8] == b'SNDJFACT' and d[8] == 1, 'factory.sndjfact: bad magic'
+    plen = d[12] | (d[13] << 8) | (d[14] << 16)
+    return d[16:16 + plen]
+
+
 def main(out_path):
-    src = os.path.join(ROOT, 'samples', 'pool.bin')
-    if os.path.exists(src):
-        data = open(src, 'rb').read()
+    data = factory_pool()
+    if data is not None:
+        assert data[:8] == b'SNDJPOOL', 'factory pool: bad magic'
+        print(f'sndj_pool: pool from samples/factory.sndjfact ({len(data)} bytes)')
+    elif os.path.exists(os.path.join(ROOT, 'samples', 'pool.bin')):
+        data = open(os.path.join(ROOT, 'samples', 'pool.bin'), 'rb').read()
         assert data[:8] == b'SNDJPOOL', 'samples/pool.bin: bad magic'
         print(f'sndj_pool: using committed samples/pool.bin ({len(data)} bytes)')
     else:
