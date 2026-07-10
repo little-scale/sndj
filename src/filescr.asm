@@ -4,14 +4,20 @@
 ;   Up/Down            pick a slot (empty slots show (EMPTY))
 ;   B-hold + Left/Right  move the name cursor
 ;   B-hold + Up/Down     cycle the character (saved slot renames the file;
-;                        an empty slot edits the working song's name,
-;                        which becomes the file name on SAVE)
+;                        an empty slot edits the working song's name)
 ;   A + B              open the action menu: SAVE / LOAD / CLEAR /
-;                      PURGE PH / PURGE CH (Up/Down choose, B runs and
-;                      closes, A cancels). CLEAR closes the gap; LOAD
+;                      PURGE PH / PURGE CH / CANC (Up/Down choose; B arms
+;                      the item — it reads SURE? — and a 2nd B tap runs it
+;                      and closes; moving disarms; CANC or A cancels).
+;                      CLEAR closes the gap; LOAD
 ;                      on the (EMPTY) row blanks the working song;
 ;                      PURGE blanks phrases/chains not reachable from
 ;                      the SONG grid and reports FREED nn.
+;
+; SAVE is name-keyed (genmddj dir_save parity): the working song stores
+; under its header name, overwriting the same-named file or appending a
+; new one — the cursor slot plays no part. Renaming a saved file forks
+; it; LOAD copies the file's name back into the song header.
 ;
 ; Playback stops on entry, like genmddj. Reached with A+Down from SONG.
 
@@ -27,6 +33,7 @@ files_init:
     stz fl_ncur
     lda #$FF
     sta fl_msg              ; no message
+    sta fl_armed            ; no pending SURE?
     jsr engine_stop         ; playback stops while managing files
     jsr text_clear
     stz text_x
@@ -99,6 +106,8 @@ files_update:
     sta fl_menu
     stz fl_mitem
     stz fl_freed
+    lda #$FF
+    sta fl_armed
     lda #$01
     sta a_used
 @a_draw:
@@ -215,6 +224,8 @@ files_menu:
 .ACCU 8
     beq @not_cancel
     stz fl_menu
+    lda #$FF
+    sta fl_armed
     lda #$01
     sta a_used
     jmp files_draw
@@ -229,9 +240,11 @@ files_menu:
     lda fl_mitem
     dec a
     bpl @m_set
-    lda #$04
+    lda #$05
 @m_set:
     sta fl_mitem
+    lda #$FF                ; moving disarms a pending SURE?
+    sta fl_armed
 @m_dn:
     rep #$20
 .ACCU 16
@@ -242,11 +255,13 @@ files_menu:
     beq @m_b
     lda fl_mitem
     inc a
-    cmp #$05
+    cmp #$06
     bcc @m_set2
     lda #$00
 @m_set2:
     sta fl_mitem
+    lda #$FF
+    sta fl_armed
 @m_b:
     rep #$20
 .ACCU 16
@@ -255,6 +270,21 @@ files_menu:
     sep #$20
 .ACCU 8
     beq @m_draw
+    lda fl_mitem
+    cmp #$05
+    beq @do_canc            ; CANC: close the menu, run nothing
+    cmp fl_armed
+    beq @confirmed
+    sta fl_armed            ; 1st tap arms: the item reads SURE?
+    bra @m_draw
+@do_canc:
+    stz fl_menu
+    lda #$FF
+    sta fl_armed
+    bra @m_draw
+@confirmed:
+    lda #$FF
+    sta fl_armed
     ; run the action on fl_slot
     stz fl_menu
     lda fl_mitem
@@ -281,8 +311,7 @@ files_menu:
     sta fl_msg
     bra @m_draw
 @do_save:
-    lda fl_slot
-    jsr save_slot
+    jsr save_song           ; name-keyed: overwrite the same-named file or append
     sta fl_msg
     ora #$80                ; bit7: message reads SAVED
     sta fl_msg
@@ -902,6 +931,13 @@ files_draw:
 .ACCU 8
 @m_txt:
     lda ui_cnt
+    cmp fl_armed
+    bne @m_lbl
+    ldx #str_fsure          ; armed item asks for the confirming tap
+    jsr text_puts
+    bra @m_next
+@m_lbl:
+    lda ui_cnt
     rep #$30
 .ACCU 16
     and #$00FF
@@ -925,7 +961,7 @@ files_draw:
 @m_next:
     inc ui_cnt
     lda ui_cnt
-    cmp #$05
+    cmp #$06
     bne @mrow
     ; status line
     lda #2
@@ -1096,7 +1132,7 @@ fl_name_attr:
 .DEFINE FL_CHARSET_N 39
 fl_charset:  .DB " ABCDEFGHIJKLMNOPQRSTUVWXYZ-.0123456789", 0
 
-fl_menu_tab: .DW str_fsave, str_fload, str_fclear, str_fpurgep, str_fpurgec
+fl_menu_tab: .DW str_fsave, str_fload, str_fclear, str_fpurgep, str_fpurgec, str_fcanc
 
 str_files:   .DB "FILES", 0
 str_fsram:   .DB "SRAM", 0
@@ -1112,6 +1148,8 @@ str_fload:   .DB "LOAD ", 0
 str_fclear:  .DB "CLEAR", 0
 str_fpurgep: .DB "PURGE PH", 0
 str_fpurgec: .DB "PURGE CH", 0
+str_fcanc:   .DB "CANC    ", 0
+str_fsure:   .DB "SURE?   ", 0
 str_ffreed:  .DB "FREED ", 0
 str_frowclr: .DB "               ", 0
 str_fblank:  .DB "        ", 0

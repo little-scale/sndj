@@ -261,6 +261,8 @@ tap_live     db      ; a first B tap is pending (cleared by cursor moves,
 apu_cool     db      ; frames to hold the heartbeat off (driver inside a
                      ; long echo reconfig; a blocked write would freeze
                      ; the main loop and eat input)
+fl_armed     db      ; FILES menu confirm: armed item index ($FF = none);
+                     ; the armed item reads SURE? and a 2nd B tap runs it
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

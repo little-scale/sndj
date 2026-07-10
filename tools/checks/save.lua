@@ -102,6 +102,11 @@ emu.addEventCallback(function()
   frames = frames + 1
 
   if stage == "boot" and frames == 20 then
+    -- the emulator persists .sav across runs: empty the directory so the
+    -- name-keyed save lands in slot 0
+    for s = 0, 15 do
+      emu.write(0x10 + s * 16, 0xFF, emu.memType.snesSaveRam)
+    end
     pad = { start = true }
     stage = "to_song"
     t0 = frames + 2
@@ -151,7 +156,15 @@ emu.addEventCallback(function()
     t0 = frames + 4
   elseif stage == "do_save" and frames == t0 then
     check(wram(0x1CE) == 1, "action menu open")
-    pad = { b = true }         -- item 0 = SAVE
+    pad = { b = true }         -- item 0 = SAVE: arm (SURE?)
+    stage = "sv_arm"
+    t0 = frames + 2
+  elseif stage == "sv_arm" and frames == t0 then
+    pad = {}
+    stage = "sv_arm2"
+    t0 = frames + 2
+  elseif stage == "sv_arm2" and frames == t0 then
+    pad = { b = true }         -- confirm
     stage = "saving"
     t0 = frames + 2
   elseif stage == "saving" and frames == t0 then
@@ -191,7 +204,15 @@ emu.addEventCallback(function()
     stage = "do_load"
     t0 = frames + 2
   elseif stage == "do_load" and frames == t0 then
-    pad = { b = true }
+    pad = { b = true }         -- arm (SURE?)
+    stage = "ld_arm"
+    t0 = frames + 2
+  elseif stage == "ld_arm" and frames == t0 then
+    pad = {}
+    stage = "ld_arm2"
+    t0 = frames + 2
+  elseif stage == "ld_arm2" and frames == t0 then
+    pad = { b = true }         -- confirm
     stage = "loading"
     t0 = frames + 4
   elseif stage == "loading" and frames == t0 then
@@ -245,7 +266,15 @@ emu.addEventCallback(function()
     stage = "rmenu_b"
     t0 = frames + 2
   elseif stage == "rmenu_b" and frames == t0 then
-    pad = { b = true }
+    pad = { b = true }         -- arm (SURE?)
+    stage = "r_arm"
+    t0 = frames + 2
+  elseif stage == "r_arm" and frames == t0 then
+    pad = {}
+    stage = "r_arm2"
+    t0 = frames + 2
+  elseif stage == "r_arm2" and frames == t0 then
+    pad = { b = true }         -- confirm
     stage = "reboot_loading"
     t0 = frames + 4
   elseif stage == "reboot_loading" and frames == t0 then

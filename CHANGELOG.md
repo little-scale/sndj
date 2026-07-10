@@ -5,6 +5,16 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- **SAVE is name-keyed** (genmddj parity): the working song stores
+  under its name — a same-named file is overwritten, a new name saves
+  a new file; the cursor slot plays no part. LOAD copies the file's
+  name back into the song. Fixes the "song name reverted to SONG"
+  trap where renaming a saved file was silently stamped over by the
+  next save.
+- **FILES menu confirm**: B arms the chosen action and it reads
+  **SURE?** — a second B runs it. Moving disarms; a new **CANC**
+  item (or A) closes the menu without running anything.
+
 - **One nudge grammar everywhere**: B + left/right steps any field by
   1 (the low nibble); B + up/down steps the high nibble (±16) on byte
   fields, an octave (±12) on semitone fields (notes, transpose, chord

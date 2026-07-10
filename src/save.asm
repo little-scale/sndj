@@ -693,6 +693,68 @@ save_slot:
     lda #SV_OK
     rts
 
+; --- save the working song under its header name (genmddj dir_save parity) --------
+; The FILES cursor plays no part: a file whose name matches the song header
+; is overwritten (journalled — the old block frees after the flip); otherwise
+; the song appends as a new file. Renaming a saved file therefore forks it:
+; the next SAVE recreates the song under its own name and the renamed file
+; keeps living. Returns A = SV_* status.
+save_song:
+    stz sv_run              ; directory index under test
+@scan:
+    lda sv_run
+    jsr dir_x
+    lda.l SRAM_TABLE,x
+    cmp #$A5
+    bne @append             ; packed directory: first free ends the scan
+    rep #$30
+.ACCU 16
+    txa
+    sta tmp0                ; entry base offset
+    sep #$20
+.ACCU 8
+    stz tmp2                ; char index
+@cmp:
+    lda tmp2
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_HEADER + SH_NAME,x
+    pha
+    rep #$30
+.ACCU 16
+    lda tmp2
+    and #$00FF
+    clc
+    adc tmp0
+    clc
+    adc #$0008              ; entry name field
+    tax
+    sep #$20
+.ACCU 8
+    pla
+    cmp.l SRAM_TABLE,x
+    bne @next
+    inc tmp2
+    lda tmp2
+    cmp #$08
+    bne @cmp
+    lda sv_run              ; full match: overwrite that file
+    jmp save_slot
+@next:
+    inc sv_run
+    lda sv_run
+    cmp #SLOT_COUNT
+    bne @scan
+    lda #SV_FULL            ; sixteen files, none ours
+    rts
+@append:
+    lda sv_run              ; first free entry
+    jmp save_slot
+
 ; --- clear slot A (0-15): drop the entry, slide the directory + heap -------------
 slot_clear:
     sta sv_slot
@@ -854,6 +916,43 @@ load_slot:
     sta sv_src + 2
     jsr rle_unpack
     jsr stage_in
+    ; the file's name becomes the song's (a rename may have diverged them)
+    lda sv_slot
+    jsr dir_x
+    rep #$30
+.ACCU 16
+    txa
+    sta tmp0                ; entry base offset
+    sep #$20
+.ACCU 8
+    stz tmp2                ; char index
+@name_in:
+    rep #$30
+.ACCU 16
+    lda tmp2
+    and #$00FF
+    clc
+    adc tmp0
+    clc
+    adc #$0008              ; entry name field
+    tax
+    sep #$20
+.ACCU 8
+    lda.l SRAM_TABLE,x
+    pha
+    lda tmp2
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    pla
+    sta.l $7E0000 + SB_HEADER + SH_NAME,x
+    inc tmp2
+    lda tmp2
+    cmp #$08
+    bne @name_in
     jsr wave_sync_all       ; the loaded song's waves come back with it
     jsr residency_build     ; ...its resident sample set
     jsr apu_echo_apply      ; ...and its room (long sequence last)

@@ -83,7 +83,7 @@ local function verify(tag)
   check(ok, tag)
 end
 
--- menu helper: A+B opens, n downs, B runs
+-- menu helper: A+B opens, n downs, B arms (SURE?), a second B runs
 local script = {}
 local function menu_run(f, downs)
   script[f] = { a = true }
@@ -97,7 +97,9 @@ local function menu_run(f, downs)
   end
   script[x] = { b = true }
   script[x + 2] = {}
-  return x + 4
+  script[x + 4] = { b = true }
+  script[x + 6] = {}
+  return x + 8
 end
 
 script[14] = { start = true }
@@ -105,13 +107,26 @@ script[16] = {}
 script[24] = { a = true }
 script[26] = { a = true, down = true }
 script[28] = {}                       -- FILES
-menu_run(40, 0)                       -- SAVE -> slot 0 (small song)
-script[200] = { down = true }
+menu_run(40, 0)                       -- SAVE -> slot 0 ("SONG", small)
+script[200] = { down = true }         -- to the (EMPTY) row
 script[202] = {}
-menu_run(210, 0)                      -- SAVE -> slot 1 (bigger song)
-script[370] = { up = true }
+-- SAVE is name-keyed: rename the working song S -> T so the save appends
+script[206] = { b = true }
+script[208] = { b = true, up = true }
+script[210] = { b = true }
+script[212] = {}
+menu_run(220, 0)                      -- SAVE -> slot 1 ("TONG", bigger song)
+script[370] = { down = true }         -- to the new (EMPTY) row
 script[372] = {}
-menu_run(380, 0)                      -- SAVE over slot 0 (now bigger: hole)
+script[376] = { b = true }            -- rename back T -> S
+script[378] = { b = true, down = true }
+script[380] = { b = true }
+script[382] = {}
+menu_run(390, 0)                      -- SAVE over the "SONG" file (now bigger: hole)
+script[544] = { up = true }
+script[546] = {}
+script[548] = { up = true }
+script[550] = {}
 menu_run(560, 2)                      -- CLEAR slot 0 (slides slot 1 down)
 
 emu.addEventCallback(function() emu.setInput(pad, 0) end, emu.eventType.inputPolled)

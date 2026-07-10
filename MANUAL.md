@@ -355,11 +355,21 @@ SRAM type, free space, and each song's size in KB.
 
 - Cursor a slot, open the menu (A+B): **SAVE**, **LOAD**, **CLEAR**,
   **PURGE PH** / **PURGE CH** (blank phrases/chains unreachable from
-  the song grid — pool hygiene).
-- LOAD on the `(EMPTY)` row starts a fresh song.
+  the song grid — pool hygiene), **CANC**.
+- Every action asks for a confirm: the first **B** arms it and the
+  item reads **SURE?** — tap **B** again to run it. Moving the cursor
+  disarms; **CANC** (or **A**) closes the menu without running
+  anything.
+- **SAVE stores the song under its name.** A file with the same name
+  is overwritten; a new name saves a new file. The cursor slot plays
+  no part — renaming a saved file then saving *forks* the song, and
+  the renamed file keeps living.
+- LOAD brings the file's name back with it. LOAD on the `(EMPTY)` row
+  starts a fresh song.
 - **Rename**: hold **B** on a name character and tap **Up/Down** to
   cycle it (blank → A–Z → `-`/`.` → 0–9 going up; the reverse going
-  down). Works on the working song's name and on saved slots.
+  down). On the `(EMPTY)` row this names the working song (the name
+  the next SAVE uses); on a saved slot it renames that file.
 - Saves are journalled — a power cut mid-save can never eat the
   previous good copy.
 
