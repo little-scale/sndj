@@ -150,7 +150,13 @@ export a patched ROM. Everything runs locally.</p>
   <table id="pal"></table>
 </div>
 <div id="exportview" hidden>
-  <button class="primary" id="export">export patched ROM</button>
+  <div class="row">
+    <button class="primary" id="export">export patched ROM</button>
+    <button id="factexport" title="everything factory in one small file:
+pool, kits, boot instruments, FIR presets, palettes">export factory</button>
+    <button id="factimport" title="apply a .sndjfact onto the loaded ROM">import factory</button>
+    <input type="file" id="factfile" hidden accept=".sndjfact">
+  </div>
 </div>
 </div>
 <div style="flex:.55">
@@ -1059,6 +1065,65 @@ $('pal').oninput = e => {
   rom[off] = c & 0xFF;
   rom[off + 1] = c >> 8;
   status('palette edited (snapped to 15-bit BGR) — export to keep it');
+};
+
+// ---------------------------------------------------- factory container
+// "SNDJFACT" v1: everything the factory is, in one small shareable file
+// (and the exact payload the build bakes from).
+function factoryExport() {
+  const pool = S.poolBuild(entries);
+  const out = new Uint8Array(16 + pool.length + 1024 + 16 + 64 + 128);
+  out.set([...'SNDJFACT'].map(c => c.charCodeAt(0)), 0);
+  out[8] = 1;
+  out[12] = pool.length & 255;
+  out[13] = (pool.length >> 8) & 255;
+  out[14] = (pool.length >> 16) & 255;
+  let o = 16;
+  out.set(pool, o); o += pool.length;
+  out.set(rom.subarray(kitOff, kitOff + 1024), o); o += 1024;
+  out.set(rom.subarray(defOff, defOff + 16), o); o += 16;
+  out.set(rom.subarray(firOff, firOff + 64), o); o += 64;
+  out.set(rom.subarray(palOff, palOff + 128), o);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([out]));
+  a.download = 'factory.sndjfact';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  status('factory exported: pool + kits + boot instruments + FIR + palettes');
+}
+
+async function factoryImport(f) {
+  const d = new Uint8Array(await f.arrayBuffer());
+  if (String.fromCharCode(...d.slice(0, 8)) !== 'SNDJFACT' || d[8] !== 1) {
+    status(f.name + ': not a SNDJFACT v1 file', 1);
+    return;
+  }
+  const plen = d[12] | (d[13] << 8) | (d[14] << 16);
+  let o = 16;
+  try {
+    entries = S.poolParse(d.subarray(o, o + plen));
+  } catch (err) {
+    status('factory pool parse failed: ' + err.message, 1);
+    return;
+  }
+  o += plen;
+  rom.set(d.subarray(o, o + 1024), kitOff); o += 1024;
+  rom.set(d.subarray(o, o + 16), defOff); o += 16;
+  rom.set(d.subarray(o, o + 64), firOff); o += 64;
+  rom.set(d.subarray(o, o + 128), palOff);
+  firTaps = Array.from(rom.slice(firOff + 40, firOff + 48)).map(s8);
+  render();
+  renderPal();
+  firSync();
+  status(f.name + ' applied — export the ROM to keep it');
+}
+
+$('factexport').onclick = () => { if (rom) factoryExport(); };
+$('factimport').onclick = () => { if (rom) $('factfile').click(); };
+$('factfile').onchange = e => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (f && rom) factoryImport(f);
 };
 
 $('export').onclick = () => {

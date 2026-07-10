@@ -5,6 +5,11 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- patcher: **export factory / import factory** — the whole factory
+  identity (pool, kits, boot instruments, FIR presets, palettes) in
+  one small `.sndjfact` file, applyable onto any loaded ROM. Share a
+  voicing, keep versions, or hand it straight to the build.
+
 - ECHO's RAM/FREE ledger also reads the free space as **time**: a
   `+NNNms` readout of how much longer the delay could get from here
   (2 KB steps, capped by the register's 15).
