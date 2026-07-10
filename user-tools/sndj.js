@@ -10,6 +10,9 @@
 //   toImage(block) / fromImage(image)      -- SNDJ1 save image reorder
 //   pitchForNote(note)                     -- the single tuning source
 //   findMarker(rom, marker)
+//   dspNew/dspWrite/dspRun                 -- sample-accurate S-DSP model
+//   seqNew/seqTick/seqTickRun/seqRender    -- the reference sequencer
+//                                             (mirrors src/engine.asm)
 
 'use strict';
 
@@ -996,6 +999,912 @@ function dspRun(d, n) {
   return { l: outL, r: outR };
 }
 
+// ------------------------------------------------------ reference sequencer
+// A JS mirror of the console engine — src/engine.asm (tick pipeline,
+// triggers, the A-Z executor, fx), src/apu.asm (apply_instrument, tune
+// contexts, tempo) and src/pool.asm (residency: the ARAM image a song
+// load builds) — driving the S-DSP model above. Every deviation from
+// the asm is a bug. This is what plays .sndj songs in the browser
+// (savetool preview, spcexport) and renders them to WAV offline.
+//
+//   const seq = seqNew(block, poolEntries);   // block: 0x5300 song image
+//   const {l, r} = seqTickRun(seq);           // one engine tick of audio
+//   const wav = seqRender(block, pool, 20);   // 20 s -> {l, r, rate}
+
+const SEQ_SB = {
+  SONG: 0x0000, INSTR: 0x0400, TABLES: 0x0800, GROOVES: 0x1000,
+  WAVES: 0x1100, KITS: 0x1200, HEADER: 0x1600, CHAINS: 0x1700,
+  PHRASES: 0x2300,
+};
+const SEQ_SH = {
+  GROOVE: 0, TRANSPOSE: 1, MAGIC: 2, EDL: 3, EFB: 4, EVL: 5, EVR: 6,
+  EON: 7, FIR: 8, NAME: 9, MODE: 17, BPM: 18, FIRTAPS: 19,
+};
+const SEQ_ARAM_DIR = 0x1000, SEQ_ARAM_WAVES = 0x1100, SEQ_ARAM_STUB = 0x1200;
+const SEQ_DIR_SLOT_MAX = 56;      // sample slots 0-55 (0 = silence), waves 56-63
+const SEQ_NOTE_OFF = 97, SEQ_NOTE_MAX = 96;
+
+// src/main.asm fir_presets (SNFIR0)
+const SEQ_FIR_PRESETS = [
+  [0x7F, 0, 0, 0, 0, 0, 0, 0],                          // FLAT
+  [0x58, 0x30, 0x12, 0x08, 0, 0, 0, 0],                 // DARK
+  [0x70, 0xE8, 0x18, 0xF4, 0, 0, 0, 0],                 // BRIGHT
+  [0x40, 0, 0, 0x40, 0, 0, 0, 0],                       // COMB
+  [0x20, 0x30, 0x40, 0x30, 0x20, 0x10, 0x08, 0x04],     // SOFT
+  [0x4C, 0x21, 0x12, 0x09, 0x05, 0x03, 0x02, 0x01],     // DKC HALL
+  [0x60, 0xA0, 0x40, 0xD0, 0x20, 0xE8, 0x10, 0xF8],     // METAL
+  [0x7F, 0, 0, 0, 0, 0, 0, 0],                          // USER
+];
+// src/apu.asm karp_burst_sr (BURST nibble -> exciter ADSR2 sustain rate)
+const SEQ_KARP_SR = [20, 21, 22, 22, 23, 24, 25, 25, 26, 27, 28, 28, 29, 30, 31, 31];
+
+// tools/maketables.py karp_entry: note m + EDL -> exciter pitch (the comb
+// partial's exact frequency) and the 2-tap fractional pull
+function karpEntry(m, edl) {
+  const base = edl * 512;
+  const f = 440 * 2 ** ((m - 57) / 12);
+  const n = Math.max(1, Math.round(f * (base + 3.5) / 32000));
+  const dd = Math.max(0, Math.min(7, 32000 * n / f - base));
+  const pitch = Math.min(0x3FFF, Math.round(32000 * n / (base + dd) * 4096 / 1000));
+  const i0 = Math.min(6, Math.floor(dd));
+  return { pitch, i0, fr: Math.min(255, Math.round((dd - i0) * 256)) };
+}
+
+// ---- the ARAM image residency_build makes (src/pool.asm) ----
+function seqAramBuild(block, pool) {
+  const aram = new Uint8Array(65536);
+  const poolMap = new Uint8Array(64);
+  const sliceBase = new Uint8Array(64);
+  const dir = (slot, start, loop) => {
+    const o = SEQ_ARAM_DIR + slot * 4;
+    aram[o] = start & 0xFF; aram[o + 1] = start >> 8;
+    aram[o + 2] = loop & 0xFF; aram[o + 3] = loop >> 8;
+  };
+  // slot 0: the silent stub (END, no loop)
+  aram[SEQ_ARAM_STUB] = 0x01;
+  dir(0, SEQ_ARAM_STUB, SEQ_ARAM_STUB);
+  const dirStart = [];                  // per pool idx: ARAM start + loop
+  const dirLoop = [];
+  let slot = 1, cursor = SEQ_ARAM_STUB + 9;
+  const edl = block[SEQ_SB.HEADER + SEQ_SH.EDL] & 0x0F;
+  const ceil = edl ? 0x100 - edl * 8 : 0xFF;      // echo buffer page ceiling
+  const mark = i => {
+    if (i >= pool.length || poolMap[i]) return;
+    if (slot >= SEQ_DIR_SLOT_MAX) return;
+    const e = pool[i], len = e.brr.length;
+    if (cursor + len > 0xFFFF || ((cursor + len) >> 8) >= ceil) return;
+    aram.set(e.brr, cursor);
+    aram[cursor + len - 9] |= 0x02;     // force LOOP on the END block —
+                                        // loop-or-not is the directory's choice
+    dirStart[i] = cursor;
+    dirLoop[i] = e.loopBlock === null ? SEQ_ARAM_STUB : cursor + e.loopBlock * 9;
+    dir(slot, cursor, dirLoop[i]);
+    poolMap[i] = slot++;
+    cursor += len;
+  };
+  // scan instruments (SMP sample fields), then kits (slots with vol > 0)
+  for (let id = 0; id < 64; id++) {
+    const r = SEQ_SB.INSTR + id * 16;
+    if ((block[r] & 0x07) === 0) mark(block[r + 1]);
+  }
+  for (let s = 0; s < 256; s++) {
+    const k = SEQ_SB.KITS + s * 4;
+    if (block[k + 2]) mark(block[k]);
+  }
+  // per-instrument directory aliases: SLICE windows + SMP LOOP overrides
+  for (let id = 0; id < 64; id++) {
+    const r = SEQ_SB.INSTR + id * 16, type = block[r] & 0x07;
+    if (type === 4) {                                  // SLICE
+      const n = (block[r + 7] >> 4) + 1;
+      const blob = block[r + 1] & 0x3F;
+      mark(blob);
+      if (!poolMap[blob] || slot + n > SEQ_DIR_SLOT_MAX) continue;
+      const stepBlocks = Math.floor(pool[blob].brr.length / 9 / n);
+      if (!stepBlocks) continue;
+      sliceBase[id] = slot;
+      for (let i = 0; i < n; i++) {
+        dir(slot++, dirStart[blob] + i * stepBlocks * 9, SEQ_ARAM_STUB);
+      }
+    } else if (type === 0) {                           // SMP LOOP override
+      const mode = (block[r + 7] >> 1) & 0x03;         // 1 = ON, 2 = OFF
+      if (!mode) continue;
+      const blob = block[r + 1] & 0x3F;
+      mark(blob);
+      if (!poolMap[blob] || slot >= SEQ_DIR_SLOT_MAX) continue;
+      let loop = SEQ_ARAM_STUB;
+      if (mode === 1) {
+        loop = dirLoop[blob] === SEQ_ARAM_STUB ? dirStart[blob] : dirLoop[blob];
+      }
+      dir(slot, dirStart[blob], loop);
+      sliceBase[id] = slot++;
+    }
+  }
+  // wave scratch slots (SRCN 56-63): compile the 8 drawn banks to
+  // 2-block looped BRRs (range 11, filter 0) — src/wave.asm
+  for (let bank = 0; bank < 8; bank++) {
+    const slotAddr = SEQ_ARAM_WAVES + bank * 18;
+    dir(56 + bank, slotAddr, slotAddr);
+    aram[slotAddr] = 0xB0;              // range 11
+    aram[slotAddr + 9] = 0xB3;          // range 11, LOOP+END
+    for (let p = 0; p < 16; p++) {
+      const s0 = (block[SEQ_SB.WAVES + bank * 32 + p * 2] - 8) & 0x0F;
+      const s1 = (block[SEQ_SB.WAVES + bank * 32 + p * 2 + 1] - 8) & 0x0F;
+      aram[slotAddr + 1 + p + (p >= 8 ? 1 : 0)] = (s0 << 4) | s1;
+    }
+  }
+  return { aram, poolMap, sliceBase };
+}
+
+// ---- construction: boot + song load + engine_go -----------------------------
+function seqNew(block, pool, opts) {
+  opts = opts || {};
+  const { aram, poolMap, sliceBase } = seqAramBuild(block, pool);
+  const d = dspNew(aram);
+  const seq = {
+    block, pool, aram, dsp: d, poolMap, sliceBase,
+    trig: { voice: 0, id: 0, type: 0, note: 0, semis: 0, fine: 0 },
+    lastPitch: 0,
+    engNoise: 0, engNon: 0, engEon: 0, engPmon: 0,
+    konMask: 0, koffMask: 0, konCount: 0,
+    gpos: 0, tickwait: 0, walkGuard: 16, row: 0x0F,
+    samplesPerTick: 532, halted: false,
+    tracks: [],
+  };
+  for (let t = 0; t < 8; t++) {
+    seq.tracks.push({
+      songrow: 0, cpos: 0, tsp: 0, chain: 0xFF, phrase: 0xFF, prow: 0xFF,
+      instr: 0, instrActive: 0xFF, note: 0, pitch: 0,
+      cmd: 0, cval: 0, dlyCnt: 0xFF, dlyNote: 0, killCnt: 0xFF,
+      pending: 0xFF, playcnt: 0, mute: false,
+      tbl: 0xFF, tblSpd: 0, tblCnt: 0, tblRow: 0,
+      retPer: 0, retCnt: 0, slRate: 0, slNote: 0, slT: 0,
+      arpPh: 0, vib: 0, vibPh: 0, trm: 0, trmPh: 0,
+      voll: 0, volr: 0, fine: 0, chord: 0,
+    });
+  }
+  const W = (r, v) => dspWrite(d, r, v);
+  // boot (driver entry + apu_audio_init)
+  W(0x5D, SEQ_ARAM_DIR >> 8);
+  W(0x0C, 0x60); W(0x1C, 0x60);
+  W(0x6D, 0xFF); W(0x7D, 0x00);
+  W(0x5C, 0x00); W(0x3D, 0x00); W(0x2D, 0x00);
+  W(0x6C, 0x20);
+  for (let v = 0; v < 8; v++) {
+    W(v * 16 + 0, 0x50); W(v * 16 + 1, 0x50);
+    W(v * 16 + 4, 0x00); W(v * 16 + 5, 0xAF); W(v * 16 + 6, 0xCA);
+  }
+  // apu_echo_apply: header echo config
+  const h = SEQ_SB.HEADER;
+  W(0x2C, block[h + SEQ_SH.EVL]); W(0x3C, block[h + SEQ_SH.EVR]);
+  W(0x0D, block[h + SEQ_SH.EFB]);
+  seqEonSync(seq);
+  for (let t = 0; t < 8; t++) W(0x0F + t * 16, block[h + SEQ_SH.FIRTAPS + t]);
+  const edl = block[h + SEQ_SH.EDL] & 0x0F;
+  const esa = edl ? (0x100 - edl * 8) & 0xFF : 0xFF;
+  if (edl !== 0 || esa !== 0xFF) {      // the driver's unchanged-config fast path
+    aram.fill(0, esa << 8, (esa << 8) + Math.max(1, edl * 8) * 256);
+    W(0x6D, esa); W(0x7D, edl);
+    W(0x6C, 0x00);                      // driver re-enable: unmute, echo on
+  }
+  // engine_go
+  seqSetTempo(seq, block[h + SEQ_SH.BPM] || 150);
+  if (opts.startRow) {                  // engine_play_row
+    for (const trk of seq.tracks) trk.songrow = opts.startRow & 0x7F;
+  }
+  for (let t = 0; t < 8; t++) seqLoadSongrow(seq, t);
+  return seq;
+}
+
+function seqSetTempo(seq, bpm) {
+  if (bpm < 80) bpm = 80;
+  seq.samplesPerTick = 4 * Math.floor(20000 / bpm);   // Timer-0 target * 4
+}
+
+// effective echo sends: instrument ECHO flag AND the channel's EON MASK bit
+function seqEonSync(seq) {
+  const b = seq.block;
+  let eon = 0;
+  for (let t = 0; t < 8; t++) {
+    const id = seq.tracks[t].instr;
+    if (id === 0xFF) continue;
+    if ((b[SEQ_SB.INSTR + id * 16 + 7] & 1) &&
+        (b[SEQ_SB.HEADER + SEQ_SH.EON] & (1 << t))) eon |= 1 << t;
+  }
+  seq.engEon = eon;
+  dspWrite(seq.dsp, 0x4D, eon);
+}
+
+// ---- song walking (track_load_songrow / chain entries / chain step) ---------
+function seqSongCell(seq, t, row) {
+  return seq.block[SEQ_SB.SONG + t * 128 + row];
+}
+
+function seqLoadSongrow(seq, t) {
+  const trk = seq.tracks[t];
+  const cell = seqSongCell(seq, t, trk.songrow);
+  trk.chain = cell;
+  if (cell !== 0xFF) {
+    trk.cpos = 0;
+    seqLoadChainEntry(seq, t);
+    return;
+  }
+  for (let row = trk.songrow + 1; row < 128; row++) {  // enter at the first
+    if (seqSongCell(seq, t, row) !== 0xFF) {           // populated cell below
+      trk.songrow = row;
+      seqLoadSongrow(seq, t);
+      return;
+    }
+  }
+  trk.phrase = 0xFF;                    // nothing below: halt the track
+}
+
+function seqLoadChainEntry(seq, t) {
+  const trk = seq.tracks[t];
+  const o = SEQ_SB.CHAINS + trk.chain * 32 + trk.cpos * 2;
+  const ph = seq.block[o];
+  if (ph !== 0xFF) {
+    trk.phrase = ph;
+    trk.tsp = seq.block[o + 1];
+    seq.walkGuard = 16;
+    return;
+  }
+  if (trk.songrow === 0xFF) {           // standalone chain: loop or halt
+    if (trk.cpos === 0) { trk.phrase = 0xFF; return; }
+    trk.cpos = 0;
+    seqLoadChainEntry(seq, t);
+    return;
+  }
+  if (--seq.walkGuard === 0) { trk.phrase = 0xFF; return; }
+  seqNextSongrow(seq, t);
+}
+
+// end of chain: the next song row, or loop to the top of the contiguous block
+function seqNextSongrow(seq, t) {
+  const trk = seq.tracks[t];
+  if (trk.songrow + 1 < 128 && seqSongCell(seq, t, trk.songrow + 1) !== 0xFF) {
+    trk.songrow++;
+    seqLoadSongrow(seq, t);
+    return;
+  }
+  let row = trk.songrow;
+  while (row > 0 && seqSongCell(seq, t, row - 1) !== 0xFF) row--;
+  trk.songrow = row;
+  seqLoadSongrow(seq, t);
+}
+
+function seqChainStep(seq, t) {
+  const trk = seq.tracks[t];
+  if (trk.pending !== 0xFF) {           // LIVE-queued launch
+    trk.chain = trk.pending;
+    trk.pending = 0xFF;
+    trk.songrow = 0xFF;                 // behaves as a standalone looping chain
+    trk.cpos = 0;
+    seqLoadChainEntry(seq, t);
+    return;
+  }
+  if (trk.chain === 0xFE) return;       // standalone phrase loops
+  trk.cpos = (trk.cpos + 1) & 0x0F;
+  if (trk.cpos !== 0) { seqLoadChainEntry(seq, t); return; }
+  seqNextSongrow(seq, t);
+}
+
+// ---- tune contexts (src/apu.asm) --------------------------------------------
+function seqTunePool(seq, poolIdx, extraFine) {
+  const e = seq.pool[poolIdx];
+  let semis = e ? e.tuneSemis : 0;
+  let s = (e ? e.tuneFine : 0) + extraFine;
+  if (s >= 128) { s -= 256; semis++; }
+  else if (s < -128) { s += 256; semis--; }
+  seq.trig.semis = semis;
+  seq.trig.fine = s;
+}
+
+function seqTuneLoad(seq, id) {
+  const r = SEQ_SB.INSTR + id * 16, b = seq.block;
+  const fine = i8(b[r + 6]), type = b[r] & 0x07;
+  if (type === 0 || type === 3 || type === 4) seqTunePool(seq, b[r + 1] & 0x3F, fine);
+  else if (type === 2) {                // WAV: +1 semi, -52 fine (8-bit wrap)
+    seq.trig.semis = 1;
+    seq.trig.fine = i8((fine - 52) & 0xFF);
+  } else {                              // KIT (slot tune at trigger) / KARP
+    seq.trig.semis = 0;
+    seq.trig.fine = fine;
+  }
+}
+
+function seqTrackTuneLoad(seq, t) {
+  const id = seq.tracks[t].instr;
+  if (id === 0xFF) { seq.trig.semis = 0; seq.trig.fine = 0; return; }
+  seq.trig.id = id;
+  seqTuneLoad(seq, id);
+}
+
+// ---- pitch (note_pitch_calc_only: table + fine interpolation) ---------------
+function seqPitchCalc(seq, note) {
+  const t = seq.trig;
+  if (!t.semis && !t.fine) return pitchForNote(note);
+  let n = note + t.semis;
+  if (n < 0) n = 0;
+  if (n >= 96) n = 95;
+  let fine = t.fine;
+  if (fine < 0) {
+    if (n === 0) fine = 0;
+    else { n--; fine &= 0xFF; }         // borrow a semitone, keep the fraction
+  }
+  if (!fine) return pitchForNote(n);
+  const base = pitchForNote(n);
+  if (n + 1 >= 96) return base;
+  const delta = pitchForNote(n + 1) - base;
+  return (base + ((delta * fine) >> 8)) & 0xFFFF;
+}
+
+function seqPitchWrite(seq, pitch) {
+  const v = seq.trig.voice * 16;
+  dspWrite(seq.dsp, v + 2, pitch & 0xFF);
+  dspWrite(seq.dsp, v + 3, (pitch >> 8) & 0xFF);
+}
+
+// ---- apply_instrument --------------------------------------------------------
+function seqApply(seq, id) {
+  const g = seq.trig, b = seq.block, W = (r, v) => dspWrite(seq.dsp, r, v);
+  g.id = id;
+  seqTuneLoad(seq, id);
+  const v = g.voice, vx = v * 16, bit = 1 << v;
+  const r = SEQ_SB.INSTR + id * 16;
+  const trk = seq.tracks[v];
+  g.type = b[r] & 0x07;
+  if (trk.instrActive === id) return;
+  trk.instrActive = id;
+  // SRCN: WAV = scratch slot; SMP alias (LOOP override) wins over the pool
+  let srcn;
+  if (g.type === 2) srcn = 56 + (b[r + 1] & 0x07);
+  else if (g.type === 0 && seq.sliceBase[id]) srcn = seq.sliceBase[id];
+  else srcn = seq.poolMap[b[r + 1] & 0x3F];
+  W(vx + 4, srcn);
+  // NON bit
+  const non = g.type === 3 ? (seq.engNon | bit) : (seq.engNon & ~bit);
+  if (non !== seq.engNon) { seq.engNon = non; W(0x3D, non); }
+  // EON bit (KARP sends unconditionally — the exciter must reach the string)
+  let eon;
+  if (g.type === 5) eon = seq.engEon | bit;
+  else if ((b[r + 7] & 1) && (b[SEQ_SB.HEADER + SEQ_SH.EON] & bit)) {
+    eon = seq.engEon | bit;
+  } else eon = seq.engEon & ~bit;
+  if (eon !== seq.engEon) { seq.engEon = eon; W(0x4D, eon); }
+  // envelope
+  if (g.type === 5) {                   // KARP: seed burst
+    W(vx + 5, 0xFF);
+    W(vx + 6, SEQ_KARP_SR[b[r + 2] >> 4]);
+  } else if (g.type === 4) {            // SLICE: attack + FADE nibbles
+    W(vx + 5, 0x80 | (b[r + 2] & 0x0F));
+    const fade = b[r + 2] >> 4;
+    W(vx + 6, 0xE0 | (fade ? fade + 14 : 0));
+  } else {
+    W(vx + 5, b[r + 2] | 0x80);
+    W(vx + 6, b[r + 3]);
+  }
+  // volume, latched as the voice's live level
+  trk.voll = i8(b[r + 4]);
+  trk.volr = i8(b[r + 5]);
+  W(vx + 0, b[r + 4]);
+  W(vx + 1, b[r + 5]);
+}
+
+// ---- type triggers -----------------------------------------------------------
+function seqKitTrigger(seq) {
+  const g = seq.trig, b = seq.block, W = (r, v) => dspWrite(seq.dsp, r, v);
+  const kit = b[SEQ_SB.INSTR + g.id * 16 + 1] & 0x0F;
+  const k = SEQ_SB.KITS + kit * 64 + (g.note & 0x0F) * 4;
+  const vol = b[k + 2];
+  if (!vol) return false;               // empty slot: no KON
+  seqTunePool(seq, b[k] & 0x3F, 0);
+  const vx = g.voice * 16;
+  W(vx + 4, seq.poolMap[b[k] & 0x3F]);
+  W(vx + 0, vol); W(vx + 1, vol);       // per-slot volume overrides
+  let n = (60 + i8(b[k + 1])) & 0xFF;
+  if (n >= 96) n = 60;                  // wild tunes snap back to native
+  seq.lastPitch = seqPitchCalc(seq, n);
+  seqPitchWrite(seq, seq.lastPitch);
+  seq.tracks[g.voice].instrActive = 0xFF;
+  return true;
+}
+
+function seqSliceTrigger(seq) {
+  const g = seq.trig, b = seq.block;
+  const r = SEQ_SB.INSTR + g.id * 16;
+  const n = (b[r + 7] >> 4) + 1;
+  seqTunePool(seq, b[r + 1] & 0x3F, i8(b[r + 6]));
+  const slice = g.note % n;
+  const base = seq.sliceBase[g.id];
+  dspWrite(seq.dsp, g.voice * 16 + 4, base ? base + slice : 0);
+  let note = (60 + i8(b[r + 9])) & 0xFF;
+  if (note >= 96) note = 60;
+  seq.lastPitch = seqPitchCalc(seq, note);
+  seqPitchWrite(seq, seq.lastPitch);
+  seq.tracks[g.voice].instrActive = 0xFF;
+}
+
+function seqKarpTrigger(seq) {
+  const g = seq.trig, b = seq.block, W = (r, v) => dspWrite(seq.dsp, r, v);
+  const r = SEQ_SB.INSTR + g.id * 16;
+  const edl = b[SEQ_SB.HEADER + SEQ_SH.EDL] & 0x0F;
+  const tab = karpEntry(g.note, edl === 2 ? 2 : 1);
+  const damp = b[r + 2] & 0x0F;
+  W(g.voice * 16 + 4, 56 + (b[r + 1] & 0x07));      // exciter wave bank
+  W(0x0D, b[r + 3] & 0x7F);                         // feedback = SUSTAIN
+  seqPitchWrite(seq, tab.pitch);
+  seq.lastPitch = tab.pitch;
+  // taps: tuning pair flanked by DAMP's smoothing sides (total always 127)
+  const side = (15 - damp) * 2;
+  const pair = 127 - 2 * side;
+  const m = (pair * tab.fr) >> 8;
+  const taps = [0, 0, 0, 0, 0, 0, 0, 0];
+  taps[tab.i0] = pair - m;
+  taps[tab.i0 + 1] = m;
+  if (tab.i0 === 0) taps[0] += side; else taps[tab.i0 - 1] += side;
+  if (tab.i0 >= 6) taps[7] += side; else taps[tab.i0 + 2] += side;
+  for (let i = 0; i < 8; i++) W(0x0F + i * 16, taps[i]);
+  seq.tracks[g.voice].instrActive = 0xFF;
+}
+
+// ---- track_trigger_note --------------------------------------------------------
+function seqTriggerNote(seq, t, rawNote) {
+  const g = seq.trig, b = seq.block, trk = seq.tracks[t];
+  g.type = 0;
+  g.voice = t;
+  g.semis = 0;
+  g.fine = 0;
+  if (trk.instr !== 0xFF) seqApply(seq, trk.instr);
+  // the instrument's table + LFO seeds
+  if (g.id !== 0xFF) {
+    const r = SEQ_SB.INSTR + g.id * 16;
+    trk.vib = b[r + 14];
+    trk.trm = b[r + 15];
+    trk.vibPh = 0;
+    trk.trmPh = 0;
+    const tbl = b[r + 12], tbs = b[r + 13] & 0x0F;
+    if (tbl >= 0x20) trk.tbl = 0xFF;
+    else {
+      trk.tblSpd = tbs;
+      if (tbs === 0) {                  // note-sync: keep the row on re-trigger
+        if (tbl !== trk.tbl) trk.tblRow = 0;
+      } else trk.tblRow = 0;
+      trk.tbl = tbl;
+      trk.tblCnt = 1;                   // row 0 (or the kept row) runs this tick
+    }
+  }
+  g.fine = i8((g.fine + i8(trk.fine)) & 0xFF);      // F command folds in
+  let note = (rawNote + i8(trk.tsp) +
+    i8(b[SEQ_SB.HEADER + SEQ_SH.TRANSPOSE]) - 1) & 0xFF;
+  if (note >= SEQ_NOTE_MAX) note = SEQ_NOTE_MAX - 1;
+  g.note = note;
+  trk.note = note;
+  let pitch;
+  if (g.type === 1) {                   // KIT
+    if (!seqKitTrigger(seq)) return;    // empty slot: no KON, no fanout
+    pitch = seq.lastPitch;
+  } else if (g.type === 4) {            // SLICE
+    seqSliceTrigger(seq);
+    pitch = seq.lastPitch;
+  } else if (g.type === 5) {            // KARP
+    seqKarpTrigger(seq);
+    pitch = seq.lastPitch;
+  } else if (g.type === 3) {            // NSE: the global noise clock
+    const clk = b[SEQ_SB.INSTR + g.id * 16 + 1];
+    seq.engNoise = (clk ? clk - 1 : note) & 0x1F;
+    dspWrite(seq.dsp, 0x6C, seq.engNoise);
+    pitch = seq.lastPitch;
+  } else if (g.type === 2) {            // WAV: -1 octave, tuned context
+    pitch = seqPitchCalc(seq, note) >> 1;
+    seqPitchWrite(seq, pitch);
+  } else {
+    pitch = seqPitchCalc(seq, note);
+    seqPitchWrite(seq, pitch);
+  }
+  trk.pitch = pitch & 0xFFFF;
+  trk.slRate = 0;
+  seq.konMask |= 1 << t;
+  seqGrpFanout(seq, t);
+}
+
+// GRP / C-command chord: fan the trigger out to the voices to the right
+function seqGrpFanout(seq, t) {
+  const g = seq.trig, b = seq.block, trk = seq.tracks[t];
+  if (trk.instr === 0xFF) return;
+  const id = g.id;
+  const r = SEQ_SB.INSTR + id * 16;
+  const span = trk.chord ? 2 : b[r + 8] & 0x03;
+  if (!span) return;
+  const baseNote = g.note;
+  for (let m = 1; m <= span; m++) {
+    const voice = t + m;
+    if (voice >= 8) break;
+    g.voice = voice;
+    const ofs = trk.chord
+      ? (m === 1 ? trk.chord >> 4 : trk.chord & 0x0F)
+      : i8(b[r + 8 + m]);
+    let note = (baseNote + ofs) & 0xFF;
+    if (note >= SEQ_NOTE_MAX) note = SEQ_NOTE_MAX - 1;
+    seqApply(seq, id);
+    let pitch = seqPitchCalc(seq, note);
+    if (g.type === 2) pitch >>= 1;      // WAV members keep the -1 octave
+    seqPitchWrite(seq, pitch);
+    seq.konMask |= 1 << voice;
+  }
+  g.voice = t;
+}
+
+// ---- the A-Z executor ----------------------------------------------------------
+function seqVolWrite(seq, t) {
+  const trk = seq.tracks[t];
+  dspWrite(seq.dsp, t * 16 + 0, trk.voll & 0xFF);
+  dspWrite(seq.dsp, t * 16 + 1, trk.volr & 0xFF);
+}
+
+// pre-trigger commands; returns true when the note trigger is consumed (D/L)
+function seqCmdPre(seq, t, row) {
+  const trk = seq.tracks[t], b = seq.block, W = (r, v) => dspWrite(seq.dsp, r, v);
+  const cmd = trk.cmd, val = trk.cval;
+  switch (cmd) {
+    case 7: {                           // G xy: the public 2-step groove
+      b[SEQ_SB.GROOVES] = (val >> 4) || 1;
+      b[SEQ_SB.GROOVES + 1] = (val & 0x0F) || 1;
+      break;
+    }
+    case 2: {                           // B: wave bank (SRCN = 56 + bank)
+      W(t * 16 + 4, 56 + (val & 0x07));
+      trk.instrActive = 0xFF;
+      break;
+    }
+    case 20: seqSetTempo(seq, val); break;            // T
+    case 5: {                           // E: the channel's EON MASK gate
+      const h = SEQ_SB.HEADER + SEQ_SH.EON;
+      if (val) b[h] |= 1 << t; else b[h] &= ~(1 << t);
+      seqEonSync(seq);
+      break;
+    }
+    case 25: {                          // Y: FIR preset -> song taps
+      const p = SEQ_FIR_PRESETS[val & 0x07];
+      b[SEQ_SB.HEADER + SEQ_SH.FIR] = val & 0x07;
+      for (let i = 0; i < 8; i++) {
+        b[SEQ_SB.HEADER + SEQ_SH.FIRTAPS + i] = p[i];
+        W(0x0F + i * 16, p[i]);
+      }
+      break;
+    }
+    case 14: {                          // N: global noise clock
+      seq.engNoise = val & 0x1F;
+      W(0x6C, seq.engNoise);
+      break;
+    }
+    case 3: trk.chord = val; break;     // C
+    case 9: {                           // I: play-count mask
+      if (!((val >> (trk.playcnt & 0x07)) & 1)) row.note = 0;
+      break;
+    }
+    case 10: {                          // J xy: per-pass transpose
+      if (row.note && row.note !== SEQ_NOTE_OFF &&
+          ((val >> 4 >> (trk.playcnt & 0x03)) & 1)) {
+        let y = val & 0x0F;
+        if (y >= 8) y -= 16;
+        const n = row.note + y;
+        if (n > 0 && n <= SEQ_NOTE_MAX) row.note = n;
+      }
+      break;
+    }
+    case 13: {                          // M: master volume
+      W(0x0C, val & 0x7F);
+      W(0x1C, val & 0x7F);
+      break;
+    }
+    case 6: trk.fine = i8(val); break;  // F
+    case 19: {                          // S xy: sweep up (x) / down (y)
+      trk.slNote = trk.note;
+      if (val & 0xF0) { trk.slRate = val >> 4; trk.slT = 0x3FFF; }
+      else { trk.slRate = val & 0x0F; trk.slT = 0x0000; }
+      break;
+    }
+    case 17: {                          // Q xy: GAIN override
+      if (trk.instr === 0xFF) break;
+      const adsr1 = b[SEQ_SB.INSTR + trk.instr * 16 + 2];
+      if (!(val & 0xF0)) {              // Q00: back to ADSR
+        W(t * 16 + 5, adsr1 | 0x80);
+        break;
+      }
+      const mode = val >> 4;
+      const gain = mode === 1
+        ? (val & 0x0F) << 3
+        : 0x80 | (((mode - 2) & 0x03) << 5) | (val & 0x0F);
+      W(t * 16 + 7, gain);
+      W(t * 16 + 5, adsr1 & 0x7F);      // GAIN active
+      trk.instrActive = 0xFF;
+      break;
+    }
+    case 21: {                          // U xy: surround (phase invert)
+      let l = Math.abs(trk.voll);
+      if (val & 0xF0) l = -l;
+      trk.voll = l;
+      let r = Math.abs(trk.volr);
+      if (val & 0x0F) r = -r;
+      trk.volr = r;
+      trk.instrActive = 0xFF;
+      seqVolWrite(seq, t);
+      break;
+    }
+    case 26: {                          // Z: pitch-mod by the left neighbour
+      if (val) seq.engPmon |= 1 << t; else seq.engPmon &= ~(1 << t);
+      W(0x2D, seq.engPmon);
+      break;
+    }
+    case 11: trk.killCnt = (val + 1) & 0xFF; break;   // K
+    case 18: {                          // R: retrig
+      trk.retPer = (val & 0x0F) || 1;
+      trk.retCnt = trk.retPer;
+      break;
+    }
+    case 4: {                           // D: delay the note
+      if (row.note && row.note !== SEQ_NOTE_OFF && val) {
+        trk.dlyCnt = val;
+        trk.dlyNote = row.note;
+        return true;
+      }
+      break;
+    }
+    case 12: {                          // L: slide to the note, legato
+      if (!row.note || row.note === SEQ_NOTE_OFF) break;
+      let n = (row.note + i8(trk.tsp) - 1) & 0xFF;
+      if (n >= SEQ_NOTE_MAX) n = SEQ_NOTE_MAX - 1;
+      trk.slNote = n;
+      seq.trig.voice = t;
+      seqTrackTuneLoad(seq, t);
+      trk.slT = seqPitchCalc(seq, n);
+      trk.slRate = val || 1;
+      return true;
+    }
+  }
+  return false;
+}
+
+function seqCmdPost(seq, t) {
+  const trk = seq.tracks[t];
+  switch (trk.cmd) {
+    case 22: trk.vib = trk.cval; break;               // V: vibrato override
+    case 24: {                                        // X: volume/accent
+      trk.voll = trk.cval & 0x7F;
+      trk.volr = trk.cval & 0x7F;
+      seqVolWrite(seq, t);
+      break;
+    }
+    case 16: {                                        // P: pan
+      trk.voll = (255 - trk.cval) >> 1;
+      trk.volr = trk.cval >> 1;
+      seqVolWrite(seq, t);
+      break;
+    }
+  }
+}
+
+// ---- track_row ------------------------------------------------------------------
+function seqTrackRow(seq, t) {
+  const trk = seq.tracks[t], b = seq.block;
+  if (trk.phrase === 0xFF) return;
+  let hopGuard = 4;
+  if (trk.prow === 0xFF) trk.prow = 0;
+  else {
+    trk.prow = (trk.prow + 1) & 0x0F;
+    if (trk.prow === 0) {
+      trk.playcnt = (trk.playcnt + 1) & 0xFF;
+      seqChainStep(seq, t);
+      if (trk.phrase === 0xFF) return;
+    }
+  }
+  if (trk.mute) return;                 // muted tracks advance, stay silent
+  let o = SEQ_SB.PHRASES + trk.phrase * 64 + trk.prow * 4;
+  // H hops NOW: this row tick plays row 0 of the next chain entry
+  while (b[o + 2] === 8 && hopGuard > 0) {
+    hopGuard--;
+    seqChainStep(seq, t);
+    if (trk.phrase === 0xFF) return;
+    trk.prow = 0;
+    o = SEQ_SB.PHRASES + trk.phrase * 64 + trk.prow * 4;
+  }
+  const row = { note: b[o], instr: b[o + 1] };
+  trk.cmd = b[o + 2];
+  trk.cval = b[o + 3];
+  trk.dlyCnt = 0xFF;
+  trk.arpPh = 0;
+  trk.retPer = 0;
+  if (row.instr !== 0xFF) trk.instr = row.instr;
+  const consumed = seqCmdPre(seq, t, row);
+  if (row.note) {
+    if (row.note === SEQ_NOTE_OFF) seq.koffMask |= 1 << t;
+    else if (!consumed) seqTriggerNote(seq, t, row.note);
+  }
+  seqCmdPost(seq, t);
+}
+
+// ---- per-tick fx (delay, kill, retrig, slide, arp, vibrato, tremolo) ---------
+function seqTrackFx(seq, t) {
+  const trk = seq.tracks[t];
+  if (trk.phrase === 0xFF) return;
+  if (trk.dlyCnt !== 0xFF) {
+    trk.dlyCnt = (trk.dlyCnt - 1) & 0xFF;
+    if (trk.dlyCnt === 0) {
+      trk.dlyCnt = 0xFF;
+      seqTriggerNote(seq, t, trk.dlyNote);
+    }
+  }
+  if (trk.killCnt !== 0xFF) {
+    trk.killCnt = (trk.killCnt - 1) & 0xFF;
+    if (trk.killCnt === 0) {
+      trk.killCnt = 0xFF;
+      seq.koffMask |= 1 << t;
+    }
+  }
+  if (trk.retPer && --trk.retCnt === 0) {
+    trk.retCnt = trk.retPer;
+    seq.konMask |= 1 << t;
+  }
+  if (trk.slRate) seqFxSlide(seq, t);
+  if (trk.cmd === 1) seqFxArp(seq, t);
+  else if (trk.vib) seqFxVib(seq, t);
+  if (trk.trm) seqFxTrm(seq, t);
+}
+
+function seqFxSlide(seq, t) {
+  const trk = seq.tracks[t];
+  const step = trk.slRate * 4, target = trk.slT;
+  let p = trk.pitch;
+  if (p === target) { trk.slRate = 0; return; }
+  if (p > target) {
+    p -= step;
+    if (p < target) p = target;
+  } else {
+    p += step;
+    if (p > target) p = target;
+  }
+  trk.pitch = p & 0xFFFF;
+  if (p === target) {
+    trk.slRate = 0;
+    trk.note = trk.slNote;
+  }
+  seq.trig.voice = t;
+  seqPitchWrite(seq, trk.pitch);
+}
+
+function seqFxArp(seq, t) {
+  const trk = seq.tracks[t];
+  trk.arpPh = trk.arpPh + 1 >= 3 ? 0 : trk.arpPh + 1;
+  const ofs = trk.arpPh === 0 ? 0
+    : trk.arpPh === 1 ? trk.cval >> 4 : trk.cval & 0x0F;
+  let n = trk.note + ofs;
+  if (n >= SEQ_NOTE_MAX) n = SEQ_NOTE_MAX - 1;
+  seq.trig.voice = t;
+  seqTrackTuneLoad(seq, t);
+  seqPitchWrite(seq, seqPitchCalc(seq, n));
+}
+
+function seqFxVib(seq, t) {
+  const trk = seq.tracks[t];
+  trk.vibPh = (trk.vibPh + (trk.vib >> 4)) & 0xFF;
+  let tri = trk.vibPh & 0x1F;
+  if (tri >= 0x10) tri ^= 0x1F;
+  const centred = tri - 8;
+  const prod = Math.abs(centred) * (trk.vib & 0x0F);
+  let p = trk.pitch + (centred < 0 ? -(prod << 2) : prod << 2);
+  seq.trig.voice = t;
+  seqPitchWrite(seq, p & 0xFFFF);
+}
+
+function seqFxTrm(seq, t) {
+  const trk = seq.tracks[t];
+  trk.trmPh = (trk.trmPh + (trk.trm >> 4)) & 0xFF;
+  let tri = trk.trmPh & 0x1F;
+  if (tri >= 0x10) tri ^= 0x1F;
+  const dip = (tri * (trk.trm & 0x0F)) >> 1;
+  const side = lvl => {
+    if (lvl < 0) return -Math.max(0, -lvl - dip);
+    return Math.max(0, lvl - dip);
+  };
+  dspWrite(seq.dsp, t * 16 + 0, side(trk.voll) & 0xFF);
+  dspWrite(seq.dsp, t * 16 + 1, side(trk.volr) & 0xFF);
+}
+
+// ---- per-tick table step -------------------------------------------------------
+function seqTrackTable(seq, t) {
+  const trk = seq.tracks[t], b = seq.block;
+  if (trk.tbl === 0xFF) return;
+  if (trk.tblSpd === 0) {               // note-sync: pending steps only
+    if (!trk.tblCnt) return;
+    trk.tblCnt = 0;
+  } else {
+    if (--trk.tblCnt) return;
+    trk.tblCnt = trk.tblSpd;
+  }
+  const o = SEQ_SB.TABLES + trk.tbl * 64 + trk.tblRow * 4;
+  seqTableExec(seq, t, b[o], b[o + 1]);
+  seqTableExec(seq, t, b[o + 2], b[o + 3]);
+  trk.tblRow = (trk.tblRow + 1) & 0x0F;
+}
+
+function seqTableExec(seq, t, cmd, val) {
+  const trk = seq.tracks[t];
+  if (!cmd || cmd === 4 || cmd === 9 || cmd === 10) return;  // D/I/J inert
+  if (cmd === 8) {                      // H hops the table itself
+    trk.tblRow = (val - 1) & 0x0F;
+    return;
+  }
+  const savedCmd = trk.cmd, savedVal = trk.cval;
+  trk.cmd = cmd;
+  trk.cval = val;
+  seqCmdPre(seq, t, { note: 0, instr: 0xFF });
+  seqCmdPost(seq, t);
+  trk.cmd = savedCmd;
+  trk.cval = savedVal;
+}
+
+// ---- one engine tick -------------------------------------------------------------
+function seqTick(seq) {
+  seq.konMask = 0;
+  seq.koffMask = 0;
+  if (seq.tickwait) seq.tickwait--;
+  else {
+    const g = seq.block[SEQ_SB.GROOVES + (seq.gpos & 1)] || 6;
+    seq.tickwait = g - 1;
+    seq.gpos ^= 1;
+    for (let t = 0; t < 8; t++) seqTrackRow(seq, t);
+    seq.row = seq.tracks[0].prow;
+  }
+  for (let t = 0; t < 8; t++) {
+    seqTrackFx(seq, t);
+    seqTrackTable(seq, t);
+  }
+  seq.halted = seq.tracks.every(trk => trk.phrase === 0xFF);
+}
+
+// tick + render its samples. The KOF latch is held for two DSP samples
+// before dropping (the driver serialises key events the same way).
+function seqTickRun(seq) {
+  seqTick(seq);
+  const d = seq.dsp;
+  const n = seq.samplesPerTick;
+  const outL = new Int16Array(n), outR = new Int16Array(n);
+  let o = 0;
+  if (seq.koffMask) {
+    dspWrite(d, 0x5C, seq.koffMask);
+    const pre = dspRun(d, 2);
+    outL.set(pre.l, 0);
+    outR.set(pre.r, 0);
+    o = 2;
+    dspWrite(d, 0x5C, 0);
+  }
+  if (seq.konMask) {
+    dspWrite(d, 0x4C, seq.konMask);
+    seq.konCount++;
+  }
+  const g = dspRun(d, n - o);
+  outL.set(g.l, o);
+  outR.set(g.r, o);
+  return { l: outL, r: outR };
+}
+
+// offline render: seconds of audio (stops early only if every track halts)
+function seqRender(block, pool, seconds, opts) {
+  const seq = seqNew(block, pool, opts);
+  const total = Math.round(seconds * 32000);
+  const l = new Int16Array(total), r = new Int16Array(total);
+  let o = 0;
+  while (o < total) {
+    const g = seqTickRun(seq);
+    const n = Math.min(g.l.length, total - o);
+    l.set(g.l.subarray(0, n), o);
+    r.set(g.r.subarray(0, n), o);
+    o += n;
+    if (seq.halted) break;
+  }
+  return { l: l.subarray(0, o), r: r.subarray(0, o), rate: 32000 };
+}
+
 // 16-bit stereo PCM WAV container
 function wavBuild(l, r, rate) {
   const n = l.length;
@@ -1211,8 +2120,73 @@ function selftest() {
   assert(over.maxEdl === -1 && over.overBy === 337,
     'overflowing pool reports the silent overrun');
 
+  // ---- reference sequencer ----
+  // a minimal song: track 0 -> chain 0 -> phrase 0; C-4 on instrument 0
+  // at row 0, X accent at row 4, OFF at row 8, T tempo at row 12
+  const sblk = new Uint8Array(BLOCK_SZ);
+  sblk.fill(0xFF, 0, 0x0400);                    // song grid empty
+  for (let i = 0x1700; i < 0x2300; i += 2) sblk[i] = 0xFF;
+  for (let i = 0x2301; i < 0x5300; i += 4) sblk[i] = 0xFF;
+  sblk[0x1000] = 6; sblk[0x1001] = 6;            // groove 6/6
+  sblk[0x1600 + 2] = 0xD7;                       // header magic
+  sblk[0x1600 + 18] = 150;                       // TMPO
+  sblk[0x1600 + 7] = 0xFF;                       // EON mask open
+  sblk[0x1600 + 19] = 0x7F;                      // FLAT room
+  sblk[0x0400] = 0x00;                           // instr 0: SMP, sample 0
+  sblk[0x0401] = 0x00;
+  sblk[0x0402] = 0x2F; sblk[0x0403] = 0xCA;      // factory ADSR
+  sblk[0x0404] = 0x50; sblk[0x0405] = 0x50;
+  sblk[0x040C] = 0xFF; sblk[0x040D] = 0x01;      // no table
+  sblk[0x0000] = 0x00;                           // track 0 row 0 -> chain 0
+  sblk[0x1700] = 0x00;                           // chain 0 step 0 -> phrase 0
+  const ph = 0x2300;
+  sblk[ph] = 49; sblk[ph + 1] = 0;               // row 0: C-4, instr 0
+  sblk[ph + 16] = 0; sblk[ph + 17] = 0xFF;       // row 4: X 40 (no note)
+  sblk[ph + 18] = 24; sblk[ph + 19] = 0x40;
+  sblk[ph + 32] = 97;                            // row 8: OFF
+  sblk[ph + 50] = 20; sblk[ph + 51] = 200;       // row 12: T 200
+  const spool = [{ name: 'PAD', loopBlock: 0, tuneSemis: 0, tuneFine: 0, brr }];
+  const seq = seqNew(sblk, spool);
+  assert(seq.poolMap[0] === 1, 'seq residency mapped sample 0 to slot 1');
+  assert(seq.aram[0x1004] === 0x09 && seq.aram[0x1005] === 0x12,
+    'seq directory entry 1 starts at $1209');
+  assert((seq.aram[0x1209 + brr.length - 9] & 0x02) === 0x02,
+    'seq forced LOOP on the END block');
+  assert(seq.samplesPerTick === 532, 'seq tempo 150 -> 532 samples/tick');
+  seqTick(seq);                                  // tick 1 = phrase row 0
+  assert(seq.konMask === 0x01, 'seq row 0 KONs voice 0');
+  assert(seq.dsp.regs[0x04] === 1 && seq.dsp.regs[0x02] === 0x00 &&
+    seq.dsp.regs[0x03] === 0x08, 'seq C-4 pitch $0800 on SRCN 1');
+  assert(seq.dsp.regs[0x05] === 0xAF && seq.dsp.regs[0x00] === 0x50,
+    'seq instrument env + volume applied');
+  for (let k = 0; k < 24; k++) seqTick(seq);     // through row 4 (tick 25)
+  assert(seq.row === 4 && seq.dsp.regs[0x00] === 0x40,
+    'seq X accent retargeted the live level at row 4');
+  let sawKoff = false;
+  for (let k = 0; k < 24; k++) {                 // through row 8
+    seqTick(seq);
+    if (seq.koffMask & 1) sawKoff = true;
+  }
+  assert(sawKoff && seq.row === 8, 'seq OFF row keyed voice 0 off');
+  for (let k = 0; k < 24; k++) seqTick(seq);     // through row 12
+  assert(seq.samplesPerTick === 400, 'seq T 200 -> 400 samples/tick');
+  // audio end-to-end: the first half second must actually sound
+  const ren = seqRender(sblk, spool, 0.5);
+  assert(ren.l.length === 16000, 'seq render length');
+  let rpeak = 0;
+  for (let i = 0; i < 6000; i++) rpeak = Math.max(rpeak, Math.abs(ren.l[i]));
+  assert(rpeak > 2000, 'seq render is audible (' + rpeak + ')');
+  let rtail = 0;                                 // OFF row 8 lands ~0.45 s in
+  for (let i = 15000; i < 16000; i++) {
+    rtail = Math.max(rtail, Math.abs(ren.l[i]));
+  }
+  assert(rtail < rpeak, 'seq OFF released the voice (' + rtail + ')');
+  assert(karpEntry(48, 1).pitch > 0x0100 && karpEntry(48, 2).i0 <= 6,
+    'karp tuning entries sane');
+
   console.log('sndj.js selftest: OK (BRR SNR ' + snr.toFixed(1) + ' dB, ' +
-    'empty song ' + packed.length + ' bytes, dsp voice peak ' + peak + ')');
+    'empty song ' + packed.length + ' bytes, dsp voice peak ' + peak +
+    ', seq peak ' + rpeak + ')');
 }
 
 const SNDJ = {
@@ -1224,6 +2198,7 @@ const SNDJ = {
   rlePack, rleUnpack, crc16, toImage, fromImage,
   pitchForNote, findMarker, fixChecksum, selftest,
   dspNew, dspWrite, dspRun, wavBuild,
+  seqNew, seqTick, seqTickRun, seqRender, seqAramBuild, karpEntry,
 };
 
 if (typeof module !== 'undefined' && module.exports) {

@@ -448,7 +448,10 @@ SRAM type, free space, and each song's size in KB.
 
 `user-tools/savetool.html` opens the `.srm` on a computer: view any
 song's SONG/CHAIN/PHRASE data read-only, extract songs as `.sndj`
-files, rename them, share them, rebuild cart images.
+files, rename them, share them, rebuild cart images. Drop the
+matching `sndj.sfc` next to it and every song gets a **play**
+button — the browser plays the song through a bit-exact model of the
+console's sound chip, using the ROM's own samples.
 
 ## 13. Options
 

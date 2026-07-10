@@ -5,6 +5,20 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- **The reference sequencer** (`sndj.js`): a JS mirror of the console
+  engine — tick pipeline, groove, all six instrument types (SMP, KIT,
+  WAV, NSE, SLICE, KARP), the full A–Z executor, tables, GRP/chord
+  fanout, vibrato/tremolo/slide/arp, residency (the exact ARAM image
+  a song load builds) — driving the sample-accurate S-DSP model.
+  Renders `.sndj` songs to audio at ~100x realtime; self-tested in
+  `make test` (row timing, X/OFF/T semantics, end-to-end audio).
+  This is the keystone for the savetool preview, spcexport and
+  headless WAV renders.
+- **savetool.html song preview**: drop the matching `sndj.sfc` next
+  to the save and every song gets a play/stop button — the reference
+  sequencer + S-DSP model play the real console sound (samples, echo,
+  FIR, KARP and all) in the browser.
+
 - savetool.html catches up with its own manual: **rename** (the same
   A-Z 0-9 - . alphabet as the console's FILES rename — names matter,
   saves are name-keyed), a per-slot read-only **SONG/CHAIN/PHRASE

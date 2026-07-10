@@ -45,8 +45,12 @@
 raw) to view its packed song list (up to 16, variable size), open any song
 in a read-only SONG/CHAIN/PHRASE viewer, extract songs as
 <code>.sndj</code> files, rename them, or assemble a new cart image from
-<code>.sndj</code> files. Everything runs locally.</p>
-<div class="drop" id="drop">drop a .srm or .sndj here (or click)</div>
+<code>.sndj</code> files. Drop the matching <code>sndj.sfc</code> ROM
+alongside and every song gets a <b>play</b> button — the reference
+sequencer + S-DSP model render the actual console sound, samples, echo
+and all. Everything runs locally.</p>
+<div id="poolinfo" class="dim"></div>
+<div class="drop" id="drop">drop a .srm / .sndj / sndj.sfc here (or click)</div>
 <input type="file" id="file" hidden multiple>
 <div id="status"></div>
 <div id="view" hidden>
@@ -67,6 +71,8 @@ in a read-only SONG/CHAIN/PHRASE viewer, extract songs as
 'use strict';
 const S = window.SNDJ;
 let srm = S.srmNew();
+let pool = null;                // sample pool from a dropped sndj.sfc
+let player = null;              // live preview: {idx, stop}
 const $ = id => document.getElementById(id);
 const status = (msg, warn) => {
   $('status').textContent = msg;
@@ -112,10 +118,13 @@ function render() {
     } else {
       const crc = s.ok ? '<span class="ok">ok</span>'
                        : '<span class="warn">BAD</span>';
+      const playing = player && player.idx === s.index;
       tr.innerHTML = '<td>' + s.index + '</td><td>' + s.name +
         ' <span class="dim">' + songStats(s.packed) + '</span></td>' +
         '<td>' + s.size + ' B</td><td>' + crc + ' ' + hex(s.crc) + '</td>' +
-        '<td><button data-v="' + s.index + '">view</button> ' +
+        '<td>' + (pool ? '<button class="primary" data-p="' + s.index + '">' +
+          (playing ? '&#9632; stop' : '&#9654; play') + '</button> ' : '') +
+        '<button data-v="' + s.index + '">view</button> ' +
         '<button data-x="' + s.index + '">extract</button> ' +
         '<button data-r="' + s.index + '">rename</button> ' +
         '<button data-e="' + s.index + '">erase</button></td>';
@@ -136,6 +145,18 @@ function save(bytes, name) {
 
 function ingest(name, bytes) {
   const lower = name.toLowerCase();
+  if (lower.endsWith('.sfc') || lower.endsWith('.smc')) {
+    const off = S.findMarker(bytes, 'SNDJPOOL') - 8;
+    if (off < 0) { status(name + ': no SNDJPOOL block in this ROM', true); return; }
+    try { pool = S.poolParse(bytes.slice(off)); }
+    catch (e) { status(name + ': ' + e.message, true); return; }
+    const used = pool.filter(p => p.name !== '-').length;
+    $('poolinfo').textContent =
+      'sample pool loaded: ' + used + ' samples — songs are playable';
+    status(name + ' — pool adopted for previews');
+    render();
+    return;
+  }
   if (lower.endsWith('.sndj')) {
     const parsed = S.srmParse(srm);
     const free = parsed.slots.find(s => s.empty);
@@ -173,15 +194,90 @@ document.body.ondrop = e => {
   }
 };
 
+// ---- song preview: the reference sequencer + S-DSP model -> WebAudio -------
+// Renders ahead of the playhead in ~0.5 s chunks (the DSP model runs
+// ~100x realtime) and schedules gapless AudioBuffers. Songs loop like
+// the console; press stop.
+function playSlot(idx) {
+  if (player) {
+    const same = player.idx === idx;
+    player.stop();
+    player = null;
+    render();
+    if (same) return;
+  }
+  const s = S.srmParse(srm).slots[idx];
+  if (!s || s.empty || !pool) return;
+  let block;
+  try { block = S.fromImage(S.rleUnpack(s.packed, 0x5300)); }
+  catch (e) { status('slot ' + idx + ': ' + e.message, true); return; }
+  const seq = S.seqNew(block, pool);
+  const ctx = new (window.AudioContext || window.webkitAudioContext)(
+    { sampleRate: 32000 });
+  let at = ctx.currentTime + 0.15;
+  let stopped = false, timer = null;
+  const sources = [];
+  const pump = () => {
+    if (stopped) return;
+    while (at - ctx.currentTime < 1.5 && !seq.halted) {
+      let n = 0;
+      const chunks = [];
+      while (n < 16000 && !seq.halted) {
+        const g = S.seqTickRun(seq);
+        chunks.push(g);
+        n += g.l.length;
+      }
+      if (!n) break;
+      const buf = ctx.createBuffer(2, n, 32000);
+      const L = buf.getChannelData(0), R = buf.getChannelData(1);
+      let o = 0;
+      for (const g of chunks) {
+        for (let i = 0; i < g.l.length; i++) {
+          L[o + i] = g.l[i] / 32768;
+          R[o + i] = g.r[i] / 32768;
+        }
+        o += g.l.length;
+      }
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start(at);
+      at += n / 32000;
+      sources.push(src);
+      if (sources.length > 8) sources.shift();
+    }
+    if (seq.halted && at - ctx.currentTime <= 0) {
+      playSlot(idx);                    // song ended (halted): auto-stop
+      return;
+    }
+    timer = setTimeout(pump, 250);
+  };
+  player = {
+    idx,
+    stop() {
+      stopped = true;
+      clearTimeout(timer);
+      for (const src of sources) { try { src.stop(); } catch (e) {} }
+      ctx.close();
+    },
+  };
+  pump();
+  status('playing "' + s.name + '" — reference sequencer + S-DSP model');
+  render();
+}
+
 $('slots').onclick = e => {
   const x = e.target.dataset.x, er = e.target.dataset.e;
   const rn = e.target.dataset.r, vw = e.target.dataset.v;
+  const pl = e.target.dataset.p;
+  if (pl !== undefined) { playSlot(+pl); return; }
   if (x !== undefined) {
     const bytes = S.srmExtract(srm, +x);
     const name = S.sndjFileParse(bytes).name.trim() || 'slot' + x;
     save(bytes, name.replace(/\s+/g, '_') + '.sndj');
     status('extracted slot ' + x);
   } else if (er !== undefined) {
+    if (player) { player.stop(); player = null; }
     srm = S.srmErase(srm, +er);
     $('viewer').classList.remove('show');
     status('erased slot ' + er);
