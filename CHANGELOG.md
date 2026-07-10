@@ -5,6 +5,11 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- savetool.html catches up with its own manual: **rename** (the same
+  A-Z 0-9 - . alphabet as the console's FILES rename — names matter,
+  saves are name-keyed), a per-slot read-only **SONG/CHAIN/PHRASE
+  viewer**, and a heap **free-bytes** readout under the slot list.
+
 - **als2sndj.html**: Ableton / MIDI / MML ⇄ `.sndj` converter
   (browser, offline). Imports Live Sets and Standard MIDI Files —
   first 8 tracks → V1–V8, tempo → TMPO, velocity → `X`, real `OFF`s

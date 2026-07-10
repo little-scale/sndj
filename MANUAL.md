@@ -446,8 +446,9 @@ SRAM type, free space, and each song's size in KB.
 - Saves are journalled — a power cut mid-save can never eat the
   previous good copy.
 
-`user-tools/savetool.html` opens the `.srm` on a computer: extract
-songs as `.sndj` files, share them, rebuild cart images.
+`user-tools/savetool.html` opens the `.srm` on a computer: view any
+song's SONG/CHAIN/PHRASE data read-only, extract songs as `.sndj`
+files, rename them, share them, rebuild cart images.
 
 ## 13. Options
 

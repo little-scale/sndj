@@ -26,13 +26,25 @@
   .warn { color: #ff6060; }
   .ok { color: #40d0c8; }
   .dim { color: #606888; }
+  #viewer { display: none; margin-top: 1rem; }
+  #viewer.show { display: block; }
+  #viewer table { border-collapse: collapse; width: auto;
+                  margin: .4rem .8rem .4rem 0; }
+  #viewer td, #viewer th { padding: .1rem .45rem; border: 1px solid #2a2e48;
+                           border-bottom: 1px solid #2a2e48; font-size: .85rem; }
+  #viewer th { color: #606888; font-weight: normal; }
+  #viewer td.mt { color: #383e5c; }
+  #viewer td.note { color: #ffb020; }
+  #viewer td.cmd { color: #40d0c8; }
+  #viewer h3 { color: #40d0c8; font-size: 1rem; }
 </style>
 </head>
 <body>
 <h1>sndj savetool <small>— songs &amp; saves</small></h1>
 <p>Drop a <code>.srm</code> cart save (FXPak / Mesen / ares / snes9x are all
-raw) to view its packed song list (up to 16, variable size), extract songs
-as <code>.sndj</code> files, or assemble a new cart image from
+raw) to view its packed song list (up to 16, variable size), open any song
+in a read-only SONG/CHAIN/PHRASE viewer, extract songs as
+<code>.sndj</code> files, rename them, or assemble a new cart image from
 <code>.sndj</code> files. Everything runs locally.</p>
 <div class="drop" id="drop">drop a .srm or .sndj here (or click)</div>
 <input type="file" id="file" hidden multiple>
@@ -40,12 +52,16 @@ as <code>.sndj</code> files, or assemble a new cart image from
 <div id="view" hidden>
   <table>
     <thead><tr><th>slot</th><th>name</th><th>packed</th><th>crc</th>
-      <th></th><th></th></tr></thead>
+      <th></th></tr></thead>
     <tbody id="slots"></tbody>
   </table>
-  <button class="primary" id="download">download .srm</button>
-  <button id="fresh">new empty cart image</button>
+  <div id="free" class="dim"></div>
+  <p>
+    <button class="primary" id="download">download .srm</button>
+    <button id="fresh">new empty cart image</button>
+  </p>
 </div>
+<div id="viewer"></div>
 
 <script>
 'use strict';
@@ -92,18 +108,21 @@ function render() {
     const tr = document.createElement('tr');
     if (s.empty) {
       tr.innerHTML = '<td>' + s.index + '</td><td class="dim">— empty —</td>' +
-        '<td></td><td></td><td></td><td></td>';
+        '<td></td><td></td><td></td>';
     } else {
       const crc = s.ok ? '<span class="ok">ok</span>'
                        : '<span class="warn">BAD</span>';
       tr.innerHTML = '<td>' + s.index + '</td><td>' + s.name +
         ' <span class="dim">' + songStats(s.packed) + '</span></td>' +
         '<td>' + s.size + ' B</td><td>' + crc + ' ' + hex(s.crc) + '</td>' +
-        '<td><button data-x="' + s.index + '">extract</button></td>' +
-        '<td><button data-e="' + s.index + '">erase</button></td>';
+        '<td><button data-v="' + s.index + '">view</button> ' +
+        '<button data-x="' + s.index + '">extract</button> ' +
+        '<button data-r="' + s.index + '">rename</button> ' +
+        '<button data-e="' + s.index + '">erase</button></td>';
     }
     tb.appendChild(tr);
   });
+  $('free').textContent = parsed.free + ' B free of ' + S.SRM_HEAP_SZ;
   $('view').hidden = false;
 }
 
@@ -156,6 +175,7 @@ document.body.ondrop = e => {
 
 $('slots').onclick = e => {
   const x = e.target.dataset.x, er = e.target.dataset.e;
+  const rn = e.target.dataset.r, vw = e.target.dataset.v;
   if (x !== undefined) {
     const bytes = S.srmExtract(srm, +x);
     const name = S.sndjFileParse(bytes).name.trim() || 'slot' + x;
@@ -163,10 +183,92 @@ $('slots').onclick = e => {
     status('extracted slot ' + x);
   } else if (er !== undefined) {
     srm = S.srmErase(srm, +er);
+    $('viewer').classList.remove('show');
     status('erased slot ' + er);
     render();
+  } else if (rn !== undefined) {
+    const songs = S.srmParse(srm).slots.filter(s => !s.empty)
+      .map(s => ({ name: s.name, packed: s.packed }));
+    const cur = songs[+rn].name;
+    const raw = prompt('new name for "' + cur + '" (8 chars, A-Z 0-9 - .):', cur);
+    if (raw === null) return;
+    // same alphabet the console's FILES rename offers
+    const name = raw.toUpperCase().replace(/[^A-Z0-9 .-]/g, '')
+      .trimEnd().slice(0, 8);
+    if (!name) { status('name is empty after sanitising', true); return; }
+    songs[+rn].name = name;
+    srm = S.srmLayout(songs);
+    status('slot ' + rn + ': "' + cur + '" -> "' + name + '"');
+    render();
+  } else if (vw !== undefined) {
+    showSong(+vw);
   }
 };
+
+// ---- read-only SONG / CHAIN / PHRASE viewer -------------------------------
+// block geometry from src/song.inc: song grid column-major at $0000,
+// chains at $1700 (96 x 32), phrases at $2300 (192 x 64)
+const NN = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+const noteName = v => v === 0 ? '···' : v >= 97 ? 'OFF'
+  : NN[(v - 1) % 12] + Math.floor((v - 1) / 12);
+const hx = v => v.toString(16).toUpperCase().padStart(2, '0');
+
+function showSong(idx) {
+  const s = S.srmParse(srm).slots[idx];
+  if (!s || s.empty) return;
+  let d;
+  try { d = S.fromImage(S.rleUnpack(s.packed, 0x5300)); }
+  catch (e) { status('slot ' + idx + ': ' + e.message, true); return; }
+  const V = $('viewer'), P = [];
+  P.push('<h3>' + s.name + ' <span class="dim">TMPO ' +
+    (d[0x1600 + 18] || 150) + ' · EDL ' + d[0x1600 + 3] + '</span></h3>');
+  const usedCh = new Set();
+  let rows = '';
+  for (let r = 0; r < 128; r++) {
+    let cells = '', u = false;
+    for (let t = 0; t < 8; t++) {
+      const v = d[t * 128 + r];
+      if (v !== 0xFF) { u = true; usedCh.add(v); }
+      cells += '<td class="' + (v === 0xFF ? 'mt' : '') + '">' +
+        (v === 0xFF ? '··' : hx(v)) + '</td>';
+    }
+    if (u) rows += '<tr><th>' + hx(r) + '</th>' + cells + '</tr>';
+  }
+  P.push('<h3>Song</h3><table><tr><th></th>' +
+    [1, 2, 3, 4, 5, 6, 7, 8].map(t => '<th>V' + t + '</th>').join('') +
+    '</tr>' + (rows || '<tr><td colspan=9 class=dim>empty</td></tr>') + '</table>');
+  const usedPh = new Set();
+  let ch = '';
+  [...usedCh].sort((a, b) => a - b).forEach(c => {
+    let steps = '';
+    for (let st = 0; st < 16; st++) {
+      const ph = d[0x1700 + c * 32 + st * 2];
+      if (ph !== 0xFF) { usedPh.add(ph); steps += '<td>' + hx(ph) + '</td>'; }
+    }
+    if (steps) ch += '<tr><th>' + hx(c) + '</th>' + steps + '</tr>';
+  });
+  if (ch) P.push('<h3>Chains</h3><table>' + ch + '</table>');
+  let phr = '';
+  [...usedPh].sort((a, b) => a - b).slice(0, 32).forEach(p => {
+    let body = '';
+    for (let r = 0; r < 16; r++) {
+      const o = 0x2300 + p * 64 + r * 4;
+      const nt = d[o], ins = d[o + 1], cmd = d[o + 2], val = d[o + 3];
+      body += '<tr><th>' + hx(r) + '</th><td class="note">' + noteName(nt) +
+        '</td><td>' + (ins === 0xFF ? '··' : hx(ins)) + '</td><td class="cmd">' +
+        (cmd ? String.fromCharCode(64 + cmd) : '·') + '</td><td>' +
+        (cmd ? hx(val) : '··') + '</td></tr>';
+    }
+    phr += '<div style="display:inline-block;vertical-align:top">' +
+      '<b class=dim>ph ' + hx(p) + '</b><table><tr><th></th><th>nt</th>' +
+      '<th>in</th><th>c</th><th>v</th></tr>' + body + '</table></div>';
+  });
+  if (phr) P.push('<h3>Phrases</h3>' + phr);
+  V.innerHTML = '<button style="float:right" onclick="document.getElementById(' +
+    "'viewer'" + ').classList.remove(' + "'show'" + ')">close</button>' + P.join('');
+  V.classList.add('show');
+  V.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
 
 $('download').onclick = () => { save(srm, 'sndj.srm'); };
 $('fresh').onclick = () => { srm = S.srmNew(); status('new cart image'); render(); };
