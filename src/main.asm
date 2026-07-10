@@ -358,6 +358,10 @@ logo_data_end:
 factory_kits:
     .INCBIN "kits.bin"
 
+; KARP tuning tables (maketables.py): read with long addressing from
+; karp_trigger — parked here to keep the code bank breathing
+.INCLUDE "karptab.inc"
+
 ; SPC700 driver blob, uploaded via the IPL protocol at boot (read with
 ; long addressing; parked here to keep the code bank breathing)
 driver_blob:

@@ -101,7 +101,8 @@ def karp_entry(m, edl):
 
 
 def karp_tables_inc():
-    lines = ["", "; KARP: 2 tables (EDL 1, EDL 2) x 96 notes x 4 bytes",
+    lines = ["; KARP: 2 tables (EDL 1, EDL 2) x 96 notes x 4 bytes",
+             "; (its own include: lives in bank 6, read with lda.l)",
              "karp_tab:"]
     for edl in (1, 2):
         for m in range(96):
@@ -204,6 +205,7 @@ def main(build_dir):
         f.write(defs)
     with open(f'{build_dir}/tables.inc', 'w') as f:
         f.write(tables_inc())
+    with open(f'{build_dir}/karptab.inc', 'w') as f:
         f.write(karp_tables_inc())
         f.write(scheme_names_inc())
     print(f"maketables: schemes.bin ({len(sch)}), kits.bin ({len(kits)}), "

@@ -46,18 +46,6 @@ if_fields:
     .DB 12, 0, $FF, 255  ; 24 TBL (>= 32 shows -- = no table; free wrap)
     .DB 13, 0, $0F, 15   ; 25 TBS ticks/row (0 = advance per note)
 
-; screen row per field: blank rows separate the groups (fields with
-; exclusive visibility may share a row: SLICES/LOOP, DAMP/ATTACK,
-; BURST/FADE/DECAY, SUSTAIN/SUS LVL, TUNE/GRP)
-if_row:
-    .DB 0, 1, 2, 3, 3              ; number + identity (+ SLICES | LOOP)
-    .DB 4, 5, 6                    ; KARP: DAMP / BURST / SUSTAIN
-    .DB 4, 5, 5, 6, 7              ; envelope (FADE on DECAY's row)
-    .DB 9, 10, 11                  ; mix + send
-    .DB 13, 14, 15                 ; tune + motion
-    .DB 17, 17, 18, 19, 20         ; chord span (TUNE on GRP's row)
-    .DB 22, 23                     ; table
-
 ; visibility per type (bit 0 SMP, 1 KIT, 2 WAV, 3 NSE, 4 SLICE,
 ; 5 KARP): a type hides the fields its trigger path never reads
 if_vis:
@@ -552,9 +540,21 @@ if_nudge:
     rts
 
 instr_draw:
+    ; dynamic layout: visible fields pack onto consecutive rows with a
+    ; blanked spacer between groups — a type's hidden fields cost no
+    ; space, and rows are fully overdrawn so layouts can shift freely
     stz ui_cnt
+    lda #$00
+    sta.w str_buf + 26      ; screen row cursor (0-based)
+    lda #$FF
+    sta.w str_buf + 27      ; previous group id
 @rows:
-    ; row position from the group map
+    lda ui_cnt
+    jsr if_field_vis
+    bcs @shown
+    jmp @next
+@shown:
+    ; a blanked spacer row when the field group changes
     lda ui_cnt
     rep #$30
 .ACCU 16
@@ -562,31 +562,28 @@ instr_draw:
     tax
     sep #$20
 .ACCU 8
-    lda.w if_row,x
+    lda.w if_grp,x
+    cmp.w str_buf + 27
+    beq @no_gap
+    pha
+    lda.w str_buf + 27
+    cmp #$FF
+    beq @grp_first
+    lda.w str_buf + 26
+    jsr if_blank_row
+    lda.w str_buf + 26
+    inc a
+    sta.w str_buf + 26
+@grp_first:
+    pla
+    sta.w str_buf + 27
+@no_gap:
+    lda.w str_buf + 26
     clc
     adc #4
     sta text_y
     lda #2
     sta text_x
-    ; fields the current type never reads draw blank — unless a visible
-    ; field shares the row (FADE/DECAY, TUNE/GRP): blanking would erase it
-    lda ui_cnt
-    jsr if_field_vis
-    bcs @shown
-    jsr if_row_shared
-    bcc @blank_ok
-    jmp @next
-@blank_ok:
-    rep #$20
-.ACCU 16
-    lda #ATTR_TEXT
-    sta text_attr
-    sep #$20
-.ACCU 8
-    ldx #str_if_blank
-    jsr text_puts
-    jmp @next
-@shown:
     ; labels stay dim; the VALUE carries the cursor accent
     rep #$20
 .ACCU 16
@@ -632,7 +629,15 @@ instr_draw:
 .ACCU 8
 @lab_put:
     jsr text_puts
-    ; value at x12 (text colour)
+    ; pad the label to the value column (labels of any length overdraw)
+@lab_pad:
+    lda text_x
+    cmp #12
+    bcs @lab_padded
+    lda #' ' - 32
+    jsr text_puttile
+    bra @lab_pad
+@lab_padded:
     lda #12
     sta text_x
     lda ui_cnt
@@ -664,13 +669,13 @@ instr_draw:
     ldx #str_if_on
     jsr text_puts
     plx
-    jmp @next
+    jmp @val_done
 @e_off:
     phx
     ldx #str_if_off
     jsr text_puts
     plx
-    jmp @next
+    jmp @val_done
 @not_echo_v:
     cmp #$18
     bne @not_tbl_v
@@ -682,11 +687,11 @@ instr_draw:
     ldx #str_if_nil
     jsr text_puts
     plx
-    jmp @next
+    jmp @val_done
 @tbl_hex:
     lda str_buf + 33
     jsr text_hex8
-    jmp @next
+    jmp @val_done
 @not_tbl_v:
     lda ui_cnt
     cmp #$02
@@ -701,13 +706,13 @@ instr_draw:
     ldx #str_if_note
     jsr text_puts
     plx
-    jmp @next
+    jmp @val_done
 @clk_fixed:
     dec a
     jsr text_hex8
     lda #' ' - 32
     jsr text_puttile
-    jmp @next
+    jmp @val_done
 @not_clk_v:
     lda ui_cnt
     cmp #$03
@@ -716,7 +721,7 @@ instr_draw:
     lda str_buf + 33
     inc a
     jsr text_hex8
-    jmp @next
+    jmp @val_done
 @not_sli_v:
     lda ui_cnt
     cmp #$04
@@ -730,26 +735,26 @@ instr_draw:
     ldx #str_if_off
     jsr text_puts
     plx
-    jmp @next
+    jmp @val_done
 @lp_on:
     phx
     ldx #str_if_on
     jsr text_puts
     plx
-    jmp @next
+    jmp @val_done
 @lp_pool:
     phx
     ldx #str_if_pool
     jsr text_puts
     plx
-    jmp @next
+    jmp @val_done
 @not_loop_v:
     lda ui_cnt
     bne @not_num_v
     ; INSTR: the edited instrument's number
     lda ed_instr
     jsr text_hex8
-    jmp @next
+    jmp @val_done
 @not_num_v:
     cmp #$01
     bne @hex
@@ -787,57 +792,73 @@ instr_draw:
     sec
     sbc #32
     jsr text_puttile
-    bra @next
+    bra @val_done
 @hex:
     lda str_buf + 33
     jsr text_hex8
+@val_done:
+    ; pad the value tail (layouts shift; stale chars must die)
+    rep #$20
+.ACCU 16
+    lda #ATTR_TEXT
+    sta text_attr
+    sep #$20
+.ACCU 8
+@val_pad:
+    lda text_x
+    cmp #18
+    bcs @val_padded
+    lda #' ' - 32
+    jsr text_puttile
+    bra @val_pad
+@val_padded:
+    lda.w str_buf + 26
+    inc a
+    sta.w str_buf + 26
 @next:
     inc ui_cnt
     lda ui_cnt
     cmp #IF_COUNT
-    beq @done
+    beq @tail
     jmp @rows
+@tail:
+    ; blank everything below the last field (layouts shrink)
+    lda.w str_buf + 26
+@tb:
+    cmp #24
+    bcs @done
+    pha
+    jsr if_blank_row
+    pla
+    inc a
+    bra @tb
 @done:
     rts
 
-; carry set when another, VISIBLE field shares field ui_cnt's screen row
-if_row_shared:
-    lda ui_cnt
-    rep #$30
-.ACCU 16
-    and #$00FF
-    tax
-    sep #$20
-.ACCU 8
-    lda.w if_row,x
-    sta str_buf + 30        ; the row under test
-    stz str_buf + 31        ; scan index
-@scan:
-    lda str_buf + 31
-    cmp ui_cnt
-    beq @skip
-    rep #$30
-.ACCU 16
-    and #$00FF
-    tax
-    sep #$20
-.ACCU 8
-    lda.w if_row,x
-    cmp str_buf + 30
-    bne @skip
-    lda str_buf + 31
-    jsr if_field_vis
-    bcs @yes
-@skip:
-    inc str_buf + 31
-    lda str_buf + 31
-    cmp #IF_COUNT
-    bne @scan
+; blank content row A (0-based; y = A + 4)
+if_blank_row:
     clc
-    rts
-@yes:
-    sec
-    rts
+    adc #4
+    sta text_y
+    lda #2
+    sta text_x
+    rep #$20
+.ACCU 16
+    lda #ATTR_TEXT
+    sta text_attr
+    sep #$20
+.ACCU 8
+    ldx #str_if_blank
+    jmp text_puts
+
+; field -> layout group (a blanked spacer row separates groups):
+; 0 identity+envelope, 1 mix+send, 2 tune+motion, 3 chord, 4 table
+if_grp:
+    .DB 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    .DB 1, 1, 1
+    .DB 2, 2, 2
+    .DB 3, 3, 3, 3, 3
+    .DB 4, 4
 
 str_instr: .DB "INSTR ", 0
 str_if_blank: .DB "                   ", 0
