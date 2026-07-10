@@ -157,7 +157,7 @@ slots with the current import settings">drop samples (or click)</div>
 <input type="file" id="batchfile" hidden accept=".wav" multiple>
 </div>
 <div>
-<div class="drop small" id="sf2drop">drop an .sf2 soundfont here (or click)</div>
+<div class="drop small off" id="sf2drop">drop an .sf2 soundfont here (or click)</div>
 <input type="file" id="sf2file" hidden accept=".sf2">
 <div id="sf2view" hidden>
   <h1><small id="sf2name">soundfont</small></h1>
@@ -240,6 +240,7 @@ async function loadRom(f) {
   kitExpand[0] = true;
   $('tabsbar').hidden = false;
   $('batchdrop').classList.remove('off');
+  $('sf2drop').classList.remove('off');
   selectTab('poolview');
   status(`loaded ${f.name}: ${entries.length} samples in the pool`);
   render();
@@ -709,8 +710,11 @@ $('firefb').oninput = () => { $('firefbv').textContent = $('firefb').value; };
 let sf2fonts = [];
 const sf2Loaded = () => sf2fonts.length > 0;
 
-$('sf2drop').onclick = () => $('sf2file').click();
-$('sf2drop').ondragover = e => { e.preventDefault(); $('sf2drop').classList.add('armed'); };
+$('sf2drop').onclick = () => { if (rom) $('sf2file').click(); };
+$('sf2drop').ondragover = e => {
+  e.preventDefault();
+  if (rom) $('sf2drop').classList.add('armed');
+};
 $('sf2drop').ondragleave = () => $('sf2drop').classList.remove('armed');
 $('sf2drop').ondrop = e => {
   e.preventDefault();
@@ -725,6 +729,7 @@ $('sf2file').onchange = e => {
 };
 
 async function loadSf2(f) {
+  if (!rom) { status('drop a sndj.sfc first — everything patches into it', 1); return; }
   let samples;
   try {
     samples = S.sf2Parse(new Uint8Array(await f.arrayBuffer()));
