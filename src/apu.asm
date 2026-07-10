@@ -779,6 +779,7 @@ apply_instrument:
 .ACCU 8
     lda.w slice_base,x
     plx
+    cmp #$00                ; plx clobbers flags: re-test the alias
     bne @srcn
 @from_pool:
     ; SMP/NSE: the sample field is a POOL index -> resident SRCN

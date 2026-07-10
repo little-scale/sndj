@@ -76,6 +76,12 @@ emu.addEventCallback(function()
     poke(0x4301, 1)
     poke(0x4340, 49)           -- phrase 1 row 0: C-4, I2
     poke(0x4341, 2)
+    -- V3: I3 untouched (fresh SMP, LOOP=POOL, no alias) — regression
+    -- for the plx-flags bug that silenced every non-zero instrument
+    poke(0x2100, 2)            -- V3 r0 = chain 2
+    poke(0x3740, 2)            -- chain 2 e0 = phrase 2
+    poke(0x4380, 49)           -- phrase 2 row 0: C-4, I3
+    poke(0x4381, 3)
   elseif frames == 290 then
     check(wram(0x2417) == 0x04, string.format(
       "B+Right nudged LOOP ON -> OFF (byte7 $%02X, ui %02X)",
@@ -93,6 +99,12 @@ emu.addEventCallback(function()
     check(s1 > 0 and s1 ~= s0, "I2 has its own alias (" .. s1 .. ")")
     check(dirw(s1, 2) == dirw(s1, 0),
       "forced loop on a one-shot: whole-sample loop (loop == start)")
+    -- voice 2 = I3 (fresh POOL): straight off the pool map, and audible
+    local s2 = dsp(0x24)
+    check(s2 > 0 and s2 == wram(0x97 + 3),
+      "fresh POOL instrument uses the pool SRCN (" .. s2 .. ")")
+    check(dsp(0x28) > 0,
+      "fresh POOL instrument sounds (ENVX " .. dsp(0x28) .. ")")
   elseif frames == 425 then
     -- late in the phrase (before row 0 retriggers): the forced
     -- one-shot violin (~0.3 s) has died; the forced-loop percussion
