@@ -338,6 +338,24 @@ echo_draw:
     jsr text_puttile
     lda #'B' - 32
     jsr text_puttile
+    ; ...and the same setting as time: EDL * 16 ms
+    lda #' ' - 32
+    jsr text_puttile
+    lda ui_cnt
+    jsr ef_addr
+    lda.l $7E0000,x
+    and #$0F
+    asl
+    asl
+    asl
+    asl
+    sta tmp0
+    stz tmp0 + 1
+    jsr text_dec3
+    lda #'M' - 32
+    jsr text_puttile
+    lda #'S' - 32
+    jsr text_puttile
 @no_cost:
     inc ui_cnt
     lda ui_cnt
@@ -346,10 +364,11 @@ echo_draw:
     jmp @rows
 @taps:
     ; ARAM ledger: resident samples vs what the current EDL leaves free
-    ; (the echo buffer and the sample set share the same 64 KB)
+    ; (the echo buffer and the sample set share the same 64 KB) — drawn
+    ; at the top, above the DELAY it trades against
     lda #2
     sta text_x
-    lda #16
+    lda #2
     sta text_y
     rep #$20
 .ACCU 16

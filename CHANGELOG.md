@@ -10,6 +10,8 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
   one small `.sndjfact` file, applyable onto any loaded ROM. Share a
   voicing, keep versions, or hand it straight to the build.
 
+- ECHO: the RAM/FREE ledger sits at the top, above the DELAY it
+  trades against, and the DELAY row reads both ways — `0C -24KB 192MS`.
 - ECHO's RAM/FREE ledger also reads the free space as **time**: a
   `+NNNms` readout of how much longer the delay could get from here
   (2 KB steps, capped by the register's 15).
