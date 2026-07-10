@@ -433,7 +433,8 @@ Zero-toolchain browser apps — download the folder, open the HTML,
 everything runs locally:
 
 - **patcher.html** — the ROM workshop, in tabs: **SAMPLES** (replace
-  pool slots from WAVs or dropped SoundFonts — several stack at once,
+  pool slots from WAVs — sampler-loop WAVs import melodic, in tune —
+  or dropped SoundFonts — several stack at once,
   drag a font slot onto a pool slot — with per-slot tune and rename,
   and ROM + audio-RAM budget meters that mirror the console's math),
   **KITS** (the factory drum kits: drag a one-shot straight onto a kit

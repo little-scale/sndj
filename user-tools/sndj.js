@@ -456,6 +456,35 @@ function sf2Oneshot(s, capMs) {
   return { pcm, loopBlock: null, tuneSemis: 0, tuneFine: 0 };
 }
 
+// ------------------------------------------------------------- WAV import
+// RIFF scan for the bits decodeAudioData throws away: the sample rate
+// and the sampler chunk's loop + root key. A WAV with a smpl loop can
+// ride the exact same melodic pipeline as an sf2 preset.
+function wavInfo(bytes) {
+  const u32 = o => (bytes[o] | (bytes[o + 1] << 8) | (bytes[o + 2] << 16) |
+    (bytes[o + 3] << 24)) >>> 0;
+  const id = o => String.fromCharCode(...bytes.slice(o, o + 4));
+  if (id(0) !== 'RIFF' || id(8) !== 'WAVE') return null;
+  const info = { rate: 0, root: 60, loop: null };
+  let pos = 12;
+  while (pos + 8 <= bytes.length) {
+    const cid = id(pos), size = u32(pos + 4), body = pos + 8;
+    if (cid === 'fmt ') {
+      info.rate = u32(body + 4);
+    } else if (cid === 'smpl') {
+      const root = u32(body + 12);
+      if (root > 0 && root < 128) info.root = root;
+      const nloops = u32(body + 28);
+      if (nloops > 0) {
+        const ls = u32(body + 44), le = u32(body + 48);
+        if (le > ls) info.loop = [ls, le + 1];  // smpl end is inclusive
+      }
+    }
+    pos = body + size + (size & 1);
+  }
+  return info.rate ? info : null;
+}
+
 // ------------------------------------------------------------ ARAM budget
 // Mirror of src/pool.asm's residency math: samples upload from $1209
 // (after the 9-byte silent stub at ARAM_SAMPLES $1200) and must end on a
@@ -1159,6 +1188,20 @@ function selftest() {
   assert(wav.length === 44 + 512 * 4 &&
     String.fromCharCode(...wav.slice(0, 4)) === 'RIFF', 'wav container');
 
+  // WAV metadata scan (rate + smpl loop/root)
+  const wavHdr = [];
+  const w32 = v => wavHdr.push(v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24));
+  const wtag = t => { for (const c of t) wavHdr.push(c.charCodeAt(0)); };
+  wtag('RIFF'); w32(4 + 8 + 16 + 8 + 60); wtag('WAVE');
+  wtag('fmt '); w32(16); w32(0); w32(22050); w32(0); w32(0);
+  wavHdr[wavHdr.length - 16] = 1;  // PCM tag low byte
+  wtag('smpl'); w32(60); w32(0); w32(0); w32(0); w32(67); w32(0); w32(0);
+  w32(0); w32(1); w32(0); w32(0); w32(0); w32(100); w32(299); w32(0); w32(0);
+  const wi = wavInfo(new Uint8Array(wavHdr));
+  assert(wi && wi.rate === 22050 && wi.root === 67 &&
+    wi.loop && wi.loop[0] === 100 && wi.loop[1] === 300,
+    'wav smpl chunk parsed (rate/root/loop)');
+
   // ARAM budget calculator (mirrors pool.asm residency)
   const mkE = n => ({ brr: new Uint8Array(n) });
   assert(aramBudget([]).maxEdl === 15, 'empty pool leaves the full echo');
@@ -1177,7 +1220,7 @@ const SNDJ = {
   SRM_SIZE, SRM_SLOTS, SRM_HEAP_SZ,
   srmNew, srmParse, srmExtract, srmInsert, srmErase, srmLayout,
   sndjFileBuild, sndjFileParse,
-  brrEncode, brrDecode, poolParse, poolBuild, aramBudget,
+  brrEncode, brrDecode, poolParse, poolBuild, aramBudget, wavInfo,
   rlePack, rleUnpack, crc16, toImage, fromImage,
   pitchForNote, findMarker, fixChecksum, selftest,
   dspNew, dspWrite, dspRun, wavBuild,

@@ -5,6 +5,13 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- WAV imports aren't one-shot-only anymore: a `.wav` carrying a
+  sampler (`smpl`) loop imports **melodic** through the same in-tune
+  pipeline as soundfont presets (loop points exact, root key
+  honoured); choosing melodic without one loops the **whole file**
+  (single-cycle / seamless sources, root C-4 + trim). The auto mode
+  picks per file, one-shot stays the fallback.
+
 - **The factory bank is Seb's curated set** (extracted from a patcher
   session and committed as `samples/pool.bin` + `samples/kits.bin`,
   both baked verbatim into every build): 7 melodics — xylophone,

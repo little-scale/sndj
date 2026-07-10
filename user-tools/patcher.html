@@ -153,7 +153,10 @@ export a patched ROM. Everything runs locally.</p>
       min="20" max="500" style="width:4rem"></label>
   </div>
   <p class="hint">play auditions through the real BRR pipeline with the
-  settings above; drag a row onto a pool slot to import it there.</p>
+  settings above; drag a row onto a pool slot to import it there. The
+  mode also governs WAV replaces: a .wav with a smpl-chunk loop imports
+  melodic (root key honoured); melodic without one loops the whole
+  file.</p>
   <table id="sf2list"></table>
 </div>
 </div>
@@ -837,20 +840,61 @@ $('wavfile').onchange = async e => {
   }
   if (replacing < 0) return;
   try {
-    const samples = await wavTo32k(f);
-    const trimmed = samples.slice(0, Math.floor(samples.length / 16) * 16);
-    if (!trimmed.length) throw new Error('WAV too short');
-    const brr = S.brrEncode(trimmed, null);
+    const raw = new Uint8Array(await f.arrayBuffer());
+    const info = S.wavInfo(raw);
     const name = f.name.replace(/\.wav$/i, '').toUpperCase().slice(0, 8) || 'SAMPLE';
-    entries[replacing] = { name, loopBlock: null, brr };
-    status(`replaced #${replacing} with ${name} ` +
-      `(${trimmed.length} samples, ${brr.length} bytes BRR)`);
+    let mode = $('sfmode').value;
+    if (mode === 'auto') mode = (info && info.loop) ? 'melodic' : 'oneshot';
+    if (mode === 'melodic') {
+      // a smpl-chunk loop rides the sf2 melodic pipeline; without one,
+      // the WHOLE file is the loop (single-cycle / seamless sources)
+      const rate = info ? info.rate : 32000;
+      const pcm = await wavDecode(raw.buffer.slice(0), rate);
+      const s = {
+        name, pcm, rate,
+        root: (info && info.loop) ? info.root : 60,
+        corr: 0,
+        loop: (info && info.loop) ? info.loop : [0, pcm.length],
+      };
+      const prep = S.sf2Melodic(s, +$('sftrim').value || 0);
+      const brr = S.brrEncode(prep.pcm, prep.loopBlock);
+      entries[replacing] = {
+        name, loopBlock: prep.loopBlock,
+        tuneSemis: prep.tuneSemis, tuneFine: prep.tuneFine, brr,
+      };
+      status(`replaced #${replacing} with ${name} as melodic (` +
+        brr.length + ' B, loop@' + prep.loopBlock + ', tune ' +
+        prep.tuneSemis + ':' + prep.tuneFine +
+        ((info && info.loop) ? ', smpl loop + root ' + s.root
+          : ', whole-file loop') + ')');
+    } else {
+      const samples = await wavTo32k(f);
+      const trimmed = samples.slice(0, Math.floor(samples.length / 16) * 16);
+      if (!trimmed.length) throw new Error('WAV too short');
+      const brr = S.brrEncode(trimmed, null);
+      entries[replacing] = { name, loopBlock: null, brr };
+      status(`replaced #${replacing} with ${name} ` +
+        `(${trimmed.length} samples, ${brr.length} bytes BRR, one-shot)`);
+    }
     render();
   } catch (err) {
     status('replace failed: ' + err.message, 1);
   }
   replacing = -1;
 };
+
+// decode a WAV at its OWN rate (loop points stay exact; sf2Melodic does
+// the in-tune resample to 32 kHz itself)
+async function wavDecode(buf, rate) {
+  const ctx = new OfflineAudioContext(1, 1, Math.max(8000, Math.min(96000, rate)));
+  const decoded = await ctx.decodeAudioData(buf);
+  const src = decoded.getChannelData(0);
+  const out = new Int16Array(src.length);
+  for (let i = 0; i < src.length; i++) {
+    out[i] = Math.max(-32768, Math.min(32767, Math.round(src[i] * 30000)));
+  }
+  return out;
+}
 
 async function wavTo32k(f) {
   const buf = await f.arrayBuffer();
