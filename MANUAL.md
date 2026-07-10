@@ -178,7 +178,8 @@ The INSTR screen groups its fields — identity / envelope / mix / tune
 & motion / chord span / table — and hides what a type never reads:
 KIT keeps envelope and echo but drops VOL, FINE, VIB and GRP (the kit
 slots own volume and tune); NSE drops SAMPLE and everything pitched;
-WAV shows everything with SAMPLE reading **BANK**. The **INSTR number is
+WAV shows everything with SAMPLE reading **BANK**; SLICE swaps the
+ADSR for **ATTACK + FADE** and GRP for **TUNE**. The **INSTR number is
 itself the first field** — nudge it (B + d-pad) to switch which
 instrument you're editing, or **Y + ↑/↓** flips previous/next (TABLE
 and PHRASE answer the same gesture).
@@ -192,6 +193,7 @@ sound. An instrument's **TYPE** decides what the voice does:
 | **KIT** | a drum kit: the note row picks a slot (C-4 = slot 0, C#4 = slot 1, wrapping every 16) — the PHRASE note column shows the slot's **sample name** instead of a pitch |
 | **WAV** | a drawn 32-sample wavetable loop from the WAVE screen |
 | **NSE** | the DSP noise generator; the note sets the noise clock, or the instrument's CLOCK field pins it |
+| **SLICE** | one pool sample (a breakbeat, a vocal, anything) cut into **SLICES** equal parts; the note picks the slice, wrapping past the count — the PHRASE note column shows two letters of the sample's name + the slice number |
 
 Any type can go on any of the 8 voices — there are no special
 channels. Eight kits at once is legal. The factory set is deliberately
@@ -233,6 +235,31 @@ use it (the ECHO screen's RAM/FREE line shows the live balance).
   TBS `1`–`F` runs a table row every n ticks; TBS `0` is *note-sync*
   — each new note advances the table one row (great for cycling
   chords, sample-offsets, pan patterns).
+
+### SLICE — chopping a break
+
+Point a SLICE instrument's SAMPLE at any pool one-shot and set
+**SLICES** (2–16). The sample divides into that many equal,
+block-aligned parts at **zero audio-RAM cost** — slices are directory
+aliases into the sample the song already loaded. Then:
+
+- **The note picks the slice.** Note 1 (C-0) = slice 0, note 2 =
+  slice 1, … wrapping past the count — so any melodic line is a valid
+  chop sequence, and transpose commands *rotate the chop*.
+- **FADE** is the whole envelope story: each slice plays from its
+  start toward the end of the sample, fading at the FADE rate
+  (`0` = never — slices ring into each other like an open sampler
+  pad; `8` = the factory middle; `F` = tightest gate). ATTACK still
+  softens the front.
+- **TUNE** transposes the whole slice set in semitones (notes pick
+  slices, so pitch lives here); FINE trims cents.
+- Slices ignore GRP, and pitch commands act on the playing slice —
+  `L` slides a break in flight.
+
+A 16-slice break costs 16 of the 56 sample directory slots while its
+instrument exists; if the directory can't fit the window the slices
+fall silent rather than eating other samples (drop the count or free
+an instrument).
 
 ## 6. Tables
 

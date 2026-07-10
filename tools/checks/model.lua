@@ -115,6 +115,8 @@ emu.addEventCallback(function()
       string.format("%04X", p1) .. ")")
   elseif frames == 228 then
     check(wram(0x0016) == 0, "stopped")
+  elseif frames == 240 then
+    -- shot after a settle: the displayed chrome lags the stop by a draw
     local out = os.getenv("SNDJ_SONG_SHOT")
     if out then
       local png = emu.takeScreenshot()

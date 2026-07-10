@@ -116,7 +116,16 @@ song_init:
     ply
     lda.w factory_instr_smp,y
     sta.l $7E0000 + SB_INSTR + 1,x  ; sample / bank / kit
+    lda.w factory_instr_x7,y
+    sta.l $7E0000 + SB_INSTR + 7,x  ; SLICES-1 nibble + EON
+    lda.l $7E0000 + SB_INSTR,x
+    cmp #$04
+    bne @env_std
+    lda #$8F                        ; SLICE: ATK F + FADE 8 (the middle)
+    bra @env_wr
+@env_std:
     lda #$2F
+@env_wr:
     sta.l $7E0000 + SB_INSTR + 2,x  ; ADSR1 (bit7 forced on at apply)
     lda #$CA
     sta.l $7E0000 + SB_INSTR + 3,x  ; ADSR2
@@ -1013,6 +1022,13 @@ track_trigger_note:
 @kit_played:
     bra @pitched
 @not_kit:
+    cmp #$04
+    bne @not_slice
+    phx
+    jsr slice_trigger       ; always sounds (a lost window is the stub)
+    plx
+    bra @pitched
+@not_slice:
     cmp #$03
     bne @not_nse
     ; the instrument's CLOCK field (byte 1) pins the rate; 0 follows
@@ -1855,6 +1871,94 @@ kit_trigger:
     jsr note_pitch_calc_only
     jsr voice_pitch_write
     ; SRCN/vol no longer match the instrument record on this voice
+    lda trig_voice
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda #$FF
+    sta.w trk_instr_active,x
+    sec
+    rts
+
+; --- SLICE trigger: equal divisions of one pool sample ----------------------------
+; rec[1] = the blob (pool index), rec[7] bits 4-7 = slices-1, rec[9] = TUNE
+; (signed semitones). The (transposed) note picks the slice, wrapped mod n;
+; SRCN = the instrument's alias window (slice_base, built by residency) +
+; slice. Pitch is native +/- TUNE plus the blob's pool tune and the record
+; FINE; the envelope (attack + FADE) came from apply_instrument. Always
+; sounds (carry set) — a missing window plays the silent stub. Clobbers X.
+slice_trigger:
+    lda trig_id
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR + 7,x
+    lsr
+    lsr
+    lsr
+    lsr
+    inc a
+    sta es0                 ; n (1-16)
+    lda.l $7E0000 + SB_INSTR + 9,x
+    sta es1                 ; TUNE (signed semitones)
+    ; tune context: blob pool default + the record's FINE
+    lda.l $7E0000 + SB_INSTR + 6,x
+    sta np_fine
+    lda.l $7E0000 + SB_INSTR + 1,x
+    and #$3F
+    jsr trig_tune_pool      ; preserves X
+    ; slice = trig_note mod n
+    lda trig_note
+@mod:
+    cmp es0
+    bcc @have
+    sec
+    sbc es0
+    bra @mod
+@have:
+    sta es0 + 1
+    ; SRCN = window base + slice (base 0 = not resident: the silent stub)
+    lda trig_id
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w slice_base,x
+    beq @srcn_have
+    clc
+    adc es0 + 1
+@srcn_have:
+    tay
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0SRCN
+    jsr apu_dsp_write
+    ; pitch: native (note 60) +/- TUNE
+    lda es1
+    clc
+    adc #60
+    cmp #NOTE_MAX
+    bcc @tuned
+    lda #60                 ; wild tunes snap back to native
+@tuned:
+    jsr note_pitch_calc_only
+    jsr voice_pitch_write
+    ; SRCN no longer matches the instrument record on this voice
     lda trig_voice
     rep #$30
 .ACCU 16

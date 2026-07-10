@@ -14,59 +14,67 @@
 .ACCU 8
 .INDEX 16
 
-.DEFINE IF_COUNT 19
+.DEFINE IF_COUNT 22
 
 ; field table, in DISPLAY order: byte offset in record, shift, value
 ; mask (post-shift), max
 if_fields:
     .DB 0,  0, $3F, 63   ; 0  INSTR — the number itself (pseudo-field)
-    .DB 0,  0, $03, 3    ; 1  TYPE
-    .DB 1,  0, $FF, 63   ; 1  SAMPLE / KIT / BANK (max re-clamped per type)
-    .DB 2,  0, $0F, 15   ; 2  ATTACK
-    .DB 2,  4, $07, 7    ; 3  DECAY
-    .DB 3,  5, $07, 7    ; 4  SUS LVL
-    .DB 3,  0, $1F, 31   ; 5  SUS RATE
-    .DB 4,  0, $FF, 127  ; 6  VOL L
-    .DB 5,  0, $FF, 127  ; 7  VOL R
-    .DB 7,  0, $01, 1    ; 8  EON (echo send)
-    .DB 6,  0, $FF, 255  ; 9  FINE (signed 1/256 semitone; free wrap)
-    .DB 14, 0, $FF, 255  ; 10 VIB speed/depth nibbles (free wrap)
-    .DB 15, 0, $FF, 255  ; 11 TRM speed/depth nibbles (free wrap)
-    .DB 8,  0, $03, 3    ; 12 GRP
-    .DB 9,  0, $FF, 24   ; 13 OFS 1
-    .DB 10, 0, $FF, 24   ; 14 OFS 2
-    .DB 11, 0, $FF, 24   ; 15 OFS 3
-    .DB 12, 0, $FF, 255  ; 16 TBL (>= 32 shows -- = no table; free wrap)
-    .DB 13, 0, $0F, 15   ; 17 TBS ticks/row (0 = advance per note)
+    .DB 0,  0, $07, 4    ; 1  TYPE
+    .DB 1,  0, $FF, 63   ; 2  SAMPLE / KIT / BANK (max re-clamped per type)
+    .DB 7,  4, $0F, 15   ; 3  SLICES (drawn +1: 01-10 equal divisions)
+    .DB 2,  0, $0F, 15   ; 4  ATTACK
+    .DB 2,  4, $0F, 15   ; 5  FADE (SLICE: cut rate; 0 = ring/bleed)
+    .DB 2,  4, $07, 7    ; 6  DECAY
+    .DB 3,  5, $07, 7    ; 7  SUS LVL
+    .DB 3,  0, $1F, 31   ; 8  SUS RATE
+    .DB 4,  0, $FF, 127  ; 9  VOL L
+    .DB 5,  0, $FF, 127  ; 10 VOL R
+    .DB 7,  0, $01, 1    ; 11 EON (echo send)
+    .DB 6,  0, $FF, 255  ; 12 FINE (signed 1/256 semitone; free wrap)
+    .DB 14, 0, $FF, 255  ; 13 VIB speed/depth nibbles (free wrap)
+    .DB 15, 0, $FF, 255  ; 14 TRM speed/depth nibbles (free wrap)
+    .DB 9,  0, $FF, 255  ; 15 TUNE (SLICE: signed semitones; free wrap)
+    .DB 8,  0, $03, 3    ; 16 GRP
+    .DB 9,  0, $FF, 24   ; 17 OFS 1
+    .DB 10, 0, $FF, 24   ; 18 OFS 2
+    .DB 11, 0, $FF, 24   ; 19 OFS 3
+    .DB 12, 0, $FF, 255  ; 20 TBL (>= 32 shows -- = no table; free wrap)
+    .DB 13, 0, $0F, 15   ; 21 TBS ticks/row (0 = advance per note)
 
-; screen row per field: blank rows separate the groups
+; screen row per field: blank rows separate the groups (fields with
+; exclusive visibility may share a row: FADE/DECAY, TUNE/GRP)
 if_row:
-    .DB 0, 1, 2                    ; number + identity
-    .DB 4, 5, 6, 7                 ; envelope
+    .DB 0, 1, 2, 3                 ; number + identity (+ SLICES)
+    .DB 4, 5, 5, 6, 7              ; envelope (FADE on DECAY's row)
     .DB 9, 10, 11                  ; mix + send
     .DB 13, 14, 15                 ; tune + motion
-    .DB 17, 18, 19, 20             ; chord span
+    .DB 17, 17, 18, 19, 20         ; chord span (TUNE on GRP's row)
     .DB 22, 23                     ; table
 
-; visibility per type (bit 0 SMP, 1 KIT, 2 WAV, 3 NSE): a type hides
-; the fields its trigger path never reads
+; visibility per type (bit 0 SMP, 1 KIT, 2 WAV, 3 NSE, 4 SLICE): a type
+; hides the fields its trigger path never reads
 if_vis:
-    .DB $0F              ; INSTR number
-    .DB $0F              ; TYPE
-    .DB $0F              ; SAMPLE / KIT / BANK / CLOCK
-    .DB $0F, $0F, $0F, $0F   ; envelope: hardware ADSR applies to all
-    .DB $0D, $0D         ; VOL L/R (KIT: the slot's vol rules)
-    .DB $0F              ; ECHO
-    .DB $05              ; FINE (KIT: slot+pool tune; NSE: no pitch)
-    .DB $05              ; VIB  (pitch wobble: SMP/WAV only)
-    .DB $0D              ; TRM  (KIT: slot volume domain)
+    .DB $1F              ; INSTR number
+    .DB $1F              ; TYPE
+    .DB $1F              ; SAMPLE / KIT / BANK / CLOCK
+    .DB $10              ; SLICES (SLICE only)
+    .DB $1F              ; ATTACK
+    .DB $10              ; FADE (SLICE only)
+    .DB $0F, $0F, $0F    ; DECAY/SUS: SLICE synthesizes its envelope
+    .DB $1D, $1D         ; VOL L/R (KIT: the slot's vol rules)
+    .DB $1F              ; ECHO
+    .DB $15              ; FINE (KIT: slot+pool tune; NSE: no pitch)
+    .DB $15              ; VIB  (pitch wobble: SMP/WAV/SLICE)
+    .DB $1D              ; TRM  (KIT: slot volume domain)
+    .DB $10              ; TUNE (SLICE only)
     .DB $05, $05, $05, $05   ; GRP+OFS (kit ids aren't pool samples; NSE unison is noise)
-    .DB $0F, $0F         ; TBL/TBS
+    .DB $1F, $1F         ; TBL/TBS
 
 if_labels:
     .DW if_lnum
-    .DW if_l0, if_l1, if_l2, if_l3, if_l4, if_l5
-    .DW if_l6, if_l7, if_l12, if_l13, if_l14, if_l15
+    .DW if_l0, if_l1, if_lsli, if_l2, if_lfad, if_l3, if_l4, if_l5
+    .DW if_l6, if_l7, if_l12, if_l13, if_l14, if_l15, if_ltun
     .DW if_l8, if_l9, if_l10, if_l11, if_l16, if_l17
 if_lnum: .DB "INSTR", 0
 if_l0:  .DB "TYPE", 0
@@ -90,6 +98,9 @@ if_l14: .DB "VIB", 0
 if_l15: .DB "TRM", 0
 if_l16: .DB "TBL", 0
 if_l17: .DB "TBS", 0
+if_lsli: .DB "SLICES", 0
+if_lfad: .DB "FADE", 0
+if_ltun: .DB "TUNE", 0
 
 ; A = 1 << current instrument's type
 if_typebit:
@@ -105,7 +116,7 @@ if_typebit:
     sep #$20
 .ACCU 8
     lda.l $7E0000 + SB_INSTR,x
-    and #$03
+    and #$07
     rep #$30
 .ACCU 16
     and #$00FF
@@ -138,7 +149,7 @@ if_field_vis:
     rts
 
 if_types:
-    .DB "SMPKITWAVNSE"     ; 3 chars each
+    .DB "SMPKITWAVNSESLC"  ; 3 chars each
 
 instr_init:
     lda #SCREEN_INSTR
@@ -411,13 +422,17 @@ if_cur_fix:
 
 if_nudge:
     ; big step (U/D): the high nibble for byte fields, an octave for
-    ; the semitone offsets, 4 for short ranges; L/R always steps 1
+    ; the semitone fields (TUNE, OFS 1-3), 4 for short ranges; L/R
+    ; always steps 1
     lda if_cur
-    cmp #13
+    cmp #15
+    beq @mag_semi           ; TUNE
+    cmp #17
     bcc @mag_std
-    cmp #16
+    cmp #20
     bcs @mag_std
-    lda #12                 ; OFS 1-3: semitones
+@mag_semi:
+    lda #12                 ; semitones
     bra @mag_have
 @mag_std:
     lda if_cur
@@ -488,10 +503,11 @@ if_nudge:
 @in_range:
 @store:
     jsr if_set_x
-    ; type or sample edits change which pool samples the song needs
+    ; type / sample / slice-count edits change the resident set and
+    ; the slice alias windows
     lda if_cur
     beq @no_res
-    cmp #$03
+    cmp #$04
     bcs @no_res
     jsr residency_build
 @no_res:
@@ -514,10 +530,15 @@ instr_draw:
     sta text_y
     lda #2
     sta text_x
-    ; fields the current type never reads draw blank
+    ; fields the current type never reads draw blank — unless a visible
+    ; field shares the row (FADE/DECAY, TUNE/GRP): blanking would erase it
     lda ui_cnt
     jsr if_field_vis
     bcs @shown
+    jsr if_row_shared
+    bcc @blank_ok
+    jmp @next
+@blank_ok:
     rep #$20
 .ACCU 16
     lda #ATTR_TEXT
@@ -591,7 +612,7 @@ instr_draw:
     pla
     sta if_cur
     lda ui_cnt
-    cmp #$09
+    cmp #$0B
     bne @not_echo_v
     ; ECHO: a toggle reads ON/OFF, not 00/01
     lda str_buf + 33
@@ -608,7 +629,7 @@ instr_draw:
     plx
     jmp @next
 @not_echo_v:
-    cmp #$11
+    cmp #$14
     bne @not_tbl_v
     ; TBL: anything past the 32 tables is the nil state
     lda str_buf + 33
@@ -645,6 +666,15 @@ instr_draw:
     jsr text_puttile
     jmp @next
 @not_clk_v:
+    lda ui_cnt
+    cmp #$03
+    bne @not_sli_v
+    ; SLICES: the stored nibble is divisions-1
+    lda str_buf + 33
+    inc a
+    jsr text_hex8
+    jmp @next
+@not_sli_v:
     lda ui_cnt
     bne @not_num_v
     ; INSTR: the edited instrument's number
@@ -694,6 +724,45 @@ instr_draw:
     beq @done
     jmp @rows
 @done:
+    rts
+
+; carry set when another, VISIBLE field shares field ui_cnt's screen row
+if_row_shared:
+    lda ui_cnt
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w if_row,x
+    sta str_buf + 30        ; the row under test
+    stz str_buf + 31        ; scan index
+@scan:
+    lda str_buf + 31
+    cmp ui_cnt
+    beq @skip
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w if_row,x
+    cmp str_buf + 30
+    bne @skip
+    lda str_buf + 31
+    jsr if_field_vis
+    bcs @yes
+@skip:
+    inc str_buf + 31
+    lda str_buf + 31
+    cmp #IF_COUNT
+    bne @scan
+    clc
+    rts
+@yes:
+    sec
     rts
 
 str_instr: .DB "INSTR ", 0

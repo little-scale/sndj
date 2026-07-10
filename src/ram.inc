@@ -263,6 +263,11 @@ apu_cool     db      ; frames to hold the heartbeat off (driver inside a
                      ; the main loop and eat input)
 fl_armed     db      ; FILES menu confirm: armed item index ($FF = none);
                      ; the armed item reads SURE? and a 2nd B tap runs it
+sl_n         db      ; residency slice scan: slices in this window
+sl_blob      db      ; residency slice scan: blob pool index
+sl_step      dw      ; residency slice scan: bytes per slice (blocks*9)
+sl_addr      dw      ; residency slice scan: running ARAM address
+slice_base   ds 64   ; per-instrument SLICE window base SRCN (0 = none)
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

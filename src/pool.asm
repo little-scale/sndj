@@ -181,7 +181,7 @@ residency_build:
     sep #$20
 .ACCU 8
     lda.l $7E0000 + SB_INSTR,x
-    and #$03
+    and #$07
     bne @not_smp
     lda.l $7E0000 + SB_INSTR + 1,x
     jsr res_mark
@@ -210,6 +210,169 @@ residency_build:
     inc res_scan            ; 256 slots: loop until the counter wraps
     lda res_scan
     bne @kit_slot
+    ; scan instruments again: SLICE (type 4) alias windows — n consecutive
+    ; directory entries pointing into the blob's resident data at equal,
+    ; block-aligned divisions. slice_base[instr] = the window's first SRCN
+    ; (0 = no window: silent stub). Zero extra sample bytes.
+    ldx #$0000
+    lda #$00
+@sb_clr:
+    sta.w slice_base,x
+    inx
+    cpx #INSTR_COUNT
+    bne @sb_clr
+    stz res_scan
+@slice:
+    lda res_scan
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR,x
+    and #$07
+    cmp #$04
+    beq @sl_do
+@sl_skip:
+    jmp @sl_next
+@sl_do:
+    lda.l $7E0000 + SB_INSTR + 7,x
+    lsr
+    lsr
+    lsr
+    lsr
+    inc a
+    sta sl_n                ; slices 1-16
+    lda.l $7E0000 + SB_INSTR + 1,x
+    and #$3F
+    sta sl_blob
+    jsr res_mark            ; blob resident (uploads if new; clobbers X)
+    ; blob SRCN (0 = silence / over budget: no window)
+    lda sl_blob
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w pool_map,x
+    beq @sl_skip
+    ; window must fit the directory (slots res_slot .. res_slot+n-1 < 56)
+    pha
+    lda res_slot
+    clc
+    adc sl_n
+    cmp #(DIR_SLOT_MAX + 1)
+    bcc @sl_fits
+    pla
+    bra @sl_skip
+@sl_fits:
+    pla
+    ; base ARAM start = the blob's directory entry
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    tax
+    lda.w res_dir,x
+    sta sl_addr
+    ; step = (blocks / n) whole blocks -> bytes (*9); 0 = blob too short
+    lda sl_blob
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    lda.l POOL_TABLE + 10,x ; blocks (16-bit)
+    sep #$20
+.ACCU 8
+    sta.w WRDIVL
+    xba
+    sta.w WRDIVH
+    lda sl_n
+    sta.w WRDIVB            ; divide starts; 16 cycles until the quotient
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    rep #$30
+.ACCU 16
+    lda.w RDDIVL            ; step in blocks
+    beq @sl_short
+    sta sl_step
+    asl
+    asl
+    asl
+    clc
+    adc sl_step
+    sta sl_step             ; * 9 = bytes per slice
+    ; write the n entries into the directory staging
+    lda res_slot
+    and #$00FF
+    asl
+    asl
+    clc
+    adc #res_dir
+    tay
+    sep #$20
+.ACCU 8
+    lda sl_n
+    sta sl_blob             ; countdown (blob index no longer needed)
+@sl_ent:
+    rep #$30
+.ACCU 16
+    lda sl_addr
+    sta.w $0000,y           ; start
+    sta.w $0002,y           ; loop (unused: slices are one-shots)
+    clc
+    adc sl_step
+    sta sl_addr
+    iny
+    iny
+    iny
+    iny
+    sep #$20
+.ACCU 8
+    dec sl_blob
+    bne @sl_ent
+    ; publish the window
+    lda res_scan
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda res_slot
+    sta.w slice_base,x
+    clc
+    adc sl_n
+    sta res_slot
+    bra @sl_next
+@sl_short:
+.ACCU 16
+    sep #$20
+.ACCU 8
+@sl_next:
+    inc res_scan
+    lda res_scan
+    cmp #INSTR_COUNT
+    bne @slice_far
+    bra @dir_up
+@slice_far:
+    jmp @slice
+@dir_up:
     ; upload the directory (sample slots only; waves live at 56-63)
     lda res_slot
     rep #$30

@@ -5,6 +5,17 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- **New instrument type: SLICE** — chop any pool sample (a breakbeat,
+  a vocal) into 2-16 equal parts for free: slices are audio-RAM
+  directory aliases into the sample the song already loaded. The note
+  picks the slice (wrapping past the count, so melodies chop), FADE
+  sets how fast each slice dies (0 = bleed into the next like an open
+  sampler pad), TUNE transposes the whole set, and the PHRASE note
+  column reads as sample-name + slice number. The patcher's boot
+  instruments grew a type picker (SMP/KIT/WAV/NSE/SLICE) + slices
+  count, and the factory container is now SNDJFACT v2 (v1 files still
+  import).
+
 - **Consistent playback indicators** on SONG / CHAIN / PHRASE (the
   GROOVE convention everywhere): a plain arrow in the gutter left of
   the data marks the playing row, the playing value carries the

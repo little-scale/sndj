@@ -521,6 +521,7 @@ All 8 voices are DSP sample voices; instrument type decides behaviour:
 | **KIT** | V1–V8 | Note row selects a kit slot (sample+tune+vol+env packaged); the drum idiom of F6/KIT, but on any voice, up to 8 kits at once |
 | **WAV** | V1–V8 | Drawn 32-sample single-cycle wavetable, looped BRR; `B` command switches banks per tick for wave-sequencing |
 | **NSE** | V1–V8 | DSP noise (NON on): pitch column sets the *global* noise clock (32 rates) — like the siblings, noise "frequency" is one shared resource; last-writer-wins is the documented rule |
+| **SLICE** | V1–V8 | (built 2026-07-10) one pool sample cut into 2–16 equal block-aligned parts as ARAM **directory aliases** — zero extra sample RAM; the note picks the slice mod n (transpose rotates the chop); record: byte 7 hi-nibble = SLICES-1, byte 2 = ATK+FADE nibbles (trigger synthesizes the hardware envelope; FADE 0 = bleed), byte 9 = TUNE semitones; windows built by residency_build (slots after the samples), silent when the directory can't fit |
 
 Instrument parameters worth calling out:
 

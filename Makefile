@@ -39,7 +39,7 @@ $(BUILD)/font.bin: tools/makefont.py | $(BUILD)
 $(BUILD)/logo.bin $(BUILD)/logo.inc: tools/makelogo.py art/sndj-logo.png | $(BUILD)
 	python3 tools/makelogo.py $(BUILD)/logo.bin $(BUILD)/logo.inc
 
-$(BUILD)/schemes.bin $(BUILD)/kits.bin $(BUILD)/tables.inc: tools/maketables.py $(wildcard samples/factory.sndjfact) $(wildcard samples/kits.bin) | $(BUILD)
+$(BUILD)/schemes.bin $(BUILD)/kits.bin $(BUILD)/defaults.bin $(BUILD)/tables.inc: tools/maketables.py $(wildcard samples/factory.sndjfact) $(wildcard samples/kits.bin) | $(BUILD)
 	python3 tools/maketables.py $(BUILD)
 
 $(BUILD)/pool.bin: tools/sndj_pool.py tools/sndj_brr.py $(wildcard samples/factory.sndjfact) $(wildcard samples/pool.bin) | $(BUILD)
@@ -53,7 +53,7 @@ $(BUILD)/driver.spc700.bin: $(BUILD)/driver.o
 	@printf '[objects]\n%s\n' "$(BUILD)/driver.o" > $(BUILD)/linkfile-apu
 	$(WLALINK) -S $(BUILD)/linkfile-apu $@
 
-$(BUILD)/main.o: $(SRCS) $(BUILD)/buildid.inc $(BUILD)/font.bin $(BUILD)/logo.bin $(BUILD)/logo.inc $(BUILD)/schemes.bin $(BUILD)/kits.bin $(BUILD)/tables.inc $(BUILD)/pool.bin $(BUILD)/driver.spc700.bin
+$(BUILD)/main.o: $(SRCS) $(BUILD)/buildid.inc $(BUILD)/font.bin $(BUILD)/logo.bin $(BUILD)/logo.inc $(BUILD)/schemes.bin $(BUILD)/kits.bin $(BUILD)/defaults.bin $(BUILD)/tables.inc $(BUILD)/pool.bin $(BUILD)/driver.spc700.bin
 	$(WLA65816) -I src -I $(BUILD) -o $@ src/main.asm
 
 $(BUILD)/linkfile: | $(BUILD)

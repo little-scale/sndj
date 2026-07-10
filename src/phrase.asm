@@ -948,7 +948,12 @@ phrase_draw:
     jsr cell_attr
     jsr row_is_kit
     bcc @plain_note
+    cmp #$04
+    beq @slice_note
     jsr draw_kit_name
+    bra @note_drawn
+@slice_note:
+    jsr draw_slice_name
     bra @note_drawn
 @plain_note:
     lda str_buf + 32
@@ -1114,10 +1119,13 @@ row_is_kit:
     sep #$20
 .ACCU 8
     lda.l $7E0000 + SB_INSTR,x
-    and #$03
+    and #$07
     cmp #$01
+    beq @yes
+    cmp #$04
     bne @no
-    sec
+@yes:
+    sec                     ; A = the type (1 kit, 4 slice), X = the record
     rts
 @no:
     clc
@@ -1186,6 +1194,57 @@ draw_kit_name:
     lda #'-' - 32
     jsr text_puttile
     lda #'-' - 32
+    jmp text_puttile
+
+; the slice row -> 2 chars of the blob's name + the slice index in hex,
+; wrapped mod n as slice_trigger maps it (X = the instrument record)
+draw_slice_name:
+    lda.l $7E0000 + SB_INSTR + 7,x
+    lsr
+    lsr
+    lsr
+    lsr
+    inc a
+    sta tmp2                ; n
+    lda.l $7E0000 + SB_INSTR + 1,x
+    and #$3F
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl                     ; pool entry * 16
+    tax
+    sep #$20
+.ACCU 8
+    lda.l POOL_ROM + 16,x
+    sec
+    sbc #32
+    phx
+    jsr text_puttile
+    plx
+    lda.l POOL_ROM + 17,x
+    sec
+    sbc #32
+    jsr text_puttile
+    lda str_buf + 32
+    dec a                   ; note index 0..95
+@mod:
+    cmp tmp2
+    bcc @have
+    sec
+    sbc tmp2
+    bra @mod
+@have:
+    cmp #$0A
+    bcs @letter
+    clc
+    adc #'0' - 32
+    jmp text_puttile
+@letter:
+    clc
+    adc #'A' - 10 - 32
     jmp text_puttile
 
 ; --- draw a note byte (A) as 3 glyphs at text_x/y ------------------------------

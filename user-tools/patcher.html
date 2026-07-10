@@ -239,7 +239,7 @@ async function loadRom(f) {
   } catch (err) { status('pool parse failed: ' + err.message, 1); return; }
   palOff = S.findMarker(rom, 'SNPAL0');
   kitOff = S.findMarker(rom, 'SNKIT0');
-  defOff = S.findMarker(rom, 'SNDEF0');
+  defOff = S.findMarker(rom, 'SNDEF1');
   firOff = S.findMarker(rom, 'SNFIR0');
   if (firOff >= 0) {
     firTaps = Array.from(rom.slice(firOff + 40, firOff + 48)).map(s8);
@@ -394,7 +394,7 @@ function render() {
 
 // ------------------------------------------------------- boot residency
 // mirror of the console's residency_build: the boot-resident set is
-// every pool sample referenced by the factory instruments (SNDEF0,
+// every pool sample referenced by the factory instruments (SNDEF1,
 // SMP type) or a kit slot with vol > 0 (SNKIT0). The rest of the pool
 // costs no ARAM until a song references it.
 let defOff = -1;
@@ -403,7 +403,8 @@ function bootResident() {
   if (defOff < 0) return null;           // old ROM: assume everything
   const set = new Set();
   for (let i = 0; i < 8; i++) {
-    if (rom[defOff + i] === 0) set.add(rom[defOff + 8 + i] & 0x3F);
+    const t = rom[defOff + i] & 7;
+    if (t === 0 || t === 4) set.add(rom[defOff + 8 + i] & 0x3F);
   }
   if (kitOff >= 0) {
     for (let k = 0; k < 16; k++) {
@@ -420,20 +421,50 @@ function renderBoot() {
   if (defOff < 0) { $('bootview').hidden = true; return; }
   const row = $('bootrow');
   row.innerHTML = '';
+  const TYPES = ['SMP', 'KIT', 'WAV', 'NSE', 'SLICE'];
   for (let i = 0; i < 8; i++) {
     const lab = document.createElement('label');
     lab.textContent = 'I' + i + ' ';
-    if (rom[defOff + i] === 1) {         // the kit instrument
+    const t = rom[defOff + i] & 7;
+    const tsel = document.createElement('select');
+    TYPES.forEach((n, v) => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = n;
+      tsel.appendChild(o);
+    });
+    tsel.value = Math.min(t, 4);
+    tsel.title = 'boot type for instrument ' + i;
+    tsel.onchange = () => { rom[defOff + i] = +tsel.value; renderBoot(); render(); };
+    lab.appendChild(tsel);
+    lab.appendChild(document.createTextNode(' '));
+    if (t === 1) {                       // kit id
       const kin = document.createElement('input');
       kin.type = 'number';
       kin.min = 0; kin.max = 15;
-      kin.value = rom[defOff + 8 + i];
+      kin.value = rom[defOff + 8 + i] & 0x0F;
       kin.title = 'kit id';
       kin.style.width = '2.6rem';
       kin.oninput = () => { rom[defOff + 8 + i] = (+kin.value || 0) & 0x0F; };
-      lab.textContent = 'I' + i + ' KIT ';
       lab.appendChild(kin);
-    } else {
+    } else if (t === 2) {                // WAV bank
+      const bin = document.createElement('input');
+      bin.type = 'number';
+      bin.min = 0; bin.max = 7;
+      bin.value = rom[defOff + 8 + i] & 0x07;
+      bin.title = 'wave bank';
+      bin.style.width = '2.6rem';
+      bin.oninput = () => { rom[defOff + 8 + i] = (+bin.value || 0) & 0x07; };
+      lab.appendChild(bin);
+    } else if (t === 3) {                // NSE clock (0 = follow the note)
+      const cin = document.createElement('input');
+      cin.type = 'number';
+      cin.min = 0; cin.max = 32;
+      cin.value = rom[defOff + 8 + i];
+      cin.title = 'noise clock (0 = note)';
+      cin.style.width = '2.6rem';
+      cin.oninput = () => { rom[defOff + 8 + i] = Math.min(32, +cin.value || 0); };
+      lab.appendChild(cin);
+    } else {                             // SMP / SLICE: a pool sample
       const pick = document.createElement('select');
       entries.forEach((e, n) => {
         const o = document.createElement('option');
@@ -445,6 +476,20 @@ function renderBoot() {
       pick.title = 'boot sample for instrument ' + i;
       pick.onchange = () => { rom[defOff + 8 + i] = +pick.value; render(); };
       lab.appendChild(pick);
+      if (t === 4) {                     // slices: equal divisions of the blob
+        const sn = document.createElement('input');
+        sn.type = 'number';
+        sn.min = 1; sn.max = 16;
+        sn.value = ((rom[defOff + 16 + i] >> 4) & 0x0F) + 1;
+        sn.title = 'slices (equal divisions)';
+        sn.style.width = '2.6rem';
+        sn.oninput = () => {
+          const n = Math.max(1, Math.min(16, +sn.value || 1));
+          rom[defOff + 16 + i] = (rom[defOff + 16 + i] & 0x0F) | ((n - 1) << 4);
+        };
+        lab.appendChild(document.createTextNode(' x'));
+        lab.appendChild(sn);
+      }
     }
     row.appendChild(lab);
   }
@@ -1068,20 +1113,21 @@ $('pal').oninput = e => {
 };
 
 // ---------------------------------------------------- factory container
-// "SNDJFACT" v1: everything the factory is, in one small shareable file
-// (and the exact payload the build bakes from).
+// "SNDJFACT" v2: everything the factory is, in one small shareable file
+// (and the exact payload the build bakes from). v2 grew the boot-
+// instrument block 16 -> 24 bytes (the SLICES/EON extras row).
 function factoryExport() {
   const pool = S.poolBuild(entries);
-  const out = new Uint8Array(16 + pool.length + 1024 + 16 + 64 + 128);
+  const out = new Uint8Array(16 + pool.length + 1024 + 24 + 64 + 128);
   out.set([...'SNDJFACT'].map(c => c.charCodeAt(0)), 0);
-  out[8] = 1;
+  out[8] = 2;
   out[12] = pool.length & 255;
   out[13] = (pool.length >> 8) & 255;
   out[14] = (pool.length >> 16) & 255;
   let o = 16;
   out.set(pool, o); o += pool.length;
   out.set(rom.subarray(kitOff, kitOff + 1024), o); o += 1024;
-  out.set(rom.subarray(defOff, defOff + 16), o); o += 16;
+  out.set(rom.subarray(defOff, defOff + 24), o); o += 24;
   out.set(rom.subarray(firOff, firOff + 64), o); o += 64;
   out.set(rom.subarray(palOff, palOff + 128), o);
   const a = document.createElement('a');
@@ -1094,8 +1140,9 @@ function factoryExport() {
 
 async function factoryImport(f) {
   const d = new Uint8Array(await f.arrayBuffer());
-  if (String.fromCharCode(...d.slice(0, 8)) !== 'SNDJFACT' || d[8] !== 1) {
-    status(f.name + ': not a SNDJFACT v1 file', 1);
+  const ver = d[8];
+  if (String.fromCharCode(...d.slice(0, 8)) !== 'SNDJFACT' || (ver !== 1 && ver !== 2)) {
+    status(f.name + ': not a SNDJFACT file', 1);
     return;
   }
   const plen = d[12] | (d[13] << 8) | (d[14] << 16);
@@ -1108,7 +1155,12 @@ async function factoryImport(f) {
   }
   o += plen;
   rom.set(d.subarray(o, o + 1024), kitOff); o += 1024;
-  rom.set(d.subarray(o, o + 16), defOff); o += 16;
+  if (ver >= 2) {
+    rom.set(d.subarray(o, o + 24), defOff); o += 24;
+  } else {                               // v1: no extras row — zero it
+    rom.set(d.subarray(o, o + 16), defOff); o += 16;
+    rom.fill(0, defOff + 16, defOff + 24);
+  }
   rom.set(d.subarray(o, o + 64), firOff); o += 64;
   rom.set(d.subarray(o, o + 128), palOff);
   firTaps = Array.from(rom.slice(firOff + 40, firOff + 48)).map(s8);

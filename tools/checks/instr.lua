@@ -60,6 +60,7 @@ for _ = 1, 4 do chord({ right = true }) end -- +4 (L/R steps 1; U/D = octave)
 gest({ down = true })                     -- OFS2
 chord({ up = true })                      -- +12
 for _ = 1, 5 do chord({ left = true }) end  -- -5 -> 7
+t = t + 6                                 -- settle: the drawn value lags the edit
 local shot_at = t - 2
 local after_edit = t + 4
 gest({ a = true, left = true })           -- back to PHRASE

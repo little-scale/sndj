@@ -673,10 +673,12 @@ trig_tune_load:
     lda.l $7E0000 + SB_INSTR + 6,x  ; FINE (signed)
     sta np_fine
     lda.l $7E0000 + SB_INSTR,x
-    and #$03
+    and #$07
     beq @pool               ; SMP
     cmp #$03
     beq @pool               ; NSE
+    cmp #$04
+    beq @pool               ; SLICE: the blob's default tune applies
     cmp #$02
     beq @wav
     stz trig_semis          ; KIT: per-slot tune overrides at trigger
@@ -732,7 +734,7 @@ apply_instrument:
     sep #$20
 .ACCU 8
     lda.l $7E0000 + SB_INSTR,x
-    and #$03
+    and #$07
     sta trig_type
     plx
     lda trig_id
@@ -753,7 +755,7 @@ apply_instrument:
 .ACCU 8
     ; type decides sample routing and the NON bit
     lda.l $7E0000 + SB_INSTR,x
-    and #$03
+    and #$07
     sta trig_type
     cmp #$02                ; WAV: SRCN = 56 + bank
     bne @not_wav
@@ -847,7 +849,48 @@ apply_instrument:
     jsr apu_dsp_write
 @eon_same:
     plx
-    ; ADSR1 (ADSR mode always on)
+    ; ADSR1 (ADSR mode always on). SLICE synthesizes its envelope from
+    ; rec[2]'s two nibbles: attack (low, the shared ADSR position) +
+    ; FADE (high) -> decay 0, sustain level 7, sustain rate from FADE
+    ; (0 = hold/bleed into the next slice, F = fastest cut).
+    lda trig_type
+    cmp #$04
+    bne @env_rec
+    lda.l $7E0000 + SB_INSTR + 2,x
+    and #$0F
+    ora #$80
+    tay
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0ADSR1
+    phx
+    jsr apu_dsp_write
+    plx
+    lda.l $7E0000 + SB_INSTR + 2,x
+    lsr
+    lsr
+    lsr
+    lsr
+    beq @fade_hold          ; FADE 0: SR 0 = ring
+    clc
+    adc #14                 ; FADE 1-15 -> SR 15-29 (~2 s .. ~35 ms)
+@fade_hold:
+    ora #$E0                ; sustain level 7
+    tay
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0ADSR2
+    phx
+    jsr apu_dsp_write
+    plx
+    bra @env_done
+@env_rec:
     lda.l $7E0000 + SB_INSTR + 2,x
     ora #$80
     tay
@@ -872,6 +915,7 @@ apply_instrument:
     phx
     jsr apu_dsp_write
     plx
+@env_done:
     ; VOL L/R — also latched as the voice's live level (the X/P/U
     ; commands retarget it, TRM dips from it)
     lda.l $7E0000 + SB_INSTR + 4,x
@@ -939,10 +983,15 @@ audition_note:
     jsr apply_instrument
     lda trig_type
     cmp #$01
-    bne @no_instr
+    bne @not_kit_a
     jsr kit_trigger         ; kit instruments audition the note's slot
     bcs @kon
     rts                     ; empty slot: silence
+@not_kit_a:
+    cmp #$04
+    bne @no_instr
+    jsr slice_trigger       ; slices audition the note's division
+    bra @kon
 @no_instr:
     lda trig_note
     jsr note_pitch_calc_only

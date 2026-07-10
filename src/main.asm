@@ -295,11 +295,13 @@ pal_schemes:
     .INCBIN "schemes.bin"
 
 ; factory defaults (track instruments), marker-wrapped so browser tools
-; can re-voice a built ROM without a toolchain:
-; 8 track instrument types, 8 track samples/banks/kits
-    .DB "SNDEF0"
-factory_instr_type: .DB 0, 0, 0, 0, 0, 0, 0, 1
-factory_instr_smp:  .DB 0, 1, 2, 3, 4, 5, 6, 0
+; can re-voice a built ROM without a toolchain: 8 instrument types,
+; 8 samples/banks/kits, 8 extras (record byte 7: SLICES-1 high nibble,
+; EON bit 0). maketables.py extracts the rows from samples/factory.sndjfact.
+    .DB "SNDEF1"
+factory_instr_type: .INCBIN "defaults.bin" SKIP 0 READ 8
+factory_instr_smp:  .INCBIN "defaults.bin" SKIP 8 READ 8
+factory_instr_x7:   .INCBIN "defaults.bin" SKIP 16 READ 8
 
 
 ; 8 factory FIR curves x 8 taps, marker-wrapped so firdesign.html patches

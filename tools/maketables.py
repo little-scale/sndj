@@ -121,7 +121,7 @@ def kits_bin():
     if os.path.exists('samples/factory.sndjfact'):
         with open('samples/factory.sndjfact', 'rb') as f:
             d = f.read()
-        assert d[:8] == b'SNDJFACT' and d[8] == 1, 'factory.sndjfact: bad magic'
+        assert d[:8] == b'SNDJFACT' and d[8] in (1, 2), 'factory.sndjfact: bad magic'
         plen = d[12] | (d[13] << 8) | (d[14] << 16)
         return d[16 + plen:16 + plen + 1024]
     if os.path.exists('samples/kits.bin'):
@@ -137,6 +137,24 @@ def kits_bin():
     return bytes(out)
 
 
+def defaults_bin():
+    # SNDEF1: 8 instrument types + 8 samples/kits/banks + 8 extra bytes
+    # (record byte 7: SLICES-1 in the high nibble, EON in bit 0). A v1
+    # factory file has no extra row — pad with zeros.
+    import os.path
+    if os.path.exists('samples/factory.sndjfact'):
+        with open('samples/factory.sndjfact', 'rb') as f:
+            d = f.read()
+        plen = d[12] | (d[13] << 8) | (d[14] << 16)
+        off = 16 + plen + 1024
+        if d[8] >= 2:
+            return d[off:off + 24]
+        return d[off:off + 16] + bytes(8)
+    return bytes((0, 0, 0, 0, 0, 0, 0, 1,
+                  0, 1, 2, 3, 4, 5, 6, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0))
+
+
 def main(build_dir):
     sch = schemes_bin()
     with open(f'{build_dir}/schemes.bin', 'wb') as f:
@@ -144,10 +162,15 @@ def main(build_dir):
     kits = kits_bin()
     with open(f'{build_dir}/kits.bin', 'wb') as f:
         f.write(kits)
+    defs = defaults_bin()
+    assert len(defs) == 24, 'defaults.bin must be 24 bytes'
+    with open(f'{build_dir}/defaults.bin', 'wb') as f:
+        f.write(defs)
     with open(f'{build_dir}/tables.inc', 'w') as f:
         f.write(tables_inc())
         f.write(scheme_names_inc())
-    print(f"maketables: schemes.bin ({len(sch)}), kits.bin ({len(kits)}), tables.inc")
+    print(f"maketables: schemes.bin ({len(sch)}), kits.bin ({len(kits)}), "
+          f"defaults.bin, tables.inc")
 
 
 if __name__ == '__main__':
