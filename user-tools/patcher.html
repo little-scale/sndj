@@ -323,7 +323,8 @@ function render() {
     row.insertCell().appendChild(clr);
     // an sf2 slot dragged here imports into this pool slot
     row.ondragover = ev => {
-      if (!sf2Loaded()) return;
+      const hasFile = [...ev.dataTransfer.types].includes('Files');
+      if (!sf2Loaded() && !hasFile) return;
       ev.preventDefault();
       ev.dataTransfer.dropEffect = 'copy';
       row.classList.add('target');
@@ -332,6 +333,12 @@ function render() {
     row.ondrop = ev => {
       ev.preventDefault();
       row.classList.remove('target');
+      const f = ev.dataTransfer.files && ev.dataTransfer.files[0];
+      if (f) {                       // a file from the OS, straight onto a slot
+        if (/\.sf2$/i.test(f.name)) loadSf2(f);
+        else wavReplace(f, i);
+        return;
+      }
       const [fi, idx] = ev.dataTransfer.getData('text/plain')
         .split(',').map(Number);
       if (sf2fonts[fi] && sf2fonts[fi].samples[idx]) sf2Import(fi, idx, i);
@@ -842,12 +849,19 @@ $('wavfile').onchange = async e => {
     return;
   }
   if (replacing < 0) return;
+  await wavReplace(f, replacing);
+  replacing = -1;
+};
+
+// import a WAV into a pool slot with the current import settings
+async function wavReplace(f, slot) {
   try {
     const raw = new Uint8Array(await f.arrayBuffer());
     const info = S.wavInfo(raw);
     const name = f.name.replace(/\.wav$/i, '').toUpperCase().slice(0, 8) || 'SAMPLE';
     let mode = $('sfmode').value;
     if (mode === 'auto') mode = (info && info.loop) ? 'melodic' : 'oneshot';
+    const replacing = slot;
     if (mode === 'melodic') {
       // a smpl-chunk loop rides the sf2 melodic pipeline; without one,
       // the WHOLE file is the loop (single-cycle / seamless sources)
@@ -883,8 +897,7 @@ $('wavfile').onchange = async e => {
   } catch (err) {
     status('replace failed: ' + err.message, 1);
   }
-  replacing = -1;
-};
+}
 
 // decode a WAV at its OWN rate (loop points stay exact; sf2Melodic does
 // the in-tune resample to 32 kHz itself)
