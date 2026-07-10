@@ -475,7 +475,7 @@ function renderKits() {
           rom[off] = +pick.value;
           if (!rom[off + 2]) { rom[off + 1] = 0xE8; rom[off + 2] = 0x50; }
         }
-        renderKits();
+        render();            // the boot set changed: badges + ARAM bar follow
       };
       row.insertCell().appendChild(pick);
       const tuneIn = document.createElement('input');
@@ -493,6 +493,7 @@ function renderKits() {
       volIn.title = 'slot volume (0 = empty slot)';
       volIn.style.width = '3.2rem';
       volIn.oninput = () => { rom[off + 2] = (+volIn.value || 0) & 0x7F; };
+      volIn.onchange = () => render();
       row.insertCell().appendChild(volIn);
       const play = document.createElement('button');
       play.textContent = 'play';
@@ -507,7 +508,7 @@ function renderKits() {
       row.insertCell().appendChild(play);
       const clr = document.createElement('button');
       clr.textContent = 'clear';
-      clr.onclick = () => { rom.set([0, 0, 0, 0], off); renderKits(); };
+      clr.onclick = () => { rom.set([0, 0, 0, 0], off); render(); };
       row.insertCell().appendChild(clr);
       // an sf2 slot dropped here: one-shot into a free pool slot + assign
       row.ondragover = ev => {
