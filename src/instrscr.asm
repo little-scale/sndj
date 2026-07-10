@@ -14,12 +14,13 @@
 .ACCU 8
 .INDEX 16
 
-.DEFINE IF_COUNT 18
+.DEFINE IF_COUNT 19
 
 ; field table, in DISPLAY order: byte offset in record, shift, value
 ; mask (post-shift), max
 if_fields:
-    .DB 0,  0, $03, 3    ; 0  TYPE
+    .DB 0,  0, $3F, 63   ; 0  INSTR — the number itself (pseudo-field)
+    .DB 0,  0, $03, 3    ; 1  TYPE
     .DB 1,  0, $FF, 63   ; 1  SAMPLE / KIT / BANK (max re-clamped per type)
     .DB 2,  0, $0F, 15   ; 2  ATTACK
     .DB 2,  4, $07, 7    ; 3  DECAY
@@ -40,16 +41,17 @@ if_fields:
 
 ; screen row per field: blank rows separate the groups
 if_row:
-    .DB 0, 1                       ; identity
-    .DB 3, 4, 5, 6                 ; envelope
-    .DB 8, 9, 10                   ; mix + send
-    .DB 12, 13, 14                 ; tune + motion
-    .DB 16, 17, 18, 19             ; chord span
-    .DB 21, 22                     ; table
+    .DB 0, 1, 2                    ; number + identity
+    .DB 4, 5, 6, 7                 ; envelope
+    .DB 9, 10, 11                  ; mix + send
+    .DB 13, 14, 15                 ; tune + motion
+    .DB 17, 18, 19, 20             ; chord span
+    .DB 22, 23                     ; table
 
 ; visibility per type (bit 0 SMP, 1 KIT, 2 WAV, 3 NSE): a type hides
 ; the fields its trigger path never reads
 if_vis:
+    .DB $0F              ; INSTR number
     .DB $0F              ; TYPE
     .DB $07              ; SAMPLE (NSE has none)
     .DB $0F, $0F, $0F, $0F   ; envelope: hardware ADSR applies to all
@@ -62,9 +64,11 @@ if_vis:
     .DB $0F, $0F         ; TBL/TBS
 
 if_labels:
+    .DW if_lnum
     .DW if_l0, if_l1, if_l2, if_l3, if_l4, if_l5
     .DW if_l6, if_l7, if_l12, if_l13, if_l14, if_l15
     .DW if_l8, if_l9, if_l10, if_l11, if_l16, if_l17
+if_lnum: .DB "INSTR", 0
 if_l0:  .DB "TYPE", 0
 if_l1:  .DB "SAMPLE", 0
 if_l1k: .DB "KIT   ", 0
@@ -151,8 +155,6 @@ instr_init:
 .ACCU 8
     ldx #str_instr
     jsr text_puts
-    lda ed_instr
-    jsr text_hex8
     rts
 
 ; load field if_cur's descriptor into str_buf+36.. and X = record-relative
@@ -177,7 +179,7 @@ if_desc:
     sta str_buf + 39        ; shift
     ; the SAMPLE field's range follows the type: KIT 0-15, WAV bank 0-7
     lda if_cur
-    cmp #$01
+    cmp #$02
     bne @max_ok
     jsr if_typebit
     cmp #$02                ; KIT
@@ -291,7 +293,7 @@ instr_update:
     and #(INSTR_COUNT - 1)
     sta ed_instr
     jsr if_cur_fix
-    jmp instr_hdr
+    jmp instr_draw
 @y_dn:
     rep #$20
 .ACCU 16
@@ -305,7 +307,7 @@ instr_update:
     and #(INSTR_COUNT - 1)
     sta ed_instr
     jsr if_cur_fix
-    jmp instr_hdr
+    jmp instr_draw
 @y_done:
     jmp instr_draw
 @no_y:
@@ -390,22 +392,6 @@ instr_update:
 @draw:
     jmp instr_draw
 
-; header: reprint the instrument number (Y+up/down switch)
-instr_hdr:
-    lda #6
-    sta text_x
-    lda #1
-    sta text_y
-    rep #$20
-.ACCU 16
-    lda #ATTR_HILITE
-    sta text_attr
-    sep #$20
-.ACCU 8
-    lda ed_instr
-    jsr text_hex8
-    jmp instr_draw
-
 ; after an instrument switch the cursor may sit on a hidden field
 if_cur_fix:
     lda if_cur
@@ -426,6 +412,16 @@ if_nudge:
     sta str_buf + 35        ; pending delta (if_desc clobbers tmp1/tmp2? no,
                             ; but if_get_x reuses +34; keep delta at +35 until
                             ; the add, then let if_set_x reuse it)
+    lda if_cur
+    bne @record_field
+    ; field 0 nudges the NUMBER: switch which instrument is edited
+    lda ed_instr
+    clc
+    adc str_buf + 35
+    and #(INSTR_COUNT - 1)
+    sta ed_instr
+    rts
+@record_field:
     jsr if_desc
     jsr if_get_x
     clc
@@ -458,7 +454,8 @@ if_nudge:
     jsr if_set_x
     ; type or sample edits change which pool samples the song needs
     lda if_cur
-    cmp #$02
+    beq @no_res
+    cmp #$03
     bcs @no_res
     jsr residency_build
 @no_res:
@@ -516,7 +513,7 @@ instr_draw:
 @label:
     ; the SAMPLE row reads KIT / BANK on those types
     lda ui_cnt
-    cmp #$01
+    cmp #$02
     bne @lab_std
     jsr if_typebit
     cmp #$02
@@ -564,7 +561,7 @@ instr_draw:
     pla
     sta if_cur
     lda ui_cnt
-    cmp #$08
+    cmp #$09
     bne @not_echo_v
     ; ECHO: a toggle reads ON/OFF, not 00/01
     lda str_buf + 33
@@ -581,7 +578,7 @@ instr_draw:
     plx
     jmp @next
 @not_echo_v:
-    cmp #$10
+    cmp #$11
     bne @not_tbl_v
     ; TBL: anything past the 32 tables is the nil state
     lda str_buf + 33
@@ -598,6 +595,13 @@ instr_draw:
     jmp @next
 @not_tbl_v:
     lda ui_cnt
+    bne @not_num_v
+    ; INSTR: the edited instrument's number
+    lda ed_instr
+    jsr text_hex8
+    jmp @next
+@not_num_v:
+    cmp #$01
     bne @hex
     ; TYPE: 3-char name (fetch all chars first; text_puttile clobbers X)
     lda str_buf + 33

@@ -5,6 +5,8 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- The instrument NUMBER is the INSTR screen's first field (sibling
+  grammar): nudge it to switch instruments in place.
 - INSTR grew up: fields are **grouped** (identity / envelope / mix /
   tune & motion / chord / table) with blank rows between, **Y + ↑/↓
   flips instruments** without leaving the screen (matching PHRASE and

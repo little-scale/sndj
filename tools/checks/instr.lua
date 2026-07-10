@@ -52,7 +52,7 @@ gest({ right = true })                    -- instr column
 gest({ b = true })                        -- instr 00 at row 0
 gest({ a = true, right = true })          -- INSTR
 local at_instr = t
-for _ = 1, 12 do gest({ down = true }) end -- field 12 = GRP (grouped layout)
+for _ = 1, 13 do gest({ down = true }) end -- field 13 = GRP (NUM leads the list)
 chord({ right = true })                   -- GRP 0 -> 1
 chord({ right = true })                   -- GRP 1 -> 2
 gest({ down = true })                     -- OFS1
