@@ -5,6 +5,13 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- **Echo routing is a real gate now**: a voice sends to the room only
+  when its instrument's ECHO flag is on **and** its channel's bit in
+  the EON MASK is open (masks previously got overwritten by every
+  instrument trigger — they "did nothing"). New songs open all gates,
+  so the instrument flag alone still works; `E` and MIDI CC 91 edit
+  the channel gate. Same instrument wet on one track, dry on another.
+
 - patcher: **export factory / import factory** — the whole factory
   identity (pool, kits, boot instruments, FIR presets, palettes) in
   one small `.sndjfact` file, applyable onto any loaded ROM. Share a

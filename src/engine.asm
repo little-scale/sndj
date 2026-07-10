@@ -206,8 +206,9 @@ song_init:
     lda #$00
     sta.l $7E0000 + SB_HEADER + SH_GROOVE
     sta.l $7E0000 + SB_HEADER + SH_EDL
-    sta.l $7E0000 + SB_HEADER + SH_EON
     sta.l $7E0000 + SB_HEADER + SH_FIR
+    lda #$FF                ; EON MASK: every channel's gate starts open —
+    sta.l $7E0000 + SB_HEADER + SH_EON  ; the instrument ECHO flag decides
     lda #$30
     sta.l $7E0000 + SB_HEADER + SH_EFB
     sta.l $7E0000 + SB_HEADER + SH_EVL
@@ -626,6 +627,49 @@ engine_tick_fx:
     bne @no_pulse
     jsr sync_pulse_tick
 @no_pulse:
+    rts
+
+; --- effective echo sends: instrument ECHO flag AND the channel's EON ----------
+; MASK bit, per voice; recomputed when either side changes. Preserves X.
+eon_sync:
+    phx
+    stz sy_tmp
+    ldx #$0000
+@track:
+    lda.w trk_instr,x
+    cmp #INSTR_NONE
+    beq @next
+    phx
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR + 7,x
+    plx
+    and #$01
+    beq @next
+    lda.l $7E0000 + SB_HEADER + SH_EON
+    and.w bit_for_track,x
+    beq @next
+    lda.w bit_for_track,x
+    ora sy_tmp
+    sta sy_tmp
+@next:
+    inx
+    cpx #TRACKS
+    bne @track
+    lda sy_tmp
+    sta eng_eon
+    tay
+    lda #DSP_EON
+    jsr apu_dsp_write
+    plx
     rts
 
 ; --- SYNC IN/IN24 row gate: external clocks decide the row, one per tick ---------
@@ -1142,22 +1186,23 @@ row_cmd_pre:
 @not_t:
     cmp #CMDID_E
     bne @not_e
-    ; E: echo send on/off for this voice (val 0 = off, else on)
+    ; E: open/close this CHANNEL's gate in the song's EON MASK; the
+    ; sound still needs its instrument's ECHO flag (effective = AND)
     lda.w trk_cval,x
     beq @eon_off
-    lda.w bit_for_track,x
-    ora eng_eon
+    lda.l $7E0000 + SB_HEADER + SH_EON
+    ora.w bit_for_track,x
     bra @eon_wr
 @eon_off:
     lda.w bit_for_track,x
     eor #$FF
-    and eng_eon
+    sta es0
+    lda.l $7E0000 + SB_HEADER + SH_EON
+    and es0
 @eon_wr:
-    sta eng_eon
-    tay
-    lda #DSP_EON
+    sta.l $7E0000 + SB_HEADER + SH_EON
     phx
-    jsr apu_dsp_write
+    jsr eon_sync
     plx
     rts
 @not_e:

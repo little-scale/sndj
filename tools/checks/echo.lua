@@ -91,10 +91,11 @@ gest({ down = true })
 gest({ down = true })
 nudge("right", 10)
 local fir1 = t
--- EON field (up 1) -> +1
+-- EON field: $FF default wraps to 0 (+1), then a second +1 opens ch 1
 gest({ up = true })
 nudge("right", 10)
 local eon1 = t
+nudge("right", 6)
 -- Y/X commands via playback (song already has chain0/phrase0 context)
 local play = t + 4
 local cmds_done = play + 40
@@ -123,6 +124,7 @@ emu.addEventCallback(function()
     poke(0x4311, 0xFF)
     poke(0x4312, 5)          -- E
     poke(0x4313, 0)
+    poke(0x2407, 1)          -- instr 0: ECHO flag on (the sound opts in)
     aram_snap = snap_aram()
   elseif frames == at_echo then
     check(wram(0x0C) == 6, "navigated to the ECHO screen")
@@ -146,11 +148,15 @@ emu.addEventCallback(function()
     check(dsp(0x0F) == 0x58 and dsp(0x1F) == 0x30 and dsp(0x2F) == 0x12,
       "FIR preset 1 (DARK) taps written")
   elseif frames == eon1 then
-    check(dsp(0x4D) == 0x01, "EON mask edit reached the DSP")
+    check(wram(0x3607) == 0x00, "EON mask edits the song header ($FF wraps)")
+    check(dsp(0x4D) == 0x00, "all gates shut: no sends")
+  elseif frames == play + 12 then
+    check(dsp(0x4D) % 2 == 1,
+      "instrument ECHO + open gate = the voice sends")
   elseif frames == cmds_done then
     check(dsp(0x0F) == 0x40 and dsp(0x3F) == 0x40,
       "Y03 selected the COMB FIR preset mid-song")
-    check(dsp(0x4D) == 0x00, "E00 cleared the voice's echo send")
+    check(dsp(0x4D) == 0x00, "E00 shut the channel's gate")
     check(aram_intact(aram_snap), "samples intact after command playback")
     if fails == 0 then
       print("ALL PASS echo.lua")

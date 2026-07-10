@@ -401,16 +401,16 @@ midi_cc:
     bcs @eon_on
     lda.w bit_for_track,x
     eor #$FF
-    and eng_eon
+    sta sy_tmp
+    lda.l $7E0000 + SB_HEADER + SH_EON
+    and sy_tmp
     bra @eon_wr
 @eon_on:
-    lda.w bit_for_track,x
-    ora eng_eon
+    lda.l $7E0000 + SB_HEADER + SH_EON
+    ora.w bit_for_track,x
 @eon_wr:
-    sta eng_eon
-    tay
-    lda #DSP_EON
-    jmp apu_dsp_write
+    sta.l $7E0000 + SB_HEADER + SH_EON
+    jmp eon_sync
 @fir:
     lda mp_ev + 2
     lsr

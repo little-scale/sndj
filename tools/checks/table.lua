@@ -46,6 +46,7 @@ emu.addEventCallback(function()
     poke(0x4301, 0)
     poke(0x240C, 0)          -- instr 0: TBL = 0
     poke(0x240D, 1)          -- TBS = every tick
+    poke(0x2407, 1)          -- instr 0: ECHO flag on (E gates the channel)
     -- note-sync + nil coverage: notes on rows 4 and 6 use instr 1
     -- (TBL nil from factory) then instr 2 with TBS 0
     poke(0x4310, 49)         -- row 4: instr 1, no table

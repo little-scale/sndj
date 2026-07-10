@@ -205,7 +205,10 @@ use it (the ECHO screen's RAM/FREE line shows the live balance).
 - **VOL L / R** — signed! A negative volume inverts that side's
   phase: instant width. (The `U` command does this per row.)
 - **FINE** — signed fine-tune, 1/256ths of a semitone.
-- **ECHO** — ON/OFF: does this voice feed the echo room?
+- **ECHO** — ON/OFF: does this *sound* want the room? The voice only
+  sends when this is ON **and** the channel's gate is open in ECHO's
+  EON MASK (open by default) — so one instrument can be wet on one
+  track and dry on another.
 - **PMOD** — this voice's pitch is modulated by the voice to its
   *left*. Put a quiet sine (WAV) on the left track, melody on the
   right: FM-flavoured growls and bells. The screen shows the pairing

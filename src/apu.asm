@@ -290,11 +290,7 @@ apu_echo_apply_light:
     tay
     lda #DSP_EFB
     jsr apu_dsp_write
-    lda.l $7E0000 + SB_HEADER + SH_EON
-    sta eng_eon             ; the live shadow starts from the song default
-    tay
-    lda #DSP_EON
-    jsr apu_dsp_write
+    jsr eon_sync            ; effective sends = instrument flags AND mask
     jmp apu_fir_apply       ; the song's own taps (presets copy into them)
 
 apu_echo_apply:
@@ -831,6 +827,9 @@ apply_instrument:
     sep #$20
 .ACCU 8
     pla
+    beq @eon_off
+    lda.l $7E0000 + SB_HEADER + SH_EON
+    and.w bit_for_track,x   ; the channel's gate must be open too
     beq @eon_off
     lda.w bit_for_track,x
     ora eng_eon
