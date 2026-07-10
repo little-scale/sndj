@@ -106,7 +106,8 @@ test:
 	node user-tools/sndj.js --selftest
 	python3 tools/test_sf2.py /tmp/sndj-sf2-fixture.json
 	node tools/test_sf2.js /tmp/sndj-sf2-fixture.json
-	node -e "for (const f of ['user-tools/patcher.html','user-tools/savetool.html']) { const s = require('fs').readFileSync(f, 'utf8'); const m = s.match(/<script>([^]*?)<\/script>/); new Function(m[1]); } console.log('html tools: parse OK')"
+	node tools/test_als.js
+	node -e "for (const f of ['user-tools/patcher.html','user-tools/savetool.html','user-tools/als2sndj.html']) { const s = require('fs').readFileSync(f, 'utf8'); const m = s.match(/<script>([^]*?)<\/script>/); new Function(m[1]); } console.log('html tools: parse OK')"
 	@echo "test: OK"
 
 dist: all

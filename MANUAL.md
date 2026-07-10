@@ -535,8 +535,14 @@ everything runs locally:
   model of the console's BRR + Gaussian playback, so what you hear in
   the browser is what the cart plays.
 - **savetool.html** — song manager for cart saves (§12).
+- **als2sndj.html** — Ableton / MIDI / MML converter, both directions:
+  drop an `.als` Live Set or `.mid` (first 8 tracks → V1–V8, tempo →
+  TMPO, velocities → `X`, note ends → `OFF`), get a `.sndj`; drop a
+  `.sndj`, get a Live Set back or MML text you can edit and re-import.
+  A built-in viewer shows the SONG/CHAIN/PHRASE data before you commit.
+  ALS.md documents the mapping and the MML grammar.
 
-Both share `sndj.js`, the reference library (keep it next to
+All of them share `sndj.js`, the reference library (keep it next to
 them). Python command-line mirrors of the same operations live in
 `tools/` for people who script.
 

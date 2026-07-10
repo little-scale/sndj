@@ -5,6 +5,14 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- **als2sndj.html**: Ableton / MIDI / MML ⇄ `.sndj` converter
+  (browser, offline). Imports Live Sets and Standard MIDI Files —
+  first 8 tracks → V1–V8, tempo → TMPO, velocity → `X`, real `OFF`s
+  at note ends; exports a song back to a Session-view `.als` or to
+  editable MML text. Built-in SONG/CHAIN/PHRASE viewer; pool-limit
+  truncation is always reported. ALS.md documents the mapping;
+  `tools/test_als.js` round-trips fixtures in `make test`.
+
 - Splash: the screen comes up **before** the audio upload with a
   LOADING AUDIO line (a black screen used to sit there for the ~1.5 s
   sample transfer), then swaps to PRESS START; the version and git
