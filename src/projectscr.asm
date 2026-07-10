@@ -208,17 +208,7 @@ project_draw:
     sta text_y
     lda #2
     sta text_x
-    lda ui_cnt
-    cmp pj_cur
-    bne @dim
-    rep #$20
-.ACCU 16
-    lda #ATTR_ACCENT
-    sta text_attr
-    sep #$20
-.ACCU 8
-    bra @label
-@dim:
+    ; labels stay dim; the VALUE carries the cursor accent
     rep #$20
 .ACCU 16
     lda #ATTR_DIM
@@ -237,15 +227,27 @@ project_draw:
     sep #$20
 .ACCU 8
     jsr text_puts
-    ; value at x12
+    ; value at x12 (accent under the cursor)
     lda #12
     sta text_x
+    lda ui_cnt
+    cmp pj_cur
+    bne @val_plain
+    rep #$20
+.ACCU 16
+    lda #ATTR_ACCENT
+    sta text_attr
+    sep #$20
+.ACCU 8
+    bra @val_go
+@val_plain:
     rep #$20
 .ACCU 16
     lda #ATTR_TEXT
     sta text_attr
     sep #$20
 .ACCU 8
+@val_go:
     lda ui_cnt
     bne @not_name
     ; NAME from the song header

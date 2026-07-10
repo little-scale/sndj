@@ -29,10 +29,10 @@ fir_init:
 .ACCU 8
     ldx #str_fir
     jsr text_puts
-    ; ruler
+    ; ruler (the family grid: header y4, rows from y5)
     lda #4
     sta text_x
-    lda #8
+    lda #4
     sta text_y
     rep #$20
 .ACCU 16
@@ -204,7 +204,7 @@ fir_draw:
 @rows:
     lda ui_cnt
     clc
-    adc #9
+    adc #5
     sta text_y
     lda #2
     sta text_x

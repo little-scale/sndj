@@ -5,6 +5,11 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- TABLE and FIR grids start at the family height (header y4, rows
+  from y5) — same as PHRASE and INSTR.
+- PROJECT highlights and navigates the **values**, not the labels
+  (same convention as ECHO/INSTR/OPTIONS).
+
 - INSTR packs its layout per type: hidden fields no longer leave
   empty rows behind (KARP is 10 rows, not 24 with a void above
   TBL/TBS), a blank line still separates the groups, and every row
