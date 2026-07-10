@@ -5,6 +5,9 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- ECHO's content moves down two rows (ledger from y4, fields from
+  y8) — clear of the title line, matching the family layout.
+
 - Map: **TABLE and FIR link vertically** (A+Down / A+Up) — the FIR
   screen sits directly below TABLE in its column.
 - KIT: the **kit number is the first field** (INSTR grammar) — cursor

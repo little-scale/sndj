@@ -269,7 +269,7 @@ echo_draw:
     lda ui_cnt
     asl
     clc
-    adc #6
+    adc #8
     sta text_y
     lda #2
     sta text_x
@@ -363,7 +363,7 @@ echo_draw:
     bne @no_cost
     lda #14
     sta text_x
-    lda #7
+    lda #9
     sta text_y
     rep #$20
 .ACCU 16
@@ -429,7 +429,7 @@ echo_draw:
     ; at the top, above the DELAY it trades against
     lda #2
     sta text_x
-    lda #2
+    lda #4
     sta text_y
     rep #$20
 .ACCU 16
@@ -451,7 +451,7 @@ echo_draw:
     ; FREE on its own row
     lda #2
     sta text_x
-    lda #3
+    lda #5
     sta text_y
     ldx #str_free
     jsr text_puts
@@ -511,7 +511,7 @@ echo_draw:
     ; ...on its own row below FREE
     lda #7
     sta text_x
-    lda #4
+    lda #6
     sta text_y
     lda #'+' - 32
     jsr text_puttile
@@ -523,7 +523,7 @@ echo_draw:
     ; current FIR preset taps, read-only
     lda #2
     sta text_x
-    lda #18
+    lda #20
     sta text_y
     rep #$20
 .ACCU 16
@@ -552,7 +552,7 @@ echo_draw:
     adc es1
     adc #2                  ; x = 2 + tap*3
     sta text_x
-    lda #19
+    lda #21
     sta text_y
     phx
     lda.w fir_presets,x
