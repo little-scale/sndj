@@ -11,6 +11,10 @@ S-DSP can do: BRR samples through Gaussian interpolation, a hardware echo
 with an 8-tap FIR filter, per-voice hardware envelopes, drawn wavetables,
 and 8 full-citizen voices.
 
+> **Releases:** grab the latest ROM from
+> [Releases](../../releases/latest) — flash it to an FXPak/SD2SNES or
+> open it in Mesen 2 / ares / bsnes.
+
 ## Status
 
 Milestones **M1–M14** of the plan (see CLAUDE.md §19) are built on the
@@ -24,11 +28,15 @@ await real-hardware bring-up. What works today:
   KIT, GROOVE, ECHO, FIR, FILES, PROJECT, OPTIONS (plus the LIVE view)
   on the sibling 2-D map (A+d-pad), with the shared B-grammar
   everywhere and play indicators on every playing surface
-- **Instruments** — sample (SMP), kit (KIT), drawn wavetable (WAV),
-  noise (NSE); hardware ADSR, GRP chord spans, per-instrument VIB and
-  TRM. The factory set is lean (7 melodics + one kit) and audio RAM
-  only holds what songs reference — the rest of the pool loads on
-  demand, with the live RAM/FREE balance on the ECHO screen
+- **Six instrument types** — sample (SMP), kit (KIT), drawn wavetable
+  (WAV), noise (NSE), **SLICE** (chop any pool sample into up to 16
+  parts for free — the note picks the slice) and **KARP** (Karplus-
+  Strong on the echo loop: the room becomes a plucked string, a
+  technique no commercial SNES soundtrack ever shipped); hardware
+  ADSR, GRP chord spans, per-instrument VIB/TRM and loop overrides.
+  The factory boots 12 instruments and audio RAM only holds what
+  songs reference — the rest of the pool loads on demand, with the
+  live RAM/FREE balance on the ECHO screen
 - **The complete 24-command set** — one executor shared by phrases and
   tables (summary below)
 - **Echo & FIR** — the SNES's room as an instrument: delay with live
@@ -79,7 +87,7 @@ press means** — no simultaneous-press timing windows.
 the full reference:
 
 > **A** arpeggio · **B** wave bank · **C** chord fan · **D** delay ·
-> **E** echo send · **F** fine tune · **G** groove · **H** hop ·
+> **E** echo send · **F** fine tune · **G** groove pair · **H** hop ·
 > **I** play-count mask · **J** pass-transpose · **K** kill ·
 > **L** slide · **M** master volume · **N** noise clock · **P** pan ·
 > **Q** GAIN override · **R** retrig · **S** sweep · **T** tempo ·

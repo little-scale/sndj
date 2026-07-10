@@ -3,7 +3,12 @@
 All notable changes to sndj. First release will be **v0.1**; versions
 increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
-## 0.1.0-dev (unreleased)
+## v0.1 — 2026-07-10
+
+The first release: the full console tracker (milestones M1-M14 —
+sequencer, six instrument types, echo/FIR, saves, LIVE, sync + MIDI
+takeover console-side) plus the browser patcher/savetool ecosystem.
+Everything below is what v0.1 is made of, newest first.
 
 - **One groove, two steps** (Seb's call): the groove is a single
   public pair of tick counts — 6/6 straight, 7/5 lilt, 8/4 swing —
