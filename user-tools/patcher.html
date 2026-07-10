@@ -14,6 +14,7 @@
           text-align: center; color: #606888; margin: 1rem 0; cursor: pointer; }
   .drop.small { padding: 1rem; }
   .drop.armed { border-color: #40d0c8; color: #40d0c8; }
+  .drop.off { opacity: .35; cursor: default; }
   .cols { display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap; }
   .cols > div { flex: 1 1 0; min-width: min(100%, 340px); overflow-x: auto; }
   .cols > div:first-child { flex: 1.3 1 0; }
@@ -150,6 +151,11 @@ export a patched ROM. Everything runs locally.</p>
   <button class="primary" id="export">export patched ROM</button>
 </div>
 </div>
+<div style="flex:.55">
+<div class="drop small off" id="batchdrop">drop samples (or click)<br>
+<span class="hint">multi-select fills free slots</span></div>
+<input type="file" id="batchfile" hidden accept=".wav" multiple>
+</div>
 <div>
 <div class="drop small" id="sf2drop">drop an .sf2 soundfont here (or click)</div>
 <input type="file" id="sf2file" hidden accept=".sf2">
@@ -233,6 +239,7 @@ async function loadRom(f) {
   }
   kitExpand[0] = true;
   $('tabsbar').hidden = false;
+  $('batchdrop').classList.remove('off');
   selectTab('poolview');
   status(`loaded ${f.name}: ${entries.length} samples in the pool`);
   render();
@@ -898,6 +905,45 @@ async function wavReplace(f, slot) {
     status('replace failed: ' + err.message, 1);
   }
 }
+
+// batch import: fill free pool slots with everything dropped at once,
+// each through the current import settings
+async function batchImport(files) {
+  if (!rom) { status('drop a sndj.sfc first', 1); return; }
+  let done = 0, slot = -1;
+  for (const f of files) {
+    if (/\.sf2$/i.test(f.name)) { loadSf2(f); continue; }
+    if (!/\.wav$/i.test(f.name)) continue;
+    slot = entries.findIndex(isFree);
+    if (slot < 0) {
+      status('pool full after ' + done + ' imports — clear slots for the rest', 1);
+      return;
+    }
+    await wavReplace(f, slot);
+    done++;
+  }
+  if (done) {
+    status('batch: ' + done + ' sample' + (done === 1 ? '' : 's') +
+      ' imported into free slots — check the budgets');
+  }
+}
+
+$('batchdrop').onclick = () => { if (rom) $('batchfile').click(); };
+$('batchfile').onchange = e => {
+  const fs = [...e.target.files];
+  e.target.value = '';
+  if (fs.length) batchImport(fs);
+};
+$('batchdrop').ondragover = e => {
+  e.preventDefault();
+  if (rom) $('batchdrop').classList.add('armed');
+};
+$('batchdrop').ondragleave = () => $('batchdrop').classList.remove('armed');
+$('batchdrop').ondrop = e => {
+  e.preventDefault();
+  $('batchdrop').classList.remove('armed');
+  batchImport([...e.dataTransfer.files]);
+};
 
 // decode a WAV at its OWN rate (loop points stay exact; sf2Melodic does
 // the in-tune resample to 32 kHz itself)
