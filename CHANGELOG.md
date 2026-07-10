@@ -5,6 +5,13 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- patcher: one tuning rule everywhere — **the pool tune fully encodes
+  a sample's storage rate** (8 kHz sf2 one-shots now bake -24 there
+  too), and **kit slots default to tune 0**, staying purely musical.
+  Previously the two conventions could stack to -48 (two octaves low)
+  when a trimmed import landed in a kit. The factory kit's existing
+  -24 slots still sum correctly against their tune-0 pool entries.
+
 - patcher: **trim now works on every import and compensates itself** —
   it stores the data N semitones lower-rate (half size per octave) and
   bakes the offsetting tune into the pool slot, so playback pitch is

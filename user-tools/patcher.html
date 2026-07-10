@@ -85,7 +85,7 @@ export a patched ROM. Everything runs locally.</p>
   <label id="sfcaplab">cap ms <input type="number" id="sfcap" value="160"
     min="20" max="500" style="width:4rem"></label>
   <span class="hint" style="cursor:help; text-decoration:underline dotted"
-    title="melodic: a smpl/sf2 loop imports in tune (root key honoured); without one the whole file loops. Trim +12/+24 stores the data an octave/two lower (half/quarter size) and bakes the compensating tune into the slot automatically — playback pitch is unchanged, just darker. Soundfont one-shots resample to 8 kHz capped at cap ms (kit slots add their own -24); WAV one-shots keep full length. The → column in the soundfont list shows each sample's fate under the current settings.">?</span>
+    title="melodic: a smpl/sf2 loop imports in tune (root key honoured); without one the whole file loops. Trim +12/+24 stores the data an octave/two lower (half/quarter size) and bakes the compensating tune into the slot automatically — playback pitch is unchanged, just darker. One-shots: soundfont slots resample to 8 kHz (capped at cap ms), WAVs keep full length; either way the storage rate is baked into the pool tune, so kit-slot tunes stay purely musical. The → column in the soundfont list shows each sample's fate under the current settings.">?</span>
 </div>
 <div class="cols">
 <div>
@@ -492,7 +492,7 @@ function renderKits() {
           rom.set([0, 0, 0, 0], off);
         } else {
           rom[off] = +pick.value;
-          if (!rom[off + 2]) { rom[off + 1] = 0xE8; rom[off + 2] = 0x50; }
+          if (!rom[off + 2]) { rom[off + 1] = 0; rom[off + 2] = 0x50; }
         }
         render();            // the boot set changed: badges + ARAM bar follow
       };
@@ -833,14 +833,15 @@ function sf2Import(fi, sIdx, slot) {
     const brr = S.brrEncode(prep.pcm, prep.loopBlock);
     const name = (s.preset || s.name).toUpperCase().replace(/[^A-Z0-9 ]/g, '')
       .slice(0, 8) || 'SF2';
-    const t = mode === 'melodic' ? (+$('sftrim').value || 0) : 0;
+    const t = mode === 'melodic' ? (+$('sftrim').value || 0) : 24;
     entries[slot] = {
       name, loopBlock: prep.loopBlock,
       tuneSemis: prep.tuneSemis - t, tuneFine: prep.tuneFine, brr,
     };
     status('imported ' + name + ' into slot #' + slot + ' as ' + mode +
-      ' (' + brr.length + ' B, tune ' + prep.tuneSemis + ':' + prep.tuneFine +
-      (mode === 'oneshot' ? ', 8 kHz — kit slots want tune -24' : '') + ')');
+      ' (' + brr.length + ' B, tune ' + (prep.tuneSemis - t) + ':' +
+      prep.tuneFine +
+      (mode === 'oneshot' ? ' — 8 kHz storage baked into the tune' : '') + ')');
     render();
   } catch (err) {
     status('sf2 import failed: ' + err.message, 1);
