@@ -5,6 +5,14 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- KARP needs no ECHO-screen setup anymore: **flipping TYPE to KARP
+  sizes the room to a string automatically** (DELAY pulls to 1 when
+  it's 0 or >2 — a NEW song sits at the ARAM max, which made the
+  string an untuned wash). Feedback never needs touching (SUSTAIN
+  writes it per note) and EON MASK is bypassed. B-tap audition on
+  INSTR now plucks the real string too (it took the plain-pitch path
+  before).
+
 - KARP's **DAMP is a true tone control now**: the tap kernel always
   sums to 127, so SUSTAIN alone sets how long the string rings and
   DAMP only moves brightness (smoothing sides spread around the

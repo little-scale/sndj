@@ -531,6 +531,24 @@ if_nudge:
     bcs @no_res
     jsr residency_build
 @no_res:
+    ; flipping TYPE to KARP sizes the room for a string: the tuning
+    ; tables assume DELAY 1 or 2, and a NEW song sits at the ARAM max
+    lda if_cur
+    cmp #$01
+    bne @no_room
+    jsr if_typebit
+    cmp #$20
+    bne @no_room
+    lda.l $7E0000 + SB_HEADER + SH_EDL
+    and #$0F
+    beq @set_room
+    cmp #$03
+    bcc @no_room            ; already 1 or 2
+@set_room:
+    lda #$01
+    sta.l $7E0000 + SB_HEADER + SH_EDL
+    jsr apu_echo_apply      ; safe reconfig (the string is 2 KB)
+@no_room:
     rts
 
 instr_draw:

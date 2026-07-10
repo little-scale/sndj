@@ -38,6 +38,17 @@ end
 local script = {
   [14] = { start = true }, [16] = {},
   [44] = { start = true }, [46] = {},
+  -- phase 2: flipping another instrument's TYPE to KARP at EDL 12
+  -- must size the room back to a string (DELAY 1). SONG draws heavy
+  -- while playing: 4-frame pulses
+  [100] = { start = true }, [104] = {},
+  [110] = { a = true }, [114] = { a = true, right = true }, [118] = {},
+  [124] = { a = true }, [128] = { a = true, right = true }, [132] = {},
+  [138] = { a = true }, [142] = { a = true, right = true }, [146] = {},
+  [152] = { y = true }, [156] = { y = true, down = true }, [160] = {},
+  [166] = { down = true }, [170] = {},
+  [176] = { b = true }, [180] = { b = true, right = true },
+  [184] = { b = true }, [188] = {},
 }
 
 emu.addEventCallback(function() emu.setInput(pad, 0) end, emu.eventType.inputPolled)
@@ -91,6 +102,14 @@ emu.addEventCallback(function()
       t[5] .. "/" .. t[6] .. "/" .. t[7] .. ")")
     check(t[5] + t[6] + t[7] == 127, "tap total 127 at the top edge too")
     check(wram(0x16) == 1, "still playing (no runaway)")
+  elseif frames == 106 then
+    poke(0x3603, 12)         -- a big hall again
+    poke(0x2410, 4)          -- I1 pre-staged at SLICE (one nudge to KARP)
+    poke(0x2411, 2)
+  elseif frames == 430 then
+    check(wram(0x3603) == 1,
+      "TYPE -> KARP sized the room to a string (EDL " .. wram(0x3603) .. ")")
+    check(wram(0x2410) == 5, "I1 is KARP")
     if fails == 0 then
       print("ALL PASS karp.lua")
       emu.stop(0)

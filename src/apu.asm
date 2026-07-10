@@ -1056,8 +1056,13 @@ audition_note:
     rts                     ; empty slot: silence
 @not_kit_a:
     cmp #$04
-    bne @no_instr
+    bne @not_slice_a
     jsr slice_trigger       ; slices audition the note's division
+    bra @kon
+@not_slice_a:
+    cmp #$05
+    bne @no_instr
+    jsr karp_trigger        ; KARP auditions pluck the real string
     bra @kon
 @no_instr:
     lda trig_note
