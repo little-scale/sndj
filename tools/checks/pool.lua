@@ -62,7 +62,7 @@ emu.addEventCallback(function()
     -- instruments 0-6 (samples 0-6, in scan order) then kit 0's slots
     -- (samples 16-25); everything else stays in ROM until referenced
     local order = { 0, 1, 2, 3, 4, 5, 6,
-                    16, 17, 18, 19, 20, 21, 22, 23, 24, 25 }
+                    7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 }
     local cursor = 0x1200 + 9
     local all_ok = true
     local slot = 1
@@ -92,11 +92,11 @@ emu.addEventCallback(function()
     end
     check(all_ok, "residency: the boot set uploads in reference order (" ..
       (slot - 1) .. " resident)")
-    check(slot - 1 == 17, "boot set = instr 0-6 + kit 0 exactly (17 samples)")
-    check(srcn_of[16] ~= nil and srcn_of[21] ~= nil,
-      "the SMW kit samples made the budget")
-    check(wram(0x3200) == 16 and wram(0x3201) == 0xE8 and wram(0x3202) == 0x50,
-      "kit 0 slot 0 = SW KICK (pool 16, tune -24)")
+    check(slot - 1 == 18, "boot set = instr 0-6 + kit 0 exactly (18 samples)")
+    check(srcn_of[7] ~= nil and srcn_of[12] ~= nil,
+      "the factory kit samples made the budget")
+    check(wram(0x3200) == 7 and wram(0x3201) == 0xE8 and wram(0x3202) == 0x50,
+      "kit 0 slot 0 = kick (pool 7, tune -24)")
     check(wram(0x3242) == 0 and wram(0x3282) == 0,
       "kits 1-2 ship empty (blank canvases for the builder)")
     check(wram(0x27A0) == 0 and wram(0x27A1) == 0,
@@ -116,16 +116,16 @@ emu.addEventCallback(function()
   elseif frames == 54 then
     check(wram(0x16) == 1, "playing")
     -- C-4 -> kit slot 0 -> SW KICK (pool 16)
-    check(dsp(0x04) == srcn_of[16], "kit slot 0 routed to SW KICK (SRCN " ..
-      tostring(srcn_of[16]) .. ")")
+    check(dsp(0x04) == srcn_of[7], "kit slot 0 routed to the kick (SRCN " ..
+      tostring(srcn_of[7]) .. ")")
     check(dsp(0x02) + dsp(0x03) * 256 == 0x0400,
       "8 kHz factory drum tuned -24 ($0400)")
     check(dsp(0x00) == 0x50 and dsp(0x01) == 0x50, "kit slot volume applied")
     check(kick_peak > 0, "kick envelope ran (peak " .. kick_peak .. ")")
   elseif frames == 80 then
     -- row 4: F-4 -> slot 5 (SW BONGO, pool 21), tuned +12
-    check(dsp(0x04) == srcn_of[21], "kit slot 5 routed to SW BONGO (SRCN " ..
-      tostring(srcn_of[21]) .. ")")
+    check(dsp(0x04) == srcn_of[12], "kit slot 5 routed to BONGO 2 (SRCN " ..
+      tostring(srcn_of[12]) .. ")")
     check(dsp(0x02) + dsp(0x03) * 256 == 0x2000,
       "per-slot tune +12 doubled the pitch")
     if fails == 0 then

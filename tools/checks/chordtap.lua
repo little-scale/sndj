@@ -55,7 +55,7 @@ emu.addEventCallback(function()
   if frames == 34 then
     poke(0x2000, 0)           -- grid: track 0 row 0 = chain 0
     poke(0x3700, 0)           -- chain 0 entry 0 = phrase 0
-    poke(0x2401, 23)          -- instr 0 -> SW ORCH (tune 0)
+    poke(0x2401, 12)          -- instr 0 -> BONGO 2 (tune 0)
     row(0, 49, 0, 3, 0x47)    -- C-4, instr 0, C47: major chord
     row(2, 0, 0xFF, 7, 0x10)  -- G10 on row 2: non-C command
   elseif frames == 50 then

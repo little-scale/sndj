@@ -115,6 +115,14 @@ FACTORY_KITS = [(16, 10)]  # (first pool sample, count)
 
 
 def kits_bin():
+    # a committed samples/kits.bin (extracted from a patched ROM) is the
+    # factory truth, like samples/pool.bin; else generate from the table
+    import os.path
+    if os.path.exists('samples/kits.bin'):
+        with open('samples/kits.bin', 'rb') as f:
+            data = f.read()
+        assert len(data) == 1024, 'samples/kits.bin must be 16*16*4 bytes'
+        return data
     out = bytearray(16 * 16 * 4)
     for k, (base, count) in enumerate(FACTORY_KITS):
         for s in range(count):

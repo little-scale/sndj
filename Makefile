@@ -39,10 +39,10 @@ $(BUILD)/font.bin: tools/makefont.py | $(BUILD)
 $(BUILD)/logo.bin $(BUILD)/logo.inc: tools/makelogo.py art/sndj-logo.png | $(BUILD)
 	python3 tools/makelogo.py $(BUILD)/logo.bin $(BUILD)/logo.inc
 
-$(BUILD)/schemes.bin $(BUILD)/kits.bin $(BUILD)/tables.inc: tools/maketables.py | $(BUILD)
+$(BUILD)/schemes.bin $(BUILD)/kits.bin $(BUILD)/tables.inc: tools/maketables.py $(wildcard samples/kits.bin) | $(BUILD)
 	python3 tools/maketables.py $(BUILD)
 
-$(BUILD)/pool.bin: tools/sndj_pool.py tools/sndj_brr.py | $(BUILD)
+$(BUILD)/pool.bin: tools/sndj_pool.py tools/sndj_brr.py $(wildcard samples/pool.bin) | $(BUILD)
 	python3 tools/sndj_pool.py $@
 
 # SPC700 driver blob

@@ -5,6 +5,17 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- **The factory bank is Seb's curated set** (extracted from a patcher
+  session and committed as `samples/pool.bin` + `samples/kits.bin`,
+  both baked verbatim into every build): 7 melodics — xylophone,
+  violin, trombone, steel drum, saxophone, slap bass, crystal — 11
+  one-shot drums assembled as kit 0, and 30 cleared slots as canvas.
+  Boot residency 29.9 KB, echo ceiling EDL 14 (224 ms).
+- NSE instruments gained a **CLOCK** field (the repurposed sample
+  byte): 0 = the note column sets the noise rate as before, 1-32 pins
+  the rate so a hat sounds the same on any note. The INSTR screen
+  shows it as CLOCK / NOTE for noise types.
+
 - The instrument NUMBER is the INSTR screen's first field (sibling
   grammar): nudge it to switch instruments in place.
 - INSTR grew up: fields are **grouped** (identity / envelope / mix /

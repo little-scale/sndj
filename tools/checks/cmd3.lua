@@ -39,7 +39,7 @@ emu.addEventCallback(function()
   if frames == 30 then
     poke(0x2000, 0)
     poke(0x3700, 0)
-    poke(0x2401, 23)         -- zero-tune sample
+    poke(0x2401, 12)         -- zero-tune sample
     poke(0x4300, 49)         -- r0: C-4
     poke(0x4301, 0)
     poke(0x4302, 9)          -- I

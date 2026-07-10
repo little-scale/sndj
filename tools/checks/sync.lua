@@ -52,7 +52,7 @@ emu.addEventCallback(function()
   if frames == 30 then
     poke(0x2000, 0)            -- track 0 row 0 = chain 0
     poke(0x3700, 0)            -- chain 0 entry 0 = phrase 0
-    poke(0x2401, 23)           -- instr 0 -> SW ORCH (tune 0)
+    poke(0x2401, 12)           -- instr 0 -> BONGO 2 (tune 0)
     for r = 0, 15 do           -- a note on every row marks each advance
       poke(0x4300 + r * 4, 49)
       poke(0x4301 + r * 4, 0)

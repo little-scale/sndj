@@ -94,7 +94,7 @@ emu.addEventCallback(function()
   elseif frames == 194 then
     -- zero-tune sample for the exact pitch asserts (factory melodics
     -- carry loop-quantise tune corrections)
-    emu.write(0x2401, 23, emu.memType.snesWorkRam)
+    emu.write(0x2401, 12, emu.memType.snesWorkRam)
   elseif frames == 192 then
     check(wram(0x000C) == 3, "A+Left climbed back to SONG")
     check(wram(0x3700) == 0, "chain 00 entry0 -> phrase 00")

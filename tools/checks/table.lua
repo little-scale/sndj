@@ -41,7 +41,7 @@ emu.addEventCallback(function()
   if frames == 30 then
     poke(0x2000, 0)
     poke(0x3700, 0)
-    poke(0x2401, 23)         -- instr 0 -> SW ORCH
+    poke(0x2401, 12)         -- instr 0 -> SW ORCH
     poke(0x4300, 49)         -- C-4, instrument 0
     poke(0x4301, 0)
     poke(0x240C, 0)          -- instr 0: TBL = 0
@@ -54,8 +54,8 @@ emu.addEventCallback(function()
     poke(0x4319, 2)
     poke(0x431C, 49)         -- row 7: instr 2 again (advances one row)
     poke(0x431D, 2)
-    poke(0x2411, 23)         -- instr 1/2 -> SW ORCH too
-    poke(0x2421, 23)
+    poke(0x2411, 12)         -- instr 1/2 -> BONGO 2 too
+    poke(0x2421, 12)
     poke(0x241C, 0xFF)       -- instr 1 TBL nil (factory default, explicit)
     poke(0x242C, 1)          -- instr 2: TBL = 1
     poke(0x242D, 0)          -- TBS = note-sync

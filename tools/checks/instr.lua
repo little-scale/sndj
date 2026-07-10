@@ -94,7 +94,7 @@ emu.addEventCallback(function()
       "factory instrument ADSR present")
     -- exact-pitch asserts below need a zero-tune sample (factory melodics
     -- carry loop-quantise tune corrections now)
-    emu.write(0x2401, 23, emu.memType.snesWorkRam)
+    emu.write(0x2401, 12, emu.memType.snesWorkRam)
   elseif frames == shot_at then
     local out = os.getenv("SNDJ_INSTR_SHOT")
     if out then
@@ -127,7 +127,7 @@ emu.addEventCallback(function()
     check(p2 == 0x0BFC, "voice 2 = G-4 ($" .. string.format("%04X", p2) .. ")")
     -- sample 23 is boot-resident via kit 0; its SRCN comes from the
     -- residency map, not a fixed order
-    local srcn = wram(0x0097 + 23)
+    local srcn = wram(0x0097 + 12)
     check(srcn > 0 and dsp(0x04) == srcn and dsp(0x14) == srcn and
       dsp(0x24) == srcn,
       "GRP members use the resident sample (SRCN " .. srcn .. ")")

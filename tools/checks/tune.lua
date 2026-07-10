@@ -38,7 +38,7 @@ emu.addEventCallback(function()
     poke(0x3700, 0)          -- chain 0 entry 0 = phrase 0
     poke(0x4300, 49)         -- C-4
     poke(0x4301, 0)          -- instrument 0 (factory SMP)
-    poke(0x2401, 23)          -- zero-tune sample (SW ORCH): FINE acts alone
+    poke(0x2401, 12)          -- zero-tune sample (SW ORCH): FINE acts alone
     poke(0x2406, 0x40)       -- instrument 0 FINE = +64
   elseif frames == 44 then
     pad = { start = true }
