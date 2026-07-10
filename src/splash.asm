@@ -74,11 +74,25 @@ splash_init:
     lda tmp0 + 1
     cmp #LOGO_TH
     bne @lrow
-    ; full-width inverted band with the version (genmddj-style)
+    ; full-width inverted band: version + git hash on one line
     PUTS  0, 14, ATTR_ACCENT, str_band
-    PUTS 13, 14, ATTR_ACCENT, str_version
-    ; git stamp below, plain
-    PUTS 12, 16, ATTR_DIM,    str_stamp
+    PUTS  9, 14, ATTR_ACCENT, str_version
+    lda #' ' - 32
+    jsr text_puttile
+    ldx #str_stamp
+    jsr text_puts
+    rts
+
+; boot: the splash goes up BEFORE the audio uploads, wearing the
+; loading message; splash_ready swaps it for PRESS START once the
+; SPC700 is fed
+splash_loading:
+    jsr splash_init
+    PUTS  9, 20, ATTR_DIM, str_loading
+    rts
+
+splash_ready:
+    PUTS  9, 20, ATTR_TEXT, str_wipe
     PUTS 10, 20, ATTR_ACCENT, str_start
     rts
 
@@ -106,3 +120,5 @@ splash_update:
 
 str_band:     .DB "                                ", 0
 str_start:    .DB "PRESS START", 0
+str_loading:  .DB "LOADING AUDIO", 0
+str_wipe:     .DB "             ", 0

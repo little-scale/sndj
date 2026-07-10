@@ -5,6 +5,11 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- Splash: the screen comes up **before** the audio upload with a
+  LOADING AUDIO line (a black screen used to sit there for the ~1.5 s
+  sample transfer), then swaps to PRESS START; the version and git
+  hash share one band line.
+
 - **HELP screen** (genmddj-style): six generated pages — navigation,
   editing, block ops, the data model, the full command reference
   (merged from tools/commands.csv, one source of truth), and an about

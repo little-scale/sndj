@@ -59,7 +59,7 @@ local function onFrame()
     -- wordmark tile at the logo origin, inverted band at the version row
     check(cell(5, 3) == (192 | 0x2000), "wordmark tiles in the shadow map")
     check(cell(0, 14) == (96 | 0x2400), "inverted version band spans row 14")
-    check(cell(13, 14) == word("V", ATTR_ACCENT), "version sits in the band")
+    check(cell(9, 14) == word("V", ATTR_ACCENT), "version sits in the band (with the hash inline)")
     check(wram(0x000C) == 0, "ui_mode is splash")
     pad = { start = true }
   elseif frames == 26 then

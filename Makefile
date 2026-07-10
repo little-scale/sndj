@@ -88,9 +88,9 @@ shot: all
 	SNDJ_SHOT=$(abspath $(BUILD)/shot.png) "$(MESEN)" --testrunner $(abspath $(ROM)) $(abspath tools/shot.lua)
 	@echo "shot: $(BUILD)/shot.png"
 
-# splash comparison masks pixel rows 128-136 (the git-stamp text line)
+# splash comparison masks pixel rows 112-120 (the version+hash band)
 shot-diff: shot
-	@python3 tools/shotdiff.py $(BUILD)/shot.png tools/goldens/splash.png 128 136
+	@python3 tools/shotdiff.py $(BUILD)/shot.png tools/goldens/splash.png 112 120
 	@for g in phrase song instr wave live; do \
 	  if [ -f $(BUILD)/shot-$$g.png ]; then \
 	    python3 tools/shotdiff.py $(BUILD)/shot-$$g.png tools/goldens/$$g.png 8 16; \

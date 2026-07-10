@@ -55,6 +55,15 @@ Reset:
 
     jsr init_regs
     jsr init_video
+    ; the splash goes up first: the sample upload takes a moment, and
+    ; a LOADING AUDIO line beats a black screen. NMI + auto-joypad on
+    ; so the text shadow reaches VRAM (every APU exchange handshakes,
+    ; so the interrupt latency is harmless).
+    jsr splash_loading
+    lda #$81
+    sta NMITIMEN
+    lda #$0F
+    sta INIDISP
     jsr apu_upload_driver   ; on timeout: apu_status=1, UI shows "APU?"
     bcs +
     lda #$FF
@@ -98,15 +107,10 @@ Reset:
     stz ed_lastval
     stz ed_instr
 
-    ; init complete: mark it, enable NMI + auto-joypad, screen on
+    ; init complete: swap the loading line for PRESS START
+    jsr splash_ready
     lda #MAGIC_BOOT_OK
     sta magic_boot
-    lda #$81
-    sta NMITIMEN
-    lda #$0F
-    sta INIDISP
-
-    jsr splash_init
     jmp main_loop
 
 ; --- clear/park every PPU register we rely on -------------------------------
