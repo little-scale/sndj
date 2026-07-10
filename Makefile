@@ -90,7 +90,7 @@ shot-diff: shot
 	@python3 tools/shotdiff.py $(BUILD)/shot.png tools/goldens/splash.png 128 136
 	@for g in phrase song instr wave live; do \
 	  if [ -f $(BUILD)/shot-$$g.png ]; then \
-	    python3 tools/shotdiff.py $(BUILD)/shot-$$g.png tools/goldens/$$g.png; \
+	    python3 tools/shotdiff.py $(BUILD)/shot-$$g.png tools/goldens/$$g.png 8 16; \
 	  fi; \
 	done
 
