@@ -5,6 +5,11 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- Fixed: WAV instruments in a GRP span or `C` chord played their
+  member voices an octave up — the fanout skipped the wavetable's
+  -1-octave shift. Auditions had the same mirror; both fixed, with a
+  wave.lua chord assert.
+
 - The patcher's left half is **tabbed** now — SAMPLES / KITS / FIR /
   PALETTES — with the soundfont panel persistent on the right (drags
   land on whichever tab is open). No more scroll marathon.

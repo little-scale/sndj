@@ -1575,7 +1575,9 @@ grp_fanout:
     clc
     adc grp_m
     cmp #TRACKS
-    bcs @out
+    bcc @in_range
+    jmp @out
+@in_range:
     sta trig_voice
     ; member offset: the C-command nibbles when overriding, else rec[8+m]
     phx
@@ -1634,7 +1636,17 @@ grp_fanout:
     lda trig_id
     jsr apply_instrument
     pla
-    jsr note_pitch
+    jsr note_pitch_calc_only
+    lda trig_type
+    cmp #$02
+    bne @m_wr
+    rep #$20
+.ACCU 16
+    lsr last_pitch          ; WAV members keep the root's -1 octave
+    sep #$20
+.ACCU 8
+@m_wr:
+    jsr voice_pitch_write
     lda trig_voice
     rep #$30
 .ACCU 16
@@ -1648,8 +1660,10 @@ grp_fanout:
     inc grp_m
     lda grp_m
     cmp grp_span
-    bcc @member
-    beq @member
+    beq @more
+    bcs @out
+@more:
+    jmp @member
 @out:
     plx
     rts

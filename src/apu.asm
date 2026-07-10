@@ -1048,7 +1048,17 @@ audition_chord:
     jsr apply_instrument
 @m_bare:
     pla
-    jmp note_pitch
+    jsr note_pitch_calc_only
+    lda trig_type
+    cmp #$02
+    bne @m_wr
+    rep #$20
+.ACCU 16
+    lsr last_pitch          ; WAV members keep the root's -1 octave
+    sep #$20
+.ACCU 8
+@m_wr:
+    jmp voice_pitch_write
 
 ; --- per-frame APU housekeeping (main loop) ------------------------------------
 ; Mirrors tick telemetry and sends the M2 heartbeat: an incrementing value

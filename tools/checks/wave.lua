@@ -83,21 +83,29 @@ emu.addEventCallback(function()
     poke(0x2423, 0xCA)
     poke(0x2424, 0x50)
     poke(0x2425, 0x50)
-    -- phrase 0: r0 C-4 wav1 | r4 B02 | r8 G-4 nse2 | r12 C-4 wav1
+    -- phrase 0: r0 C-4 wav1 (+C chord) | r4 B02 | r8 G-4 nse2 | r12 C-4 wav1
     poke(0x4300, 49)
     poke(0x4301, 1)
+    poke(0x4302, 3)          -- C C0: fan +12 onto voice 1 (WAV chord)
+    poke(0x4303, 0xC0)
     poke(0x4310, 0)
     poke(0x4311, 0xFF)
     poke(0x4312, 2)          -- B
     poke(0x4313, 2)          -- bank 2 (saw)
     poke(0x4320, 56)         -- G-4 (idx 55 -> clock 23)
     poke(0x4321, 2)
+    poke(0x4322, 3)          -- C00: chord off before the NSE row
+    poke(0x4323, 0)
     poke(0x4330, 49)
     poke(0x4331, 1)
   elseif frames == play + 8 then
     check(dsp(0x04) == 57, "WAV instrument routes SRCN to wave slot 57")
     check(dsp(0x02) + dsp(0x03) * 256 == 0x0430,
       "WAV C-4 tuned to 261.6 Hz ($0430)")
+    local p1 = dsp(0x12) + dsp(0x13) * 256
+    check(p1 == 0x0860,
+      "WAV chord member keeps the octave (+12 -> $" ..
+      string.format("%04X", p1) .. ")")
     check(dsp(0x3D) == 0, "no noise yet")
   elseif frames == play + 32 then
     check(dsp(0x04) == 58, "B02 wave-sequenced to bank 2 (SRCN 58)")

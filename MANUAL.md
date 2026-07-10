@@ -53,7 +53,7 @@ press means.** There are no simultaneous-press timing windows.
 | **Start** | play / stop the whole song, from any screen |
 | **L / R** | channel left / right (shortcut for Y+←/→) |
 | **Select** | jump to LIVE and back |
-| **X** | inspect / mute-solo (hold + ↑/↓ mute, ←/→ solo, on SONG/LIVE) |
+| **X** | mute / solo (hold + ↑/↓ mute, ←/→ solo, on SONG/LIVE) |
 
 Only d-pad + B + Y + A + Start are load-bearing; L, R, X and Select
 are shortcuts to things the core grammar can already do.
@@ -134,7 +134,7 @@ left/right.
 | **FIR** | the echo filter's 8 taps, hex-editable, with presets. |
 | **PROJECT** | song name, BPM, transpose, default groove, LIVE mode, NEW (a fresh song opens the delay to whatever audio RAM allows). |
 | **FILES** | save / load / rename songs in cart SRAM. |
-| **OPTIONS** | device settings: palette, cloning depth, video readout. |
+| **OPTIONS** | device settings: palette, cloning depth, video readout, SYNC / MIDI takeover (§13a). |
 
 ## 4. Making a song
 
@@ -423,16 +423,20 @@ Y+B          block select
 Zero-toolchain browser apps — download the folder, open the HTML,
 everything runs locally:
 
-- **patcher.html** — drop your `sndj.sfc`, replace the sample pool
-  with your own WAVs or SoundFont picks, edit palettes, re-voice the
-  factory defaults, download a patched ROM. Sample auditioning runs
-  through a bit-exact model of the console's BRR + Gaussian playback,
-  so what you hear in the browser is what the cart plays.
+- **patcher.html** — the ROM workshop, in tabs: **SAMPLES** (replace
+  pool slots from WAVs or dropped SoundFonts — several stack at once,
+  drag a font slot onto a pool slot — with per-slot tune and rename,
+  and ROM + audio-RAM budget meters that mirror the console's math),
+  **KITS** (the factory drum kits: drag a one-shot straight onto a kit
+  slot), **FIR** (the echo filter designer: response plot, tap
+  sliders, echo-loop audition, writes the 8 ROM presets), and
+  **PALETTES**. Boot instruments are editable too, so you control what
+  preloads into audio RAM. Every audition runs through a bit-exact
+  model of the console's BRR + Gaussian playback, so what you hear in
+  the browser is what the cart plays.
 - **savetool.html** — song manager for cart saves (§12).
-- *(the FIR designer lives inside patcher.html)* — a live frequency
-  response plot (§9).
 
-All three share `sndj.js`, the reference library (keep it next to
+Both share `sndj.js`, the reference library (keep it next to
 them). Python command-line mirrors of the same operations live in
 `tools/` for people who script.
 
