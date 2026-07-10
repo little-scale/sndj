@@ -7,6 +7,7 @@
 .INDEX 16
 
 chain_init:
+    stz tap_live
     stz blk_mode
     lda #SCREEN_CHAIN
     sta ui_mode
@@ -191,20 +192,21 @@ chain_update:
     stz b_down
     lda b_used
     bne @cursor
+    lda tap_live
+    beq @single             ; no pending first tap (moved / new screen)
     lda frame_cnt
     sec
     sbc tap_timer
-    cmp #7                  ; double-tap = two taps within 6 frames
+    cmp #25                 ; double-tap = 24 frames (~400 ms), genmddj's feel
     bcs @single
-    lda frame_cnt
-    clc
-    adc #$80
-    sta tap_timer           ; close the window
+    stz tap_live            ; the pair is consumed
     jsr chain_dtap          ; paste / mint / clone
     bra @draw
 @single:
     lda frame_cnt
     sta tap_timer
+    lda #$01
+    sta tap_live
     ; tap: remember the pre-tap state (the phrase column is a reference)
     jsr chain_cell_addr_p
     lda chain_cx
@@ -649,6 +651,8 @@ chain_nudge:
     rts
 
 chain_cursor_move:
+    ; moving the cursor ends any pending double-tap (same-cell gesture)
+    stz tap_live
     rep #$20
 .ACCU 16
     lda pad_event

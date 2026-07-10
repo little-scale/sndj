@@ -111,7 +111,7 @@ blk_mode     db      ; block select active on the current grid screen
 blk_start    db      ; block anchor row
 clip_kind    db      ; clipboard: 0 none, 1 phrase rows, 2 chain rows, 3 song cells
 clip_len     db      ; clipboard row count
-tap_timer    db      ; frames left to accept a B double-tap (paste)
+tap_timer    db      ; frame of the arming B tap (window base)
 ed_track     db      ; track context (set when descending from SONG)
 trk_pending  ds 8    ; LIVE: chain queued to launch at the phrase boundary
 trk_mute     db      ; bit per track: muted
@@ -256,6 +256,8 @@ mp_ev        ds 3    ; current event (status, d1, d2)
 mp_voice     db      ; dispatch: addressed voice
 mb_tot       dw      ; bend scratch: signed 1/256-semi total
 edl_applied  db      ; EDL the driver last configured ($FF = never)
+tap_live     db      ; a first B tap is pending (cleared by cursor moves,
+                     ; screen entry, or being consumed by the double-tap)
 apu_cool     db      ; frames to hold the heartbeat off (driver inside a
                      ; long echo reconfig; a blocked write would freeze
                      ; the main loop and eat input)

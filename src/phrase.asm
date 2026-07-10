@@ -11,6 +11,7 @@ col_x:  .DB 4, 8, 11, 13
 col_w:  .DB 3, 2, 1, 2
 
 phrase_init:
+    stz tap_live
     stz blk_mode
     lda #SCREEN_PHRASE
     sta ui_mode
@@ -178,20 +179,21 @@ phrase_update:
     stz b_down
     lda b_used
     bne @dpad_cursor
+    lda tap_live
+    beq @single             ; no pending first tap (moved / new screen)
     lda frame_cnt
     sec
     sbc tap_timer
-    cmp #7                  ; double-tap = two taps within 6 frames
+    cmp #25                 ; double-tap = 24 frames (~400 ms), genmddj's feel
     bcs @single
-    lda frame_cnt
-    clc
-    adc #$80
-    sta tap_timer           ; close the window
+    stz tap_live            ; the pair is consumed
     jsr phrase_paste        ; B double-tap = paste the block clipboard
     bra @dpad_cursor
 @single:
     lda frame_cnt
     sta tap_timer
+    lda #$01
+    sta tap_live
     jsr cell_tap
     bra @dpad_cursor
 
@@ -311,6 +313,8 @@ cursor_move:
     and #$0F
     sta cur_y
 @nd:
+    ; moving the cursor ends any pending double-tap (same-cell gesture)
+    stz tap_live
     rts
 
 ; --- X = song-block offset of the cell under the cursor ------------------------

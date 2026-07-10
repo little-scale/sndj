@@ -8,6 +8,7 @@
 .INDEX 16
 
 song_init_screen:
+    stz tap_live
     ; MODE LIVE: the S map position shows the launcher view
     lda.l $7E0000 + SB_HEADER + SH_MODE
     beq +
@@ -204,20 +205,21 @@ song_update:
     stz b_down
     lda b_used
     bne @cursor
+    lda tap_live
+    beq @single             ; no pending first tap (moved / new screen)
     lda frame_cnt
     sec
     sbc tap_timer
-    cmp #7                  ; double-tap = two taps within 6 frames
+    cmp #25                 ; double-tap = 24 frames (~400 ms), genmddj's feel
     bcs @single
-    lda frame_cnt
-    clc
-    adc #$80
-    sta tap_timer           ; close the window
+    stz tap_live            ; the pair is consumed
     jsr song_dtap           ; paste / mint / clone
     bra @draw
 @single:
     lda frame_cnt
     sta tap_timer
+    lda #$01
+    sta tap_live
     ; tap: remember the pre-tap state (mint/clone decides from it),
     ; then insert the last chain
     jsr song_cursor_cell
@@ -330,6 +332,8 @@ song_nudge:
     rts
 
 song_cursor_move:
+    ; moving the cursor ends any pending double-tap (same-cell gesture)
+    stz tap_live
     rep #$20
 .ACCU 16
     lda pad_event

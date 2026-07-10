@@ -5,6 +5,12 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- Fixed: **double-tap (paste / mint / clone) was humanly impossible** —
+  the window was 6 frames (100 ms); it's now genmddj's 24 (~400 ms),
+  with a pending-tap flag so the generous window can't misfire: any
+  cursor move or screen change ends the gesture, and two ordinary
+  taps in different places no longer read as a pair.
+
 - PHRASE shows **sample names on kit rows**: when a row's instrument
   is a KIT, the note cell reads the first three letters of the slot's
   pool sample (silent slots read `---`) — a pitch means nothing there.
