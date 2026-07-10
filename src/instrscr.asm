@@ -642,7 +642,17 @@ instr_draw:
     sta text_x
     lda ui_cnt
     cmp if_cur
-    beq @val_attr_done      ; keep accent on the cursor row's value too
+    bne @val_plain
+    ; the cursor row's VALUE renders inverted (the family convention:
+    ; PROJECT/OPTIONS/ECHO all accent the value, labels stay dim)
+    rep #$20
+.ACCU 16
+    lda #ATTR_ACCENT
+    sta text_attr
+    sep #$20
+.ACCU 8
+    bra @val_attr_done
+@val_plain:
     rep #$20
 .ACCU 16
     lda #ATTR_TEXT
