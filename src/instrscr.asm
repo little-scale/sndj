@@ -1,8 +1,11 @@
 ; instrscr.asm — the INSTR screen: field-list editor over the 16-byte
-; instrument record (type-switched later; SMP fields for now).
+; instrument record, grouped (identity / envelope / mix / tune+motion /
+; chord / table) and type-aware: fields a type doesn't use are hidden
+; (KIT slots own their volume+tune; NSE has no sample or pitch).
 ; B held + d-pad nudges the field (L/R = 1, U/D = 4, clamped); B tap
-; auditions C-4 with this instrument. Edits invalidate every voice's
-; loaded-instrument shadow so changes are heard immediately.
+; auditions C-4 with this instrument; Y + up/down flips instruments.
+; Edits invalidate every voice's loaded-instrument shadow so changes
+; are heard immediately.
 ;
 ; Scratch layout (text_* own tmp0/tmp1; apu_send owns tmp1):
 ;   str_buf+34/35  shift work / pending delta
@@ -13,33 +16,59 @@
 
 .DEFINE IF_COUNT 18
 
-; field table: byte offset in record, shift, value mask (post-shift), max
+; field table, in DISPLAY order: byte offset in record, shift, value
+; mask (post-shift), max
 if_fields:
-    .DB 0,  0, $03, 3    ; TYPE
-    .DB 1,  0, $FF, 63   ; SAMPLE
-    .DB 2,  0, $0F, 15   ; ATTACK
-    .DB 2,  4, $07, 7    ; DECAY
-    .DB 3,  5, $07, 7    ; SUS LVL
-    .DB 3,  0, $1F, 31   ; SUS RATE
-    .DB 4,  0, $FF, 127  ; VOL L
-    .DB 5,  0, $FF, 127  ; VOL R
-    .DB 8,  0, $03, 3    ; GRP
-    .DB 9,  0, $FF, 24   ; OFS 1
-    .DB 10, 0, $FF, 24   ; OFS 2
-    .DB 11, 0, $FF, 24   ; OFS 3
-    .DB 7,  0, $01, 1    ; EON (echo send)
-    .DB 6,  0, $FF, 255  ; FINE (signed 1/256 semitone; max 255 = free wrap)
-    .DB 14, 0, $FF, 255  ; VIB speed/depth nibbles (free wrap)
-    .DB 15, 0, $FF, 255  ; TRM speed/depth nibbles (free wrap)
-    .DB 12, 0, $FF, 255  ; TBL (>= 32 shows -- = no table; free wrap)
-    .DB 13, 0, $0F, 15   ; TBS ticks/row (0 = advance per note)
+    .DB 0,  0, $03, 3    ; 0  TYPE
+    .DB 1,  0, $FF, 63   ; 1  SAMPLE / KIT / BANK (max re-clamped per type)
+    .DB 2,  0, $0F, 15   ; 2  ATTACK
+    .DB 2,  4, $07, 7    ; 3  DECAY
+    .DB 3,  5, $07, 7    ; 4  SUS LVL
+    .DB 3,  0, $1F, 31   ; 5  SUS RATE
+    .DB 4,  0, $FF, 127  ; 6  VOL L
+    .DB 5,  0, $FF, 127  ; 7  VOL R
+    .DB 7,  0, $01, 1    ; 8  EON (echo send)
+    .DB 6,  0, $FF, 255  ; 9  FINE (signed 1/256 semitone; free wrap)
+    .DB 14, 0, $FF, 255  ; 10 VIB speed/depth nibbles (free wrap)
+    .DB 15, 0, $FF, 255  ; 11 TRM speed/depth nibbles (free wrap)
+    .DB 8,  0, $03, 3    ; 12 GRP
+    .DB 9,  0, $FF, 24   ; 13 OFS 1
+    .DB 10, 0, $FF, 24   ; 14 OFS 2
+    .DB 11, 0, $FF, 24   ; 15 OFS 3
+    .DB 12, 0, $FF, 255  ; 16 TBL (>= 32 shows -- = no table; free wrap)
+    .DB 13, 0, $0F, 15   ; 17 TBS ticks/row (0 = advance per note)
+
+; screen row per field: blank rows separate the groups
+if_row:
+    .DB 0, 1                       ; identity
+    .DB 3, 4, 5, 6                 ; envelope
+    .DB 8, 9, 10                   ; mix + send
+    .DB 12, 13, 14                 ; tune + motion
+    .DB 16, 17, 18, 19             ; chord span
+    .DB 21, 22                     ; table
+
+; visibility per type (bit 0 SMP, 1 KIT, 2 WAV, 3 NSE): a type hides
+; the fields its trigger path never reads
+if_vis:
+    .DB $0F              ; TYPE
+    .DB $07              ; SAMPLE (NSE has none)
+    .DB $0F, $0F, $0F, $0F   ; envelope: hardware ADSR applies to all
+    .DB $0D, $0D         ; VOL L/R (KIT: the slot's vol rules)
+    .DB $0F              ; ECHO
+    .DB $05              ; FINE (KIT: slot+pool tune; NSE: no pitch)
+    .DB $05              ; VIB  (pitch wobble: SMP/WAV only)
+    .DB $0D              ; TRM  (KIT: slot volume domain)
+    .DB $05, $05, $05, $05   ; GRP+OFS (kit ids aren't pool samples; NSE unison is noise)
+    .DB $0F, $0F         ; TBL/TBS
 
 if_labels:
     .DW if_l0, if_l1, if_l2, if_l3, if_l4, if_l5
-    .DW if_l6, if_l7, if_l8, if_l9, if_l10, if_l11, if_l12, if_l13, if_l14
-    .DW if_l15, if_l16, if_l17
+    .DW if_l6, if_l7, if_l12, if_l13, if_l14, if_l15
+    .DW if_l8, if_l9, if_l10, if_l11, if_l16, if_l17
 if_l0:  .DB "TYPE", 0
 if_l1:  .DB "SAMPLE", 0
+if_l1k: .DB "KIT   ", 0
+if_l1w: .DB "BANK  ", 0
 if_l2:  .DB "ATTACK", 0
 if_l3:  .DB "DECAY", 0
 if_l4:  .DB "SUS LVL", 0
@@ -56,6 +85,52 @@ if_l14: .DB "VIB", 0
 if_l15: .DB "TRM", 0
 if_l16: .DB "TBL", 0
 if_l17: .DB "TBS", 0
+
+; A = 1 << current instrument's type
+if_typebit:
+    lda ed_instr
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR,x
+    and #$03
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w bit_for_track,x
+    rts
+
+; carry set when field A is visible for the current type; preserves A
+if_field_vis:
+    pha
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w if_vis,x
+    sta tmp2 + 1
+    jsr if_typebit
+    and tmp2 + 1
+    beq @no
+    pla
+    sec
+    rts
+@no:
+    pla
+    clc
+    rts
 
 if_types:
     .DB "SMPKITWAVNSE"     ; 3 chars each
@@ -100,6 +175,22 @@ if_desc:
     sta str_buf + 38        ; byte offset
     lda.w if_fields + 1,x
     sta str_buf + 39        ; shift
+    ; the SAMPLE field's range follows the type: KIT 0-15, WAV bank 0-7
+    lda if_cur
+    cmp #$01
+    bne @max_ok
+    jsr if_typebit
+    cmp #$02                ; KIT
+    bne @not_kitmax
+    lda #15
+    sta str_buf + 37
+    bra @max_ok
+@not_kitmax:
+    cmp #$04                ; WAV
+    bne @max_ok
+    lda #7
+    sta str_buf + 37
+@max_ok:
     rep #$30
 .ACCU 16
     lda ed_instr
@@ -180,6 +271,44 @@ instr_update:
     beq @edit_ok
     jmp instr_draw
 @edit_ok:
+    ; Y held + up/down: previous / next instrument (as PHRASE/TABLE do)
+    rep #$20
+.ACCU 16
+    lda pad_held
+    and #PAD_Y
+    sep #$20
+.ACCU 8
+    beq @no_y
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_UP
+    sep #$20
+.ACCU 8
+    beq @y_dn
+    lda ed_instr
+    dec a
+    and #(INSTR_COUNT - 1)
+    sta ed_instr
+    jsr if_cur_fix
+    jmp instr_hdr
+@y_dn:
+    rep #$20
+.ACCU 16
+    lda pad_event
+    and #PAD_DOWN
+    sep #$20
+.ACCU 8
+    beq @y_done
+    lda ed_instr
+    inc a
+    and #(INSTR_COUNT - 1)
+    sta ed_instr
+    jsr if_cur_fix
+    jmp instr_hdr
+@y_done:
+    jmp instr_draw
+@no_y:
     ; B edges
     rep #$20
 .ACCU 16
@@ -223,7 +352,7 @@ instr_update:
     jsr if_nudge
     bra @draw
 @cursor:
-    ; plain up/down moves the field cursor
+    ; plain up/down moves the field cursor, skipping hidden fields
     rep #$20
 .ACCU 16
     lda pad_event
@@ -232,10 +361,13 @@ instr_update:
 .ACCU 8
     beq @nu
     lda if_cur
+@up_next:
     dec a
-    bpl @up_ok
+    bpl @up_vis
     lda #IF_COUNT - 1
-@up_ok:
+@up_vis:
+    jsr if_field_vis
+    bcc @up_next
     sta if_cur
 @nu:
     rep #$20
@@ -246,14 +378,42 @@ instr_update:
 .ACCU 8
     beq @draw
     lda if_cur
+@dn_next:
     inc a
     cmp #IF_COUNT
-    bcc @dn_ok
+    bcc @dn_vis
     lda #$00
-@dn_ok:
+@dn_vis:
+    jsr if_field_vis
+    bcc @dn_next
     sta if_cur
 @draw:
     jmp instr_draw
+
+; header: reprint the instrument number (Y+up/down switch)
+instr_hdr:
+    lda #6
+    sta text_x
+    lda #1
+    sta text_y
+    rep #$20
+.ACCU 16
+    lda #ATTR_HILITE
+    sta text_attr
+    sep #$20
+.ACCU 8
+    lda ed_instr
+    jsr text_hex8
+    jmp instr_draw
+
+; after an instrument switch the cursor may sit on a hidden field
+if_cur_fix:
+    lda if_cur
+    jsr if_field_vis
+    bcs @ok
+    stz if_cur              ; TYPE is always visible
+@ok:
+    rts
 
 if_nudge:
     lda #4                  ; U/D magnitude
@@ -307,12 +467,34 @@ if_nudge:
 instr_draw:
     stz ui_cnt
 @rows:
+    ; row position from the group map
     lda ui_cnt
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w if_row,x
     clc
     adc #4
     sta text_y
     lda #2
     sta text_x
+    ; fields the current type never reads draw blank
+    lda ui_cnt
+    jsr if_field_vis
+    bcs @shown
+    rep #$20
+.ACCU 16
+    lda #ATTR_TEXT
+    sta text_attr
+    sep #$20
+.ACCU 8
+    ldx #str_if_blank
+    jsr text_puts
+    jmp @next
+@shown:
     ; label attr: accent under cursor
     lda ui_cnt
     cmp if_cur
@@ -332,6 +514,21 @@ instr_draw:
     sep #$20
 .ACCU 8
 @label:
+    ; the SAMPLE row reads KIT / BANK on those types
+    lda ui_cnt
+    cmp #$01
+    bne @lab_std
+    jsr if_typebit
+    cmp #$02
+    bne @not_klab
+    ldx #if_l1k
+    bra @lab_put
+@not_klab:
+    cmp #$04
+    bne @lab_std
+    ldx #if_l1w
+    bra @lab_put
+@lab_std:
     lda ui_cnt
     rep #$30
 .ACCU 16
@@ -342,6 +539,7 @@ instr_draw:
     tax
     sep #$20
 .ACCU 8
+@lab_put:
     jsr text_puts
     ; value at x12 (text colour)
     lda #12
@@ -366,7 +564,7 @@ instr_draw:
     pla
     sta if_cur
     lda ui_cnt
-    cmp #$0C
+    cmp #$08
     bne @not_echo_v
     ; ECHO: a toggle reads ON/OFF, not 00/01
     lda str_buf + 33
@@ -444,6 +642,7 @@ instr_draw:
     rts
 
 str_instr: .DB "INSTR ", 0
+str_if_blank: .DB "                   ", 0
 str_if_on:  .DB "ON ", 0
 str_if_off: .DB "OFF", 0
 str_if_nil: .DB "-- ", 0

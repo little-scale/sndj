@@ -5,6 +5,14 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- INSTR grew up: fields are **grouped** (identity / envelope / mix /
+  tune & motion / chord / table) with blank rows between, **Y + ↑/↓
+  flips instruments** without leaving the screen (matching PHRASE and
+  TABLE), and each TYPE **hides the fields it never reads** — KIT
+  drops VOL/FINE/VIB/GRP (slots own those), NSE drops SAMPLE and all
+  pitch fields, WAV relabels SAMPLE to BANK. The sample field's range
+  follows the type (kit 0-15, bank 0-7). Goldens regenerated.
+
 - Fixed: WAV instruments in a GRP span or `C` chord played their
   member voices an octave up — the fanout skipped the wavetable's
   -1-octave shift. Auditions had the same mirror; both fixed, with a

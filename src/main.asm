@@ -314,11 +314,6 @@ fir_presets:
     .DB $60, $A0, $40, $D0, $20, $E8, $10, $F8   ; 6 METAL (alternating)
     .DB $7F, $00, $00, $00, $00, $00, $00, $00   ; 7 USER (starts flat)
 
-; SPC700 driver blob, uploaded via the IPL protocol at boot
-driver_blob:
-    .INCBIN "driver.spc700.bin"
-driver_blob_end:
-
 ; pitch/note tables (single tuning source: tools/maketables.py)
 .INCLUDE "tables.inc"
 
@@ -359,6 +354,12 @@ logo_data_end:
     .DB "SNKIT0"
 factory_kits:
     .INCBIN "kits.bin"
+
+; SPC700 driver blob, uploaded via the IPL protocol at boot (read with
+; long addressing; parked here to keep the code bank breathing)
+driver_blob:
+    .INCBIN "driver.spc700.bin"
+driver_blob_end:
 
 .BANK 0 SLOT 0
 ; --- internal header (hand-rolled; checksum fixed by tools/fixsum.py) --------

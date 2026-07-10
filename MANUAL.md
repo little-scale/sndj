@@ -48,7 +48,7 @@ press means.** There are no simultaneous-press timing windows.
 |--------|------|
 | **d-pad** | move the cursor |
 | **B** | *edit*: tap = insert / act · hold + d-pad = nudge the value under the cursor (left/right small, up/down big) · double-tap = paste / clone · hold B + tap **A** = cut |
-| **Y** | *context*: hold + ←/→ = previous/next channel · hold + ↑/↓ = page up/down · Y+B = block select |
+| **Y** | *context*: hold + ←/→ = previous/next channel · hold + ↑/↓ = page / previous-next phrase, instrument or table (on those screens) · Y+B = block select |
 | **A** | *screens*: hold + d-pad = navigate the screen map · **A+B** = contextual play (see below) |
 | **Start** | play / stop the whole song, from any screen |
 | **L / R** | channel left / right (shortcut for Y+←/→) |
@@ -167,6 +167,14 @@ too (duplicates inside the chain stay duplicates). Phrase clones are
 always real copies.
 
 ## 5. Instruments
+
+The INSTR screen groups its fields — identity / envelope / mix / tune
+& motion / chord span / table — and hides what a type never reads:
+KIT keeps envelope and echo but drops VOL, FINE, VIB and GRP (the kit
+slots own volume and tune); NSE drops SAMPLE and everything pitched;
+WAV shows everything with SAMPLE reading **BANK**. **Y + ↑/↓** flips
+to the previous/next instrument without leaving the screen (TABLE and
+PHRASE answer the same gesture).
 
 64 instrument slots, all pre-populated at NEW so every number makes a
 sound. An instrument's **TYPE** decides what the voice does:

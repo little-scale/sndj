@@ -80,7 +80,7 @@ apu_upload_driver:
     ; data bytes, index echoed low-byte by the IPL
     ldx #$0000
 @loop:
-    lda.w driver_blob,x
+    lda.l driver_blob,x     ; long: the blob lives in the data bank (6)
     sta APUIO1
     txa                     ; low byte of index
     sta APUIO0
