@@ -32,6 +32,12 @@ GRP span, GRP offsets x3, TABLE (byte 12, >= 32 = none), TBS (byte 13,
 ticks per table row, 0 = note-sync), VIB (byte 14, vibrato speed/depth
 nibbles), TRM (byte 15, tremolo speed/depth nibbles).
 
+KARP type (5) reinterpretations: byte 1 = the exciter wave bank
+(0-7); byte 2 = DAMP nibble (low, loop gain 7..127) + BURST nibble
+(high, the exciter's decay rate); byte 3 = SUSTAIN (echo feedback,
+0-127). The trigger writes the note's karp_tab FIR pair + feedback
+and forces the voice's echo send.
+
 SLICE type reinterpretations: byte 1 = the blob (pool sample) sliced
 into equal, block-aligned divisions; byte 2 = ATK nibble (low, the
 shared ADSR position) + FADE nibble (high — the hardware sustain rate

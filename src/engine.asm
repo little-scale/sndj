@@ -1030,6 +1030,13 @@ track_trigger_note:
     plx
     bra @pitched
 @not_slice:
+    cmp #$05
+    bne @not_karp
+    phx
+    jsr karp_trigger        ; the room is the string
+    plx
+    bra @pitched
+@not_karp:
     cmp #$03
     bne @not_nse
     ; the instrument's CLOCK field (byte 1) pins the rate; 0 follows
@@ -1960,6 +1967,148 @@ slice_trigger:
     jsr note_pitch_calc_only
     jsr voice_pitch_write
     ; SRCN no longer matches the instrument record on this voice
+    lda trig_voice
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda #$FF
+    sta.w trk_instr_active,x
+    sec
+    rts
+
+; --- KARP trigger: the echo loop is the string (M-KARP) ----------------------------
+; rec[1] = exciter wave bank (0-7), rec[2] = DAMP (low nibble) + BURST
+; (high, used by apply_instrument's envelope), rec[3] = SUSTAIN
+; (feedback 0-127). The note's karp_tab entry (EDL 1 or 2 from the song
+; header) gives the exciter pitch — the comb partial's exact frequency —
+; and the 2-tap fractional pull; DAMP scales the pair (which is also
+; the KS damping lowpass). apply_instrument already set the burst
+; envelope and forced the voice's echo send. Clobbers X.
+karp_trigger:
+    ; es0 = karp_tab offset: (EDL == 2 ? 384 : 0) + trig_note*4
+    lda trig_note
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    sta es0
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_HEADER + SH_EDL
+    and #$0F
+    cmp #$02
+    bne @tab_have
+    rep #$30
+.ACCU 16
+    lda es0
+    clc
+    adc #384
+    sta es0
+    sep #$20
+.ACCU 8
+@tab_have:
+    ; exciter: SRCN = 56 + bank
+    lda trig_id
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR + 2,x
+    and #$0F                ; DAMP 0-15 -> loop gain 7..127
+    asl
+    asl
+    asl
+    ora #$07
+    sta es1                 ; g
+    lda.l $7E0000 + SB_INSTR + 3,x
+    and #$7F
+    pha                     ; SUSTAIN (feedback)
+    lda.l $7E0000 + SB_INSTR + 1,x
+    and #$07
+    clc
+    adc #56
+    tay
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0SRCN
+    jsr apu_dsp_write
+    ; feedback = SUSTAIN
+    pla                     ; 8-bit pull (ply would take 2 bytes: X=16)
+    tay
+    lda #DSP_EFB
+    jsr apu_dsp_write
+    ; exciter pitch: the partial's exact frequency, from the table
+    rep #$30
+.ACCU 16
+    ldx es0
+    sep #$20
+.ACCU 8
+    lda.l karp_tab,x
+    sta last_pitch
+    lda.l karp_tab + 1,x
+    sta last_pitch + 1
+    jsr voice_pitch_write
+    ; the 2-tap pair: tap[i0] = g - m, tap[i0+1] = m, m = g*frac >> 8
+    rep #$30
+.ACCU 16
+    ldx es0
+    sep #$20
+.ACCU 8
+    lda.l karp_tab + 3,x
+    sta.w WRMPYA
+    lda es1
+    sta.w WRMPYB            ; 8 machine cycles until the product
+    lda.l karp_tab + 2,x
+    sta es0                 ; i0 (the table offset is consumed)
+    nop
+    lda.w RDMPYH            ; m
+    sta es0 + 1
+    ; write all 8 FIR coefficients (pair set, the rest cleared)
+    lda #$00
+    sta es1 + 1             ; tap counter
+@taps:
+    lda es1 + 1
+    cmp es0
+    bne @not_t0
+    lda es1
+    sec
+    sbc es0 + 1             ; g - m
+    bra @tap_have
+@not_t0:
+    dec a
+    cmp es0
+    bne @tap_zero
+    lda es0 + 1             ; m
+    bra @tap_have
+@tap_zero:
+    lda #$00
+@tap_have:
+    tay
+    lda es1 + 1
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_C0
+    jsr apu_dsp_write
+    inc es1 + 1
+    lda es1 + 1
+    cmp #$08
+    bne @taps
+    ; SRCN/env no longer match the record on this voice
     lda trig_voice
     rep #$30
 .ACCU 16

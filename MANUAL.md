@@ -194,6 +194,7 @@ sound. An instrument's **TYPE** decides what the voice does:
 | **WAV** | a drawn 32-sample wavetable loop from the WAVE screen |
 | **NSE** | the DSP noise generator; the note sets the noise clock, or the instrument's CLOCK field pins it |
 | **SLICE** | one pool sample (a breakbeat, a vocal, anything) cut into **SLICES** equal parts; the note picks the slice, wrapping past the count — the PHRASE note column shows two letters of the sample's name + the slice number |
+| **KARP** | Karplus-Strong: the echo loop becomes a plucked string — the note rings the room's nearest partial, tuned by a per-note FIR pull. One string per song (it owns the echo section) |
 
 Any type can go on any of the 8 voices — there are no special
 channels. Eight kits at once is legal. **The first 12 instruments are
@@ -243,6 +244,30 @@ screen's RAM/FREE line shows the live balance).
   TBS `1`–`F` runs a table row every n ticks; TBS `0` is *note-sync*
   — each new note advances the table one row (great for cycling
   chords, sample-offsets, pan patterns).
+
+### KARP — the room as a string
+
+Karplus-Strong on real hardware: the echo delay line is the string,
+the FIR is its damping filter, and every note re-tunes the room. Set
+the song's **DELAY to 1 or 2** on ECHO (the string only costs 2-4 KB
+of audio RAM) and point a KARP instrument at an exciter:
+
+- **BANK** — the wave that plucks the string (saw = bright pick,
+  sine = soft thumb, the gritty bank = snap). It fires as a fast
+  burst at the exact frequency of the note's nearest room partial.
+- **DAMP** — string material: low = dead nylon, high = ringing steel.
+- **BURST** — how long the pluck seed lasts.
+- **SUSTAIN** — the loop feedback: how long the string rings.
+- The note picks the nearest partial of the room and a 2-tap FIR
+  pulls it into tune. Chromatic from about **F#6 at DELAY 1 / F#5 at
+  DELAY 2**; below that, notes land on the room's harmonic series —
+  natural-horn intonation, gorgeous for basses and drones.
+
+One string per song: KARP owns FEEDBACK and the FIR taps while it
+plays, and anything else with ECHO on plays *through* the string.
+Arpeggios ring multiple partials at once — a harp cloud from one
+track. Design plucks in the patcher's FIR tab (the KARP row) before
+committing.
 
 ### SLICE — chopping a break
 

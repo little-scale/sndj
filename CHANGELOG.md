@@ -5,6 +5,15 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- **New instrument type: KARP** — Karplus-Strong on the echo loop.
+  The note rings the room's nearest partial (exciter = any wave bank,
+  fired as a burst at the partial's exact pitch) and a per-note 2-tap
+  FIR pulls it into tune while doubling as the string's damping
+  filter. Fields: BANK / DAMP / BURST / SUSTAIN. Chromatic from ~F#6
+  at DELAY 1, ~F#5 at DELAY 2; the harmonic series below. One string
+  per song — KARP owns the echo while it plays. Type names now render
+  4 characters (KARP reads as KARP).
+
 - **KARP prototype** in the patcher's FIR tab: Karplus-Strong on the
   echo loop (the room as a string). Pick a note, hit pluck — the comb
   rings the note's nearest partial and a 2-tap FIR supplies the

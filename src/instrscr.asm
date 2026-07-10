@@ -14,69 +14,75 @@
 .ACCU 8
 .INDEX 16
 
-.DEFINE IF_COUNT 23
+.DEFINE IF_COUNT 26
 
 ; field table, in DISPLAY order: byte offset in record, shift, value
 ; mask (post-shift), max
 if_fields:
     .DB 0,  0, $3F, 63   ; 0  INSTR — the number itself (pseudo-field)
-    .DB 0,  0, $07, 4    ; 1  TYPE
+    .DB 0,  0, $07, 5    ; 1  TYPE
     .DB 1,  0, $FF, 63   ; 2  SAMPLE / KIT / BANK (max re-clamped per type)
     .DB 7,  4, $0F, 15   ; 3  SLICES (drawn +1: 01-10 equal divisions)
     .DB 7,  1, $03, 2    ; 4  LOOP (SMP: 0 pool / 1 loop / 2 one-shot)
-    .DB 2,  0, $0F, 15   ; 5  ATTACK
-    .DB 2,  4, $0F, 15   ; 6  FADE (SLICE: cut rate; 0 = ring/bleed)
-    .DB 2,  4, $07, 7    ; 7  DECAY
-    .DB 3,  5, $07, 7    ; 8  SUS LVL
-    .DB 3,  0, $1F, 31   ; 9  SUS RATE
-    .DB 4,  0, $FF, 127  ; 10 VOL L
-    .DB 5,  0, $FF, 127  ; 11 VOL R
-    .DB 7,  0, $01, 1    ; 12 EON (echo send)
-    .DB 6,  0, $FF, 255  ; 13 FINE (signed 1/256 semitone; free wrap)
-    .DB 14, 0, $FF, 255  ; 14 VIB speed/depth nibbles (free wrap)
-    .DB 15, 0, $FF, 255  ; 15 TRM speed/depth nibbles (free wrap)
-    .DB 9,  0, $FF, 255  ; 16 TUNE (SLICE: signed semitones; free wrap)
-    .DB 8,  0, $03, 3    ; 17 GRP
-    .DB 9,  0, $FF, 24   ; 18 OFS 1
-    .DB 10, 0, $FF, 24   ; 19 OFS 2
-    .DB 11, 0, $FF, 24   ; 20 OFS 3
-    .DB 12, 0, $FF, 255  ; 21 TBL (>= 32 shows -- = no table; free wrap)
-    .DB 13, 0, $0F, 15   ; 22 TBS ticks/row (0 = advance per note)
+    .DB 2,  0, $0F, 15   ; 5  DAMP (KARP: string brightness/decay)
+    .DB 2,  4, $0F, 15   ; 6  BURST (KARP: exciter seed length)
+    .DB 3,  0, $7F, 127  ; 7  SUSTAIN (KARP: loop feedback)
+    .DB 2,  0, $0F, 15   ; 8  ATTACK
+    .DB 2,  4, $0F, 15   ; 9  FADE (SLICE: cut rate; 0 = ring/bleed)
+    .DB 2,  4, $07, 7    ; 10 DECAY
+    .DB 3,  5, $07, 7    ; 11 SUS LVL
+    .DB 3,  0, $1F, 31   ; 12 SUS RATE
+    .DB 4,  0, $FF, 127  ; 13 VOL L
+    .DB 5,  0, $FF, 127  ; 14 VOL R
+    .DB 7,  0, $01, 1    ; 15 EON (echo send)
+    .DB 6,  0, $FF, 255  ; 16 FINE (signed 1/256 semitone; free wrap)
+    .DB 14, 0, $FF, 255  ; 17 VIB speed/depth nibbles (free wrap)
+    .DB 15, 0, $FF, 255  ; 18 TRM speed/depth nibbles (free wrap)
+    .DB 9,  0, $FF, 255  ; 19 TUNE (SLICE: signed semitones; free wrap)
+    .DB 8,  0, $03, 3    ; 20 GRP
+    .DB 9,  0, $FF, 24   ; 21 OFS 1
+    .DB 10, 0, $FF, 24   ; 22 OFS 2
+    .DB 11, 0, $FF, 24   ; 23 OFS 3
+    .DB 12, 0, $FF, 255  ; 24 TBL (>= 32 shows -- = no table; free wrap)
+    .DB 13, 0, $0F, 15   ; 25 TBS ticks/row (0 = advance per note)
 
 ; screen row per field: blank rows separate the groups (fields with
-; exclusive visibility may share a row: SLICES/LOOP, FADE/DECAY,
-; TUNE/GRP)
+; exclusive visibility may share a row: SLICES/LOOP, DAMP/ATTACK,
+; BURST/FADE/DECAY, SUSTAIN/SUS LVL, TUNE/GRP)
 if_row:
     .DB 0, 1, 2, 3, 3              ; number + identity (+ SLICES | LOOP)
+    .DB 4, 5, 6                    ; KARP: DAMP / BURST / SUSTAIN
     .DB 4, 5, 5, 6, 7              ; envelope (FADE on DECAY's row)
     .DB 9, 10, 11                  ; mix + send
     .DB 13, 14, 15                 ; tune + motion
     .DB 17, 17, 18, 19, 20         ; chord span (TUNE on GRP's row)
     .DB 22, 23                     ; table
 
-; visibility per type (bit 0 SMP, 1 KIT, 2 WAV, 3 NSE, 4 SLICE): a type
-; hides the fields its trigger path never reads
+; visibility per type (bit 0 SMP, 1 KIT, 2 WAV, 3 NSE, 4 SLICE,
+; 5 KARP): a type hides the fields its trigger path never reads
 if_vis:
-    .DB $1F              ; INSTR number
-    .DB $1F              ; TYPE
-    .DB $1F              ; SAMPLE / KIT / BANK / CLOCK
+    .DB $3F              ; INSTR number
+    .DB $3F              ; TYPE
+    .DB $3F              ; SAMPLE / KIT / BANK / CLOCK
     .DB $10              ; SLICES (SLICE only)
     .DB $01              ; LOOP (SMP only)
+    .DB $20, $20, $20    ; DAMP / BURST / SUSTAIN (KARP only)
     .DB $1F              ; ATTACK
     .DB $10              ; FADE (SLICE only)
     .DB $0F, $0F, $0F    ; DECAY/SUS: SLICE synthesizes its envelope
-    .DB $1D, $1D         ; VOL L/R (KIT: the slot's vol rules)
-    .DB $1F              ; ECHO
+    .DB $3D, $3D         ; VOL L/R (KIT: the slot's vol rules)
+    .DB $1F              ; ECHO (KARP: forced on, hidden)
     .DB $15              ; FINE (KIT: slot+pool tune; NSE: no pitch)
     .DB $15              ; VIB  (pitch wobble: SMP/WAV/SLICE)
     .DB $1D              ; TRM  (KIT: slot volume domain)
     .DB $10              ; TUNE (SLICE only)
     .DB $05, $05, $05, $05   ; GRP+OFS (kit ids aren't pool samples; NSE unison is noise)
-    .DB $1F, $1F         ; TBL/TBS
+    .DB $3F, $3F         ; TBL/TBS
 
 if_labels:
     .DW if_lnum
-    .DW if_l0, if_l1, if_lsli, if_lloop, if_l2, if_lfad, if_l3, if_l4, if_l5
+    .DW if_l0, if_l1, if_lsli, if_lloop, if_ldmp, if_lbst, if_lsus
+    .DW if_l2, if_lfad, if_l3, if_l4, if_l5
     .DW if_l6, if_l7, if_l12, if_l13, if_l14, if_l15, if_ltun
     .DW if_l8, if_l9, if_l10, if_l11, if_l16, if_l17
 if_lnum: .DB "INSTR", 0
@@ -105,6 +111,9 @@ if_lsli: .DB "SLICES", 0
 if_lfad: .DB "FADE", 0
 if_ltun: .DB "TUNE", 0
 if_lloop: .DB "LOOP", 0
+if_ldmp: .DB "DAMP", 0
+if_lbst: .DB "BURST", 0
+if_lsus: .DB "SUSTAIN", 0
 str_if_pool: .DB "POOL", 0
 
 ; A = 1 << current instrument's type
@@ -154,7 +163,7 @@ if_field_vis:
     rts
 
 if_types:
-    .DB "SMPKITWAVNSESLC"  ; 3 chars each
+    .DB "SMP KIT WAV NSE SLC KARP"  ; 4 chars each
 
 instr_init:
     lda #SCREEN_INSTR
@@ -213,8 +222,14 @@ if_desc:
     bra @max_ok
 @not_wavmax:
     cmp #$08                ; NSE
-    bne @max_ok
+    bne @not_nsemax
     lda #32
+    sta str_buf + 37
+    bra @max_ok
+@not_nsemax:
+    cmp #$20                ; KARP: exciter bank 0-7
+    bne @max_ok
+    lda #7
     sta str_buf + 37
 @max_ok:
     rep #$30
@@ -430,11 +445,11 @@ if_nudge:
     ; the semitone fields (TUNE, OFS 1-3), 4 for short ranges; L/R
     ; always steps 1
     lda if_cur
-    cmp #16
+    cmp #19
     beq @mag_semi           ; TUNE
-    cmp #18
-    bcc @mag_std
     cmp #21
+    bcc @mag_std
+    cmp #24
     bcs @mag_std
 @mag_semi:
     lda #12                 ; semitones
@@ -578,8 +593,13 @@ instr_draw:
     bra @lab_put
 @not_wlab:
     cmp #$08
-    bne @lab_std
+    bne @not_nlab
     ldx #if_l1n
+    bra @lab_put
+@not_nlab:
+    cmp #$20
+    bne @lab_std
+    ldx #if_l1w             ; KARP: the exciter wave BANK
     bra @lab_put
 @lab_std:
     lda ui_cnt
@@ -617,7 +637,7 @@ instr_draw:
     pla
     sta if_cur
     lda ui_cnt
-    cmp #$0C
+    cmp #$0F
     bne @not_echo_v
     ; ECHO: a toggle reads ON/OFF, not 00/01
     lda str_buf + 33
@@ -634,7 +654,7 @@ instr_draw:
     plx
     jmp @next
 @not_echo_v:
-    cmp #$15
+    cmp #$18
     bne @not_tbl_v
     ; TBL: anything past the 32 tables is the nil state
     lda str_buf + 33
@@ -715,11 +735,10 @@ instr_draw:
 @not_num_v:
     cmp #$01
     bne @hex
-    ; TYPE: 3-char name (fetch all chars first; text_puttile clobbers X)
+    ; TYPE: 4-char name (fetch all chars first; text_puttile clobbers X)
     lda str_buf + 33
     asl
-    clc
-    adc str_buf + 33        ; *3
+    asl                     ; *4
     rep #$30
 .ACCU 16
     and #$00FF
@@ -727,20 +746,26 @@ instr_draw:
     sep #$20
 .ACCU 8
     lda.w if_types,x
-    sta str_buf + 30
+    sta str_buf + 28
     lda.w if_types + 1,x
-    sta str_buf + 31
+    sta str_buf + 29
     lda.w if_types + 2,x
-    sta str_buf + 32
+    sta str_buf + 30
+    lda.w if_types + 3,x
+    sta str_buf + 31
+    lda str_buf + 28
+    sec
+    sbc #32
+    jsr text_puttile
+    lda str_buf + 29
+    sec
+    sbc #32
+    jsr text_puttile
     lda str_buf + 30
     sec
     sbc #32
     jsr text_puttile
     lda str_buf + 31
-    sec
-    sbc #32
-    jsr text_puttile
-    lda str_buf + 32
     sec
     sbc #32
     jsr text_puttile

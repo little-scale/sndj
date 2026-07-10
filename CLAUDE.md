@@ -956,7 +956,7 @@ Commit at every milestone boundary; each has a verification gate
   CHANGELOG dated, `make dist`, tag, `gh release create` with versioned
   ROMs. Stretch queue thereafter: M-SCOPE (OUTX oscilloscope), M-STREAM
   (long-sample streaming), M-MIDI2 (hybrid EXT tracks), BIGSAVE.
-- **M-KARP — the KARP instrument type** (designed 2026-07-10; browser
+- **M-KARP — the KARP instrument type** (BUILT 2026-07-10; browser
   prototype lives in patcher.html's FIR tab). Karplus-Strong on the
   echo path — the only writable feedback loop in ARAM: the room IS the
   string. Resonances sit at n·32000/(EDL·512+d); the note picks the

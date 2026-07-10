@@ -36,6 +36,7 @@
 .DEFINE DSP_DIR      $5D
 .DEFINE DSP_ESA      $6D
 .DEFINE DSP_EDL      $7D
+.DEFINE DSP_C0       $0F    ; FIR coefficients C0-C7 at $0F,$1F,..,$7F
 
 ; ARAM layout (CLAUDE.md §14.1)
 .DEFINE ARAM_DIR     $1000
@@ -832,9 +833,25 @@ apply_instrument:
     lda #DSP_NON
     jsr apu_dsp_write
 @non_same:
-    ; EON bit from the instrument's flags byte (rec[7] bit 0)
+    ; EON bit from the instrument's flags byte (rec[7] bit 0);
+    ; KARP sends unconditionally — the exciter must reach the string
+    ; (the channel gate is bypassed too)
     plx
     phx
+    lda trig_type
+    cmp #$05
+    bne @eon_rec
+    lda trig_voice
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w bit_for_track,x
+    ora eng_eon
+    bra @eon_upd
+@eon_rec:
     lda.l $7E0000 + SB_INSTR + 7,x
     and #$01
     pha
@@ -871,6 +888,39 @@ apply_instrument:
     ; FADE (high) -> decay 0, sustain level 7, sustain rate from FADE
     ; (0 = hold/bleed into the next slice, F = fastest cut).
     lda trig_type
+    cmp #$05
+    bne @not_env_karp
+    ; KARP: the exciter is a seed burst — instant attack, decay to
+    ; nothing, tail speed from the BURST nibble (rec[2] high)
+    lda #$FF                ; enable | attack 15 | decay 7
+    tay
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0ADSR1
+    phx
+    jsr apu_dsp_write
+    plx
+    lda.l $7E0000 + SB_INSTR + 2,x
+    lsr
+    lsr
+    lsr
+    lsr
+    ora #$10                ; sustain level 0, rate 16-31
+    tay
+    lda trig_voice
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0ADSR2
+    phx
+    jsr apu_dsp_write
+    plx
+    jmp @env_done
+@not_env_karp:
     cmp #$04
     bne @env_rec
     lda.l $7E0000 + SB_INSTR + 2,x
