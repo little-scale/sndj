@@ -117,17 +117,20 @@ export a patched ROM. Everything runs locally.</p>
   </div>
 </div>
 <div id="sliceview" hidden>
-  <p class="hint">chop a pool sample into equal, block-aligned slices —
-  exactly what a SLICE instrument does on the console (zero audio-RAM
-  cost: slices are directory aliases into the loaded sample). Drag the
-  red edge handles to trim dead air first (lossless — blocks are cut,
-  nothing re-encodes); <b>apply trim</b> writes the crop into the pool
-  slot. Click a slice to hear just that slice.</p>
+  <p class="hint">chop a pool sample into slices, exactly as a SLICE
+  instrument plays them. Drag the <b>red edge handles</b> to trim dead
+  air; the space between divides equally, and every <b>orange boundary
+  drags too</b> — nudge cuts onto the transients when the groove is
+  loose. Click a slice to hear just that slice. <b>bake cuts</b>
+  writes it all into the pool slot: trims are lossless block cuts, and
+  hand-moved cuts bake by padding each slice to the widest with silent
+  blocks so the console's equal grid lands exactly on your cuts (the
+  cost shows before you commit).</p>
   <div class="row">
     <label>sample <select id="slsample"></select></label>
     <label>slices <input type="number" id="slcount" value="8" min="1"
       max="16" style="width:3rem"></label>
-    <button id="sltrim">apply trim</button>
+    <button id="sltrim">bake cuts</button>
     <button id="slreset">reset</button>
     <span class="hint" id="slinfo"></span>
   </div>
@@ -135,7 +138,7 @@ export a patched ROM. Everything runs locally.</p>
   <div class="row">
     <label>assign to <select id="slbind"></select></label>
     <button class="primary" id="slassign">set boot instrument</button>
-    <span class="hint">(applies a pending trim, then sets type SLICE +
+    <span class="hint">(bakes pending cuts, then sets type SLICE +
     sample + count on that boot slot)</span>
   </div>
 </div>
@@ -1108,7 +1111,18 @@ function audition(e, rate) {
 
 // -------------------------------------------------------- slice designer
 let slTrim = { s: 0, e: 0, sample: -1 };   // crop window in BRR blocks
-let slDrag = null;
+let slBounds = null;                       // custom cut positions (n+1 blocks)
+let slDrag = null;                         // 's' | 'e' | boundary index
+
+function slEqualBounds(n) {
+  const kept = slTrim.e - slTrim.s;
+  const step = Math.floor(kept / n);
+  if (!step) return null;
+  const b = [];
+  for (let k = 0; k < n; k++) b.push(slTrim.s + k * step);
+  b.push(slTrim.e);
+  return b;
+}
 
 function slParams() {
   const idx = +$('slsample').value || 0;
@@ -1116,8 +1130,15 @@ function slParams() {
   const n = Math.max(1, Math.min(16, +$('slcount').value || 1));
   if (slTrim.sample !== idx) {
     slTrim = { s: 0, e: (e && !isFree(e)) ? e.brr.length / 9 : 0, sample: idx };
+    slBounds = null;
   }
-  return { e, n, idx };
+  if (slBounds && slBounds.length !== n + 1) slBounds = null;
+  return { e, n, idx, bounds: slBounds || slEqualBounds(n) };
+}
+
+function slIsCustom(n, bounds) {
+  const eq = slEqualBounds(n);
+  return !!(bounds && eq && bounds.some((b, i) => b !== eq[i]));
 }
 
 // lossless block crop: slice the BRR bytes, force END on the last block
@@ -1125,6 +1146,20 @@ function slCutBrr(e, a, b) {
   const brr = e.brr.slice(a * 9, b * 9);
   brr[brr.length - 9] |= 0x01;
   return brr;
+}
+
+// custom cuts bake as equal slices: each segment pads to the widest with
+// silent (filter-0 zero) blocks, so the console's equal grid = the cuts
+function slPaddedBrr(e, bounds) {
+  const n = bounds.length - 1;
+  let step = 0;
+  for (let k = 0; k < n; k++) step = Math.max(step, bounds[k + 1] - bounds[k]);
+  const out = new Uint8Array(n * step * 9);
+  for (let k = 0; k < n; k++) {
+    out.set(e.brr.subarray(bounds[k] * 9, bounds[k + 1] * 9), k * step * 9);
+  }
+  out[out.length - 9] |= 0x01;
+  return out;
 }
 
 function renderSlices() {
@@ -1158,7 +1193,7 @@ function slDraw() {
   const cv = $('slwave'), g = cv.getContext('2d');
   g.fillStyle = '#0a0c1e';
   g.fillRect(0, 0, cv.width, cv.height);
-  const { e, n } = slParams();
+  const { e, n, bounds } = slParams();
   $('slinfo').textContent = '';
   if (!e || isFree(e)) return;
   const pcm = S.brrDecode(e.brr);
@@ -1183,24 +1218,23 @@ function slDraw() {
   g.fillStyle = 'rgba(10, 12, 30, .78)';
   if (slTrim.s > 0) g.fillRect(0, 0, bx(slTrim.s), cv.height);
   if (slTrim.e < blocks) g.fillRect(bx(slTrim.e), 0, cv.width - bx(slTrim.e), cv.height);
-  // the slice grid over the kept region
-  const kept = slTrim.e - slTrim.s;
-  const step = Math.floor(kept / n);
   g.font = '12px ui-monospace, monospace';
-  if (step) {
-    g.strokeStyle = '#ffb020';
-    g.fillStyle = '#ffb020';
-    for (let k = 0; k < n; k++) {
-      const x = Math.floor(bx(slTrim.s + k * step)) + .5;
-      g.beginPath();
-      g.moveTo(x, 0);
-      g.lineTo(x, cv.height);
-      g.stroke();
-      g.fillText(k.toString(16).toUpperCase(), x + 4, 13);
-    }
-  } else {
+  if (!bounds) {
     g.fillStyle = '#ffb020';
     g.fillText('too short for ' + n + ' slices', 8, 14);
+    return;
+  }
+  // cut boundaries: internal ones carry a grab handle
+  g.strokeStyle = '#ffb020';
+  g.fillStyle = '#ffb020';
+  for (let k = 0; k < n; k++) {
+    const x = Math.floor(bx(bounds[k])) + .5;
+    g.beginPath();
+    g.moveTo(x, 0);
+    g.lineTo(x, cv.height);
+    g.stroke();
+    g.fillText(k.toString(16).toUpperCase(), x + 4, 13);
+    if (k > 0) g.fillRect(x - 3, 0, 7, 7);
   }
   // trim handles
   g.strokeStyle = '#ff6060';
@@ -1213,88 +1247,114 @@ function slDraw() {
     g.stroke();
     g.fillRect(x - 4, cv.height - 10, 8, 10);
   }
-  const trimmed = slTrim.s > 0 || slTrim.e < blocks;
-  $('slinfo').textContent = 'kept ' + kept + '/' + blocks + ' blocks (' +
-    (kept * 9) + ' B, ' + Math.round(kept * 16 / 32) + ' ms), ' +
-    (step ? step + ' blocks/slice' : '-') + (trimmed ? ' — trim pending' : '');
+  const kept = slTrim.e - slTrim.s;
+  const custom = slIsCustom(n, bounds);
+  const cropped = slTrim.s > 0 || slTrim.e < blocks;
+  let msg = 'kept ' + kept + '/' + blocks + ' blocks (' + (kept * 9) + ' B, ' +
+    Math.round(kept * 16 / 32) + ' ms)';
+  if (custom) {
+    msg += ' — custom cuts: bake adds ' +
+      (slPaddedBrr(e, bounds).length - kept * 9) + ' B padding';
+  } else if (cropped) {
+    msg += ' — trim pending';
+  }
+  $('slinfo').textContent = msg;
 }
 
-function slApplyTrim() {
-  const { e } = slParams();
-  if (!e || isFree(e)) return false;
+function slBake() {
+  const { e, n, bounds } = slParams();
+  if (!e || isFree(e) || !bounds) return false;
   const blocks = e.brr.length / 9;
-  if (slTrim.s === 0 && slTrim.e === blocks) return false;
-  e.brr = slCutBrr(e, slTrim.s, slTrim.e);
-  if (e.loopBlock !== null && e.loopBlock >= slTrim.s && e.loopBlock < slTrim.e) {
+  const custom = slIsCustom(n, bounds);
+  const cropped = slTrim.s > 0 || slTrim.e < blocks;
+  if (!custom && !cropped) return false;
+  e.brr = custom ? slPaddedBrr(e, bounds) : slCutBrr(e, slTrim.s, slTrim.e);
+  if (!custom && e.loopBlock !== null &&
+      e.loopBlock >= slTrim.s && e.loopBlock < slTrim.e) {
     e.loopBlock -= slTrim.s;
   } else {
     e.loopBlock = null;
   }
   slTrim = { s: 0, e: e.brr.length / 9, sample: slTrim.sample };
+  slBounds = null;
   render();
   renderSlices();
   return true;
 }
 
 $('slwave').onpointerdown = ev => {
-  const { e } = slParams();
+  const { e, n, bounds } = slParams();
   if (!e || isFree(e)) return;
   const cv = $('slwave');
   const rect = cv.getBoundingClientRect();
   const x = (ev.clientX - rect.left) / rect.width * cv.width;
   const blocks = e.brr.length / 9;
   const bx = blk => blk * cv.width / blocks;
+  slDrag = null;
   if (Math.abs(x - bx(slTrim.s)) < 9) slDrag = 's';
   else if (Math.abs(x - bx(slTrim.e)) < 9) slDrag = 'e';
-  else { slDrag = null; return; }
-  cv.setPointerCapture(ev.pointerId);
+  else if (bounds) {
+    for (let k = 1; k < n; k++) {
+      if (Math.abs(x - bx(bounds[k])) < 7) { slDrag = k; break; }
+    }
+  }
+  if (slDrag !== null) cv.setPointerCapture(ev.pointerId);
 };
 $('slwave').onpointermove = ev => {
-  if (!slDrag) return;
-  const { e } = slParams();
+  if (slDrag === null) return;
+  const { e, n, bounds } = slParams();
   if (!e || isFree(e)) return;
   const cv = $('slwave');
   const rect = cv.getBoundingClientRect();
   const blocks = e.brr.length / 9;
-  let blk = Math.round((ev.clientX - rect.left) / rect.width * blocks);
-  if (slDrag === 's') slTrim.s = Math.max(0, Math.min(slTrim.e - 1, blk));
-  else slTrim.e = Math.max(slTrim.s + 1, Math.min(blocks, blk));
+  const blk = Math.round((ev.clientX - rect.left) / rect.width * blocks);
+  if (slDrag === 's') {
+    slTrim.s = Math.max(0, Math.min(slTrim.e - 1, blk));
+    slBounds = null;         // trim moves re-seed the equal grid
+  } else if (slDrag === 'e') {
+    slTrim.e = Math.max(slTrim.s + 1, Math.min(blocks, blk));
+    slBounds = null;
+  } else {
+    if (!slBounds) slBounds = bounds.slice();
+    const k = slDrag;
+    slBounds[k] = Math.max(slBounds[k - 1] + 1,
+      Math.min(slBounds[k + 1] - 1, blk));
+  }
   slDraw();
 };
 $('slwave').onpointerup = ev => {
-  if (slDrag) { slDrag = null; return; }
+  if (slDrag !== null) { slDrag = null; return; }
   // plain click: audition JUST that slice (its blocks, END forced)
-  const { e, n } = slParams();
-  if (!e || isFree(e)) return;
+  const { e, n, bounds } = slParams();
+  if (!e || isFree(e) || !bounds) return;
   const cv = $('slwave');
   const rect = cv.getBoundingClientRect();
   const blocks = e.brr.length / 9;
   const blk = (ev.clientX - rect.left) / rect.width * blocks;
-  const kept = slTrim.e - slTrim.s;
-  const step = Math.floor(kept / n);
-  if (!step || blk < slTrim.s || blk >= slTrim.e) return;
-  const k = Math.max(0, Math.min(n - 1, Math.floor((blk - slTrim.s) / step)));
-  const a = slTrim.s + k * step;
-  const b = k === n - 1 ? slTrim.e : Math.min(a + step, slTrim.e);
+  if (blk < slTrim.s || blk >= slTrim.e) return;
+  let k = n - 1;
+  while (k > 0 && blk < bounds[k]) k--;
+  const a = bounds[k], b = bounds[k + 1];
   audition({ brr: slCutBrr(e, a, b), loopBlock: null,
              tuneSemis: e.tuneSemis, tuneFine: e.tuneFine });
   status('slice ' + k.toString(16).toUpperCase() + ' of ' + e.name + ' (' +
     (b - a) + ' blocks / ' + Math.round((b - a) * 16 / 32) + ' ms at native)');
 };
-$('slcount').oninput = slDraw;
+$('slcount').oninput = () => { slBounds = null; slDraw(); };
 $('slsample').onchange = slDraw;
 $('sltrim').onclick = () => {
-  if (slApplyTrim()) status('trim written into the pool slot (lossless block cut)');
+  if (slBake()) status('cuts baked into the pool slot');
 };
 $('slreset').onclick = () => {
   slTrim.sample = -1;
+  slBounds = null;
   slDraw();
 };
 $('slassign').onclick = () => {
   if (defOff < 0) return;
   const { e, n, idx } = slParams();
   if (!e || isFree(e)) return;
-  const trimmed = slApplyTrim();
+  const baked = slBake();
   const i = +$('slbind').value || 0;
   rom[defOff + i] = 4;
   rom[defOff + 12 + i] = idx;
@@ -1303,7 +1363,7 @@ $('slassign').onclick = () => {
   render();
   renderSlices();
   status('I' + i + ' = SLICE of ' + e.name + ' \u00d7 ' + n +
-    (trimmed ? ' (trim applied first)' : ''));
+    (baked ? ' (cuts baked first)' : ''));
 };
 
 // ----------------------------------------------------------- palettes

@@ -5,6 +5,12 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- Patcher SLICES tab: **every cut is draggable** — the space between
+  the trim handles divides equally, then each orange boundary nudges
+  onto the transient by hand. Custom cuts bake by padding each slice
+  to the widest with silent blocks, so the console's equal grid lands
+  exactly on your cuts with zero engine changes (the byte cost of the
+  padding shows before you commit).
 - Patcher SLICES tab: **trim then slice** — drag the red edge handles
   to crop dead air (a lossless block cut, no re-encode; **apply trim**
   writes it into the pool slot, and assigning a boot instrument
