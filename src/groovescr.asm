@@ -1,13 +1,14 @@
-; groovescr.asm — the GROOVE screen: 16 steps of ticks-per-row for the
-; selected groove. Grooves ARE the tempo (CLAUDE.md §1.5): the header
-; shows the BPM this groove yields at the song's tick BPM
-; (effective = 96 * song BPM / step sum; groove 6/6 = the tempo as set).
+; groovescr.asm — the GROOVE screen: THE groove, one public 2-step pair
+; (ticks per row, alternating). Grooves ARE the feel: 6/6 is straight,
+; 7/5 lilts, 8/4 swings hard. The header shows the BPM the pair yields
+; at the song's tick BPM (effective = 12 * song BPM / (a+b); 6/6 reads
+; back the PROJECT tempo exactly). The G command writes the same two
+; bytes live: G84 = swing on the drop.
 ;
 ;   B + d-pad   nudge the step (L/R = 1, U/D = 4), clamped 1-15
 ;   B tap       repeat the last inserted value
-;   Y + up/down previous / next groove
 ;
-; Edits are live: the engine reads steps from WRAM every row.
+; Edits are live: the engine reads the pair from WRAM every row.
 ; Reached with A+Down from CHAIN.
 
 .ACCU 8
@@ -34,10 +35,10 @@ groove_init:
 .ACCU 8
     ldx #str_groove
     jsr text_puts
-    ; ruler
+    ; ruler (the family grid: header y4, rows from y5)
     lda #4
     sta text_x
-    lda #7
+    lda #4
     sta text_y
     rep #$20
 .ACCU 16
@@ -49,21 +50,12 @@ groove_init:
     jsr text_puts
     rts
 
-; X = song-block offset of the cursor step (groove*16 + row)
+; X = song-block offset of the cursor step (the public pair)
 gv_addr:
     rep #$30
 .ACCU 16
-    lda ed_groove
-    and #$00FF
-    asl
-    asl
-    asl
-    asl
-    sta tmp2
     lda gv_row
-    and #$00FF
-    clc
-    adc tmp2
+    and #$0001
     clc
     adc #SB_GROOVES
     tax
@@ -85,40 +77,6 @@ groove_update:
     beq @edit_ok
     jmp groove_draw
 @edit_ok:
-    ; Y + up/down: previous / next groove
-    rep #$20
-.ACCU 16
-    lda pad_held
-    and #PAD_Y
-    sep #$20
-.ACCU 8
-    beq @no_page
-    rep #$20
-.ACCU 16
-    lda pad_event
-    and #PAD_UP
-    sep #$20
-.ACCU 8
-    beq @pg_dn
-    lda ed_groove
-    dec a
-    and #(GROOVE_COUNT - 1)
-    sta ed_groove
-@pg_dn:
-    rep #$20
-.ACCU 16
-    lda pad_event
-    and #PAD_DOWN
-    sep #$20
-.ACCU 8
-    beq @pg_done
-    lda ed_groove
-    inc a
-    and #(GROOVE_COUNT - 1)
-    sta ed_groove
-@pg_done:
-    jmp groove_draw
-@no_page:
     ; B edges
     rep #$20
 .ACCU 16
@@ -164,25 +122,12 @@ groove_update:
     rep #$20
 .ACCU 16
     lda pad_event
-    and #PAD_UP
-    sep #$20
-.ACCU 8
-    beq @nu
-    lda gv_row
-    dec a
-    and #$0F
-    sta gv_row
-@nu:
-    rep #$20
-.ACCU 16
-    lda pad_event
-    and #PAD_DOWN
+    and #(PAD_UP | PAD_DOWN)
     sep #$20
 .ACCU 8
     beq @draw
     lda gv_row
-    inc a
-    and #$0F
+    eor #$01                ; two steps: up/down just swaps
     sta gv_row
 @draw:
     jmp groove_draw
@@ -215,19 +160,7 @@ gv_nudge:
     rts
 
 groove_draw:
-    ; header: groove number + BPM readout
-    lda #8
-    sta text_x
-    lda #1
-    sta text_y
-    rep #$20
-.ACCU 16
-    lda #ATTR_HILITE
-    sta text_attr
-    sep #$20
-.ACCU 8
-    lda ed_groove
-    jsr text_hex8
+    ; header: BPM readout
     lda #12
     sta text_x
     lda #1
@@ -240,15 +173,14 @@ groove_draw:
 .ACCU 8
     ldx #str_bpm
     jsr text_puts
-    lda ed_groove
     jsr groove_bpm          ; -> tmp0 (text_puts clobbers tmp0: compute after)
     jsr text_dec3
-    ; 16 step rows
+    ; the two steps
     stz ui_cnt
 @rows:
     lda ui_cnt
     clc
-    adc #8
+    adc #5
     sta text_y
     lda #2
     sta text_x
@@ -259,7 +191,9 @@ groove_draw:
     sep #$20
 .ACCU 8
     lda ui_cnt
-    jsr text_hex8
+    clc
+    adc #'1' - 32
+    jsr text_puttile
     ; playhead: left of the ticks column, drawn plain (the value below
     ; carries the highlight)
     lda #5
@@ -313,25 +247,21 @@ groove_draw:
     sta gv_row
     lda.l $7E0000,x
     jsr text_hex8
-@next:
     inc ui_cnt
     lda ui_cnt
-    cmp #$10
-    beq @done
+    cmp #$02
+    beq @rows_done
     jmp @rows
-@done:
+@rows_done:
     rts
 
-; carry set when step ui_cnt is the playing position of the edited groove
+; carry set when step ui_cnt is the playing position of the pair
 gv_playrow:
     lda eng_playing
     beq @no
-    lda eng_groove
-    cmp ed_groove
-    bne @no
     lda eng_gpos
     dec a
-    and #$0F
+    and #$01
     cmp ui_cnt
     bne @no
     sec
@@ -374,43 +304,22 @@ text_dec3:
     jsr text_puttile
     rts
 
-; A = groove id -> tmp0 = its BPM at the 60.15 Hz tick
-; (BPM = tick*60 / (avg ticks * 4 rows/beat) = 14436 / step sum)
+; tmp0 = the pair's BPM at the song's tick BPM
+; (effective = 12 * song BPM / (a + b); 6/6 reads back the tempo)
 groove_bpm:
-    rep #$30
-.ACCU 16
-    and #$00FF
-    asl
-    asl
-    asl
-    asl
-    clc
-    adc #SB_GROOVES
-    tax
-    sep #$20
-.ACCU 8
-    stz tmp2                ; sum
-    stz tmp1
-@sum:
-    lda.l $7E0000,x
-    bne @s_ok
+    lda.l $7E0000 + SB_GROOVES
+    bne @a_ok
     lda #6                  ; the engine substitutes 6 for zero steps
-@s_ok:
+@a_ok:
+    sta tmp2
+    lda.l $7E0000 + SB_GROOVES + 1
+    bne @b_ok
+    lda #6
+@b_ok:
     clc
     adc tmp2
-    sta tmp2
-    rep #$30
-.ACCU 16
-    inx
-    sep #$20
-.ACCU 8
-    inc tmp1
-    lda tmp1
-    cmp #$10
-    bne @sum
-    ; effective BPM = 96 * song BPM / step sum (at groove 6/6 the sum
-    ; is 96, so this reads back the PROJECT tempo exactly)
-    lda #96
+    sta tmp2                ; a + b (<= 30)
+    lda #12
     sta.w WRMPYA
     lda.l $7E0000 + SB_HEADER + SH_BPM
     bne +

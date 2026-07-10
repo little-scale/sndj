@@ -487,9 +487,6 @@ engine_go:
     cpx #TRACKS
     bne @fx_reset
     stz eng_pmon
-    lda.l $7E0000 + SB_HEADER + SH_GROOVE
-    and #(GROOVE_COUNT - 1)
-    sta eng_groove
     ; the song's tick BPM drives the APU timer (0 -> the 150 default)
     lda.l $7E0000 + SB_HEADER + SH_BPM
     bne +
@@ -566,20 +563,13 @@ engine_tick:
     dec eng_tickwait
     jmp engine_tick_fx
 @row:
-    ; ticks for this row from the active groove
-    lda eng_groove
+    ; ticks for this row from THE groove: one public 2-step pair
+    ; (SB_GROOVES bytes 0/1), alternating — the whole feel in two
+    ; nibbles, edited live by the G command and the GROOVE screen
+    lda eng_gpos
     rep #$30
 .ACCU 16
-    and #$00FF
-    asl
-    asl
-    asl
-    asl
-    sta es0
-    lda eng_gpos
-    and #$00FF
-    clc
-    adc es0
+    and #$0001
     tax
     sep #$20
 .ACCU 8
@@ -591,7 +581,7 @@ engine_tick:
     sta eng_tickwait
     lda eng_gpos
     inc a
-    and #(GROOVE_SZ - 1)
+    and #$01
     sta eng_gpos
 
     ; advance + trigger every track
@@ -1173,9 +1163,23 @@ row_cmd_pre:
 @dispatch:
     cmp #CMDID_G
     bne @not_g
+    ; G xy: write the groove pair directly — x ticks then y ticks
+    ; per row (a 0 nibble means 1: never stall)
     lda.w trk_cval,x
-    and #(GROOVE_COUNT - 1)
-    sta eng_groove
+    lsr
+    lsr
+    lsr
+    lsr
+    bne +
+    lda #$01
++
+    sta.l $7E0000 + SB_GROOVES
+    lda.w trk_cval,x
+    and #$0F
+    bne +
+    lda #$01
++
+    sta.l $7E0000 + SB_GROOVES + 1
     rts
 @not_g:
     cmp #CMDID_B

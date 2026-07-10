@@ -135,10 +135,10 @@ left/right.
 | **TABLE** | 16-row × 2-column per-tick command tables. |
 | **WAVE** | draw 32-sample single-cycle waves in 8 banks. |
 | **KIT** | build drum kits: 16 slots of sample + tune + volume; the kit number is the first field — nudge it to switch kits. |
-| **GROOVE** | ticks-per-row patterns — grooves ARE the tempo. |
+| **GROOVE** | the two-step groove pair — the song's feel. |
 | **ECHO** | the room: delay, feedback, level, per-voice sends. |
 | **FIR** | the echo filter's 8 taps, hex-editable, with presets. |
-| **PROJECT** | song name, BPM, transpose, default groove, LIVE mode, NEW (a fresh song opens the delay to whatever audio RAM allows). |
+| **PROJECT** | song name, BPM, transpose, LIVE mode, NEW (a fresh song opens the delay to whatever audio RAM allows). |
 | **FILES** | save / load / rename songs in cart SRAM. |
 | **OPTIONS** | device settings: palette, cloning depth, video readout, SYNC / MIDI takeover (§13a). |
 
@@ -319,13 +319,14 @@ D, I and J are row-scoped and do nothing inside tables.
 
 ## 7. Grooves, tempo, timing
 
-TMPO on PROJECT sets the BPM (80–255); a **groove** decides how many
-engine ticks each row lasts (default 6/6/6/…). Swing is just an
-uneven groove: `6,6,7,5` at groove-speed. The GROOVE screen edits 16
-steps per groove with a live BPM readout, the `G` command switches
-grooves mid-song, and `T` changes BPM from a phrase. Tick timing
-comes from the sound unit's own timer, so it's identical on every
-console, PAL or NTSC.
+TMPO on PROJECT sets the BPM (80–255); **the groove** — one public
+two-step pair — decides how many engine ticks the odd and even rows
+last (default 6/6 = straight). Swing is just an uneven pair: `7/5`
+lilts, `8/4` swings hard. The GROOVE screen edits the two steps with
+a live BPM readout, and **`G xy` writes the pair from a phrase** —
+`G84` throws the swing on the drop, `G66` snaps it straight. `T`
+changes BPM. Tick timing comes from the sound unit's own timer, so
+it's identical on every console, PAL or NTSC.
 
 ## 8. Command reference
 
@@ -339,7 +340,7 @@ Values are hex (`xy` = two nibbles).
 | `C xy` | chord | fan +x / +y semitones onto the two voices to the right; `C00` back to GRP |
 | `D 0x` | delay | trigger this row's note x ticks late |
 | `F xy` | fine tune | per-track detune, signed 1/256 semitones |
-| `G 0x` | groove | switch to groove x |
+| `G xy` | groove | set the groove pair: x ticks / y ticks per row (G66 straight, G84 swing) |
 | `H 0x` | hop | jump to the next chain entry (in tables: to table row x) |
 | `I xy` | play mask | 8-bit mask over passes: the note only fires on set bits (`AA` = every other pass) |
 | `J xy` | pass transpose | on passes picked by 4-bit mask x, transpose the note by signed nibble y |

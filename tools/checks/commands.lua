@@ -89,17 +89,20 @@ end, {
   end,
 }, 50)
 
--- 4. G: groove select (groove 1 = 2 ticks/row)
+-- 4. G: writes the groove pair directly (G22 = 2/2 ticks, double rate)
 T("G", function()
-  for i = 0, 15 do poke(0x3010 + i, 2) end
   clear_phrase(0)
-  row(0, 0, 49, 0, CG, 1)
+  row(0, 0, 49, 0, CG, 0x22)
 end, {
-  [20] = function() tests.g_row = wram(0x17) end,
+  [20] = function()
+    tests.g_row = wram(0x17)
+    check(wram(0x3000) == 2 and wram(0x3001) == 2,
+      "G22 wrote the pair (steps " .. wram(0x3000) .. "/" .. wram(0x3001) .. ")")
+  end,
   [36] = function()
     local d = (wram(0x17) - tests.g_row) % 16
     check(d >= 6 and d <= 10,
-      "G01 doubled the row rate (16 frames -> " .. d .. " rows)")
+      "G22 doubled the row rate (16 frames -> " .. d .. " rows)")
   end,
 }, 48)
 
@@ -231,6 +234,8 @@ emu.addEventCallback(function()
 
   local t = tests[cur]
   if phase == "setup" then
+    poke(0x3000, 6)          -- the groove pair persists now (G writes
+    poke(0x3001, 6)          -- data): every test starts straight 6/6
     t.setup()
     pad = { start = true }
     phase = "starting"

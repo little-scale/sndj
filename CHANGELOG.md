@@ -5,6 +5,14 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- **One groove, two steps** (Seb's call): the groove is a single
+  public pair of tick counts — 6/6 straight, 7/5 lilt, 8/4 swing —
+  and **`G xy` writes it directly** from a phrase (no more groove
+  tables to manage). The GROOVE screen edits the two steps with the
+  live BPM readout; PROJECT drops its groove-select field. The old
+  16-groove pool region stays in the save layout (RLE packs it to
+  nothing), so saves are untouched.
+
 - ECHO's content moves down two rows (ledger from y4, fields from
   y8) — clear of the title line, matching the family layout.
 

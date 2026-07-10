@@ -14,7 +14,7 @@
 .ACCU 8
 .INDEX 16
 
-.DEFINE PJ_FIELDS 6
+.DEFINE PJ_FIELDS 5
 
 project_init:
     lda #SCREEN_PROJECT
@@ -75,7 +75,7 @@ project_update:
     bne @cursor
     ; B tap: only NEW acts on a tap (armed, then confirmed)
     lda pj_cur
-    cmp #$05
+    cmp #$04
     bne @tap_done
     lda pj_arm
     bne @do_new
@@ -142,7 +142,7 @@ pj_nudge:
     lda #16
     bra @mag_have
 @not_tmpo:
-    cmp #$03
+    cmp #$02
     bne @mag_4
     lda #12
     bra @mag_have
@@ -160,10 +160,8 @@ pj_nudge:
     cmp #$01
     beq @tmpo
     cmp #$02
-    beq @groove
-    cmp #$03
     beq @tsp
-    cmp #$04
+    cmp #$03
     beq @mode
     rts
 @tmpo:
@@ -179,13 +177,6 @@ pj_nudge:
 +
     sta.l $7E0000 + SB_HEADER + SH_BPM
     jmp apu_set_tempo       ; applies immediately
-@groove:
-    lda.l $7E0000 + SB_HEADER + SH_GROOVE
-    clc
-    adc es3 + 1
-    and #(GROOVE_COUNT - 1)
-    sta.l $7E0000 + SB_HEADER + SH_GROOVE
-    rts
 @tsp:
     ; signed semitones, free wrap
     lda.l $7E0000 + SB_HEADER + SH_TRANSPOSE
@@ -289,18 +280,12 @@ project_draw:
     jmp @next
 @not_tmpo:
     cmp #$02
-    bne @not_groove
-    lda.l $7E0000 + SB_HEADER + SH_GROOVE
-    jsr text_hex8
-    jmp @next
-@not_groove:
-    cmp #$03
     bne @not_tsp
     lda.l $7E0000 + SB_HEADER + SH_TRANSPOSE
     jsr text_hex8
     jmp @next
 @not_tsp:
-    cmp #$04
+    cmp #$03
     bne @not_mode
     lda.l $7E0000 + SB_HEADER + SH_MODE
     beq @m_song
@@ -336,7 +321,7 @@ project_draw:
 @done:
     rts
 
-pj_labels: .DW str_pj_name, str_pj_tmpo, str_pj_grv, str_pj_tsp
+pj_labels: .DW str_pj_name, str_pj_tmpo, str_pj_tsp
            .DW str_pj_mode, str_pj_new
 
 str_project: .DB "PROJECT", 0

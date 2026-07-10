@@ -1,4 +1,4 @@
--- project.lua — the PROJECT screen: A+Up from CHAIN; GROOVE/TSP/MODE
+-- project.lua — the PROJECT screen: A+Up from CHAIN; TSP/MODE
 -- edit the song header; TSP transposes triggers; MODE=LIVE makes the
 -- S map position open the launcher; NEW wipes after a confirm tap.
 --
@@ -32,10 +32,10 @@ local script = {
   [34] = { a = true },
   [36] = { a = true, up = true },
   [38] = {},                                   -- PROJECT
-  -- down x3 -> TSP, one nudge up = +12 (an octave)
+  -- down x2 -> TSP (the GROOVE field left for the GROOVE screen),
+  -- one nudge up = +12 (an octave)
   [44] = { down = true }, [46] = {},
   [48] = { down = true }, [50] = {},
-  [52] = { down = true }, [54] = {},
   [58] = { b = true },
   [60] = { b = true, up = true },   -- +12
   [62] = { b = true },

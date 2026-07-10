@@ -558,7 +558,7 @@ C  chord override      K  kill note           T  tempo
 D  delay note          L  slide/legato        V  vibrato (VIB override)
 E  echo send (voice)   M  master volume       X  volume/accent
 F  fine pitch          N  noise clock (glob)
-G  groove select       P  pan (signed L/R)
+G  groove pair (x/y)   P  pan (signed L/R)
 H  hop
 ```
 
