@@ -119,17 +119,25 @@ export a patched ROM. Everything runs locally.</p>
 <div id="sliceview" hidden>
   <p class="hint">chop a pool sample into equal, block-aligned slices —
   exactly what a SLICE instrument does on the console (zero audio-RAM
-  cost: slices are directory aliases into the loaded sample). Click a
-  slice to audition it; a slice plays through to the end of the sample,
-  like the console with FADE 0.</p>
+  cost: slices are directory aliases into the loaded sample). Drag the
+  red edge handles to trim dead air first (lossless — blocks are cut,
+  nothing re-encodes); <b>apply trim</b> writes the crop into the pool
+  slot. Click a slice to hear just that slice.</p>
   <div class="row">
     <label>sample <select id="slsample"></select></label>
     <label>slices <input type="number" id="slcount" value="8" min="1"
       max="16" style="width:3rem"></label>
-    <label>assign to <select id="slbind"></select></label>
-    <button class="primary" id="slassign">set boot instrument</button>
+    <button id="sltrim">apply trim</button>
+    <button id="slreset">reset</button>
+    <span class="hint" id="slinfo"></span>
   </div>
   <canvas id="slwave" width="640" height="160"></canvas>
+  <div class="row">
+    <label>assign to <select id="slbind"></select></label>
+    <button class="primary" id="slassign">set boot instrument</button>
+    <span class="hint">(applies a pending trim, then sets type SLICE +
+    sample + count on that boot slot)</span>
+  </div>
 </div>
 <div id="kitview" hidden>
   <h1><small>factory kits</small> <span class="hint">(seeded into every NEW
@@ -979,16 +987,22 @@ async function wavReplace(f, slot) {
       // trim stores the data lower-rate and bakes the compensating tune,
       // so the slot plays at the original pitch with 1/2 or 1/4 the bytes
       const t = +$('sftrim').value || 0;
-      const rate = Math.max(8000, Math.min(96000,
+      const rate = Math.max(2000, Math.min(96000,
         Math.round(32000 / Math.pow(2, t / 12))));
       const samples = await wavToRate(f, rate);
       const trimmed = samples.slice(0, Math.floor(samples.length / 16) * 16);
       if (!trimmed.length) throw new Error('WAV too short');
       const brr = S.brrEncode(trimmed, null);
+      // bake the tune from the rate we actually stored at — a clamped
+      // rate can then never drift from its compensation (the +36 bug)
+      const cents = 1200 * Math.log2(rate / 32000);
+      const semis = Math.round(cents / 100);
+      const fineT = Math.max(-128, Math.min(127,
+        Math.round((cents - semis * 100) * 2.56)));
       entries[replacing] = { name, loopBlock: null, brr,
-        tuneSemis: -t, tuneFine: 0 };
+        tuneSemis: semis, tuneFine: fineT };
       status(`replaced #${replacing} with ${name} (${brr.length} B one-shot` +
-        (t ? ', trim ' + t + ' baked: tune ' + (-t) : '') + ')');
+        (t ? ', trim ' + t + ' baked: tune ' + semis : '') + ')');
     }
     render();
   } catch (err) {
@@ -1050,7 +1064,9 @@ async function wavDecode(buf, rate) {
 
 async function wavToRate(f, rate) {
   const buf = await f.arrayBuffer();
-  const ctx = new OfflineAudioContext(1, 1, rate);
+  // OfflineAudioContext floors at 8 kHz: decode there and let the
+  // manual resample below carry on to any target (4 kHz stores etc.)
+  const ctx = new OfflineAudioContext(1, 1, Math.max(8000, Math.min(96000, rate)));
   const decoded = await ctx.decodeAudioData(buf);
   const src = decoded.getChannelData(0);
   const ratio = decoded.sampleRate / rate;
@@ -1091,10 +1107,24 @@ function audition(e, rate) {
 }
 
 // -------------------------------------------------------- slice designer
+let slTrim = { s: 0, e: 0, sample: -1 };   // crop window in BRR blocks
+let slDrag = null;
+
 function slParams() {
-  const e = entries[+$('slsample').value || 0];
+  const idx = +$('slsample').value || 0;
+  const e = entries[idx];
   const n = Math.max(1, Math.min(16, +$('slcount').value || 1));
-  return { e, n };
+  if (slTrim.sample !== idx) {
+    slTrim = { s: 0, e: (e && !isFree(e)) ? e.brr.length / 9 : 0, sample: idx };
+  }
+  return { e, n, idx };
+}
+
+// lossless block crop: slice the BRR bytes, force END on the last block
+function slCutBrr(e, a, b) {
+  const brr = e.brr.slice(a * 9, b * 9);
+  brr[brr.length - 9] |= 0x01;
+  return brr;
 }
 
 function renderSlices() {
@@ -1129,8 +1159,10 @@ function slDraw() {
   g.fillStyle = '#0a0c1e';
   g.fillRect(0, 0, cv.width, cv.height);
   const { e, n } = slParams();
+  $('slinfo').textContent = '';
   if (!e || isFree(e)) return;
   const pcm = S.brrDecode(e.brr);
+  const blocks = e.brr.length / 9;
   const mid = cv.height / 2;
   g.strokeStyle = '#40d0c8';
   g.beginPath();
@@ -1146,57 +1178,132 @@ function slDraw() {
     g.lineTo(x + .5, mid - lo / 32768 * (mid - 2) + 1);
   }
   g.stroke();
-  // equal block-aligned divisions, exactly as residency computes them
-  const blocks = e.brr.length / 9;
-  const step = Math.floor(blocks / n);
-  g.strokeStyle = '#ffb020';
-  g.fillStyle = '#ffb020';
+  const bx = blk => blk * cv.width / blocks;
+  // dim the trimmed-away regions
+  g.fillStyle = 'rgba(10, 12, 30, .78)';
+  if (slTrim.s > 0) g.fillRect(0, 0, bx(slTrim.s), cv.height);
+  if (slTrim.e < blocks) g.fillRect(bx(slTrim.e), 0, cv.width - bx(slTrim.e), cv.height);
+  // the slice grid over the kept region
+  const kept = slTrim.e - slTrim.s;
+  const step = Math.floor(kept / n);
   g.font = '12px ui-monospace, monospace';
-  if (!step) {
-    g.fillText('sample too short for ' + n + ' slices', 8, 14);
-    return;
+  if (step) {
+    g.strokeStyle = '#ffb020';
+    g.fillStyle = '#ffb020';
+    for (let k = 0; k < n; k++) {
+      const x = Math.floor(bx(slTrim.s + k * step)) + .5;
+      g.beginPath();
+      g.moveTo(x, 0);
+      g.lineTo(x, cv.height);
+      g.stroke();
+      g.fillText(k.toString(16).toUpperCase(), x + 4, 13);
+    }
+  } else {
+    g.fillStyle = '#ffb020';
+    g.fillText('too short for ' + n + ' slices', 8, 14);
   }
-  for (let k = 0; k < n; k++) {
-    const x = Math.floor(k * step * 16 * cv.width / pcm.length) + .5;
+  // trim handles
+  g.strokeStyle = '#ff6060';
+  g.fillStyle = '#ff6060';
+  for (const blk of [slTrim.s, slTrim.e]) {
+    const x = Math.min(cv.width - .5, Math.max(.5, Math.floor(bx(blk)) + .5));
     g.beginPath();
     g.moveTo(x, 0);
     g.lineTo(x, cv.height);
     g.stroke();
-    g.fillText(k.toString(16).toUpperCase(), x + 4, 13);
+    g.fillRect(x - 4, cv.height - 10, 8, 10);
   }
+  const trimmed = slTrim.s > 0 || slTrim.e < blocks;
+  $('slinfo').textContent = 'kept ' + kept + '/' + blocks + ' blocks (' +
+    (kept * 9) + ' B, ' + Math.round(kept * 16 / 32) + ' ms), ' +
+    (step ? step + ' blocks/slice' : '-') + (trimmed ? ' — trim pending' : '');
 }
 
-$('slwave').onclick = ev => {
+function slApplyTrim() {
+  const { e } = slParams();
+  if (!e || isFree(e)) return false;
+  const blocks = e.brr.length / 9;
+  if (slTrim.s === 0 && slTrim.e === blocks) return false;
+  e.brr = slCutBrr(e, slTrim.s, slTrim.e);
+  if (e.loopBlock !== null && e.loopBlock >= slTrim.s && e.loopBlock < slTrim.e) {
+    e.loopBlock -= slTrim.s;
+  } else {
+    e.loopBlock = null;
+  }
+  slTrim = { s: 0, e: e.brr.length / 9, sample: slTrim.sample };
+  render();
+  renderSlices();
+  return true;
+}
+
+$('slwave').onpointerdown = ev => {
+  const { e } = slParams();
+  if (!e || isFree(e)) return;
+  const cv = $('slwave');
+  const rect = cv.getBoundingClientRect();
+  const x = (ev.clientX - rect.left) / rect.width * cv.width;
+  const blocks = e.brr.length / 9;
+  const bx = blk => blk * cv.width / blocks;
+  if (Math.abs(x - bx(slTrim.s)) < 9) slDrag = 's';
+  else if (Math.abs(x - bx(slTrim.e)) < 9) slDrag = 'e';
+  else { slDrag = null; return; }
+  cv.setPointerCapture(ev.pointerId);
+};
+$('slwave').onpointermove = ev => {
+  if (!slDrag) return;
+  const { e } = slParams();
+  if (!e || isFree(e)) return;
+  const cv = $('slwave');
+  const rect = cv.getBoundingClientRect();
+  const blocks = e.brr.length / 9;
+  let blk = Math.round((ev.clientX - rect.left) / rect.width * blocks);
+  if (slDrag === 's') slTrim.s = Math.max(0, Math.min(slTrim.e - 1, blk));
+  else slTrim.e = Math.max(slTrim.s + 1, Math.min(blocks, blk));
+  slDraw();
+};
+$('slwave').onpointerup = ev => {
+  if (slDrag) { slDrag = null; return; }
+  // plain click: audition JUST that slice (its blocks, END forced)
   const { e, n } = slParams();
   if (!e || isFree(e)) return;
+  const cv = $('slwave');
+  const rect = cv.getBoundingClientRect();
   const blocks = e.brr.length / 9;
-  const step = Math.floor(blocks / n);
-  if (!step) return;
-  const rect = $('slwave').getBoundingClientRect();
-  const frac = (ev.clientX - rect.left) / rect.width;
-  const k = Math.max(0, Math.min(n - 1, Math.floor(frac * blocks / step)));
-  // sub-BRR from the slice's block on: fresh decoder history, exactly
-  // what the DSP does at KON (early blocks with filters settle audibly
-  // for a moment — that's the hardware too)
-  audition({ brr: e.brr.slice(k * step * 9), loopBlock: null,
+  const blk = (ev.clientX - rect.left) / rect.width * blocks;
+  const kept = slTrim.e - slTrim.s;
+  const step = Math.floor(kept / n);
+  if (!step || blk < slTrim.s || blk >= slTrim.e) return;
+  const k = Math.max(0, Math.min(n - 1, Math.floor((blk - slTrim.s) / step)));
+  const a = slTrim.s + k * step;
+  const b = k === n - 1 ? slTrim.e : Math.min(a + step, slTrim.e);
+  audition({ brr: slCutBrr(e, a, b), loopBlock: null,
              tuneSemis: e.tuneSemis, tuneFine: e.tuneFine });
-  status('slice ' + k.toString(16).toUpperCase() + ' of ' + e.name +
-    ' (' + step + ' blocks / ' + Math.round(step * 16 / 32) + ' ms at native)');
+  status('slice ' + k.toString(16).toUpperCase() + ' of ' + e.name + ' (' +
+    (b - a) + ' blocks / ' + Math.round((b - a) * 16 / 32) + ' ms at native)');
 };
 $('slcount').oninput = slDraw;
 $('slsample').onchange = slDraw;
+$('sltrim').onclick = () => {
+  if (slApplyTrim()) status('trim written into the pool slot (lossless block cut)');
+};
+$('slreset').onclick = () => {
+  slTrim.sample = -1;
+  slDraw();
+};
 $('slassign').onclick = () => {
   if (defOff < 0) return;
-  const { e, n } = slParams();
+  const { e, n, idx } = slParams();
   if (!e || isFree(e)) return;
+  const trimmed = slApplyTrim();
   const i = +$('slbind').value || 0;
   rom[defOff + i] = 4;
-  rom[defOff + 12 + i] = +$('slsample').value || 0;
+  rom[defOff + 12 + i] = idx;
   rom[defOff + 24 + i] = (rom[defOff + 24 + i] & 0x0F) | ((n - 1) << 4);
   renderBoot();
   render();
   renderSlices();
-  status('I' + i + ' = SLICE of ' + e.name + ' \u00d7 ' + n);
+  status('I' + i + ' = SLICE of ' + e.name + ' \u00d7 ' + n +
+    (trimmed ? ' (trim applied first)' : ''));
 };
 
 // ----------------------------------------------------------- palettes

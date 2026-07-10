@@ -5,6 +5,18 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- Patcher SLICES tab: **trim then slice** — drag the red edge handles
+  to crop dead air (a lossless block cut, no re-encode; **apply trim**
+  writes it into the pool slot, and assigning a boot instrument
+  applies it automatically), and clicking a slice now plays **just
+  that slice**, not through to the sample's end.
+- Fixed: **trim +36 played back an octave off** — the one-shot WAV
+  path clamped its storage rate at 8 kHz (the OfflineAudioContext
+  floor) while still baking -36 into the tune. The decode context now
+  stays legal while the JS resampler carries on to 4 kHz, and the
+  baked tune derives from the rate actually stored, so the two can
+  never drift again.
+
 - **Patcher: six tabs** — POOL / BOOT / KITS / SLICES / FIR /
   PALETTES (the boot instruments move out of the sample list). The
   new SLICES tab is a chop designer: pick a pool sample and a count,
