@@ -269,7 +269,7 @@ echo_draw:
     lda ui_cnt
     asl
     clc
-    adc #4
+    adc #6
     sta text_y
     lda #2
     sta text_x
@@ -357,11 +357,14 @@ echo_draw:
     cmp #$08
     bne @gate
 @no_gates:
-    ; EDL row: show the live ARAM trade (EDL * 2 KB)
+    ; EDL cost: the live ARAM trade (EDL * 2 KB) on its own row under
+    ; the DELAY field
     lda ui_cnt
     bne @no_cost
-    lda #18
+    lda #14
     sta text_x
+    lda #7
+    sta text_y
     rep #$20
 .ACCU 16
     lda #ATTR_DIM
@@ -445,6 +448,11 @@ echo_draw:
     sep #$20
 .ACCU 8
     jsr fl_kb
+    ; FREE on its own row
+    lda #2
+    sta text_x
+    lda #3
+    sta text_y
     ldx #str_free
     jsr text_puts
     ; free = echo floor - resident end; floor page = $100 - 8*EDL
@@ -500,8 +508,11 @@ echo_draw:
     asl                     ; * 16 ms (<= 240)
     sta tmp0
     stz tmp0 + 1
-    lda #' ' - 32
-    jsr text_puttile
+    ; ...on its own row below FREE
+    lda #7
+    sta text_x
+    lda #4
+    sta text_y
     lda #'+' - 32
     jsr text_puttile
     jsr text_dec3
@@ -556,5 +567,5 @@ echo_draw:
 
 str_echo: .DB "ECHO", 0
 str_taps: .DB "FIR TAPS", 0
-str_ram:  .DB "RAM ", 0
-str_free: .DB "  FREE ", 0
+str_ram:  .DB "RAM  ", 0
+str_free: .DB "FREE ", 0

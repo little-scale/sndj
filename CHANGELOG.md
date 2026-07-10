@@ -5,6 +5,10 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- ECHO screen breathing room: the ledger reads as three rows (RAM /
+  FREE / +ms of possible delay), and the DELAY cost (-KB and ms) sits
+  on its own row under the field instead of crowding the right edge.
+
 - **Per-instrument LOOP override** (SMP): a new INSTR field — POOL /
   ON / OFF. Force a looped import to play one-shot (pad becomes stab)
   or a one-shot to loop whole (hit becomes drone), per instrument,
