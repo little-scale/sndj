@@ -12,3 +12,4 @@ soundfonts/*
 !soundfonts/mario_paint.sf2
 !soundfonts/super_mario_world.sf2
 !soundfonts/super_street_fighter_2.sf2
+__pycache__/
