@@ -82,8 +82,9 @@ emu.addEventCallback(function()
       "A-5 excites partial 14 at its exact pitch ($%04X)", p))
     check(dsp(0x05) == 0xFF, string.format(
       "burst envelope: instant attack, decay 7 ($%02X)", dsp(0x05)))
-    check(dsp(0x06) == 0x16, string.format(
-      "burst tail: SL 0, SR 16+BURST ($%02X)", dsp(0x06)))
+    check(dsp(0x06) == 0x19, string.format(
+      "burst tail: SL 0, SR from the seed table (BURST 6 -> 25, $%02X)",
+      dsp(0x06)))
     check(dsp(0x0D) == 0x70, string.format(
       "feedback = SUSTAIN ($%02X)", dsp(0x0D)))
     check(dsp(0x4D) & 1 == 1, "echo send forced on for the exciter")

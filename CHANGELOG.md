@@ -5,6 +5,13 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- KARP BURST re-ranged to seed lengths that make sense for a string:
+  the top is the classic Karplus-Strong pluck (~one loop transit),
+  the bottom bows the string — no more second-long drones leaking
+  into the loop at low values. (Classic KS seeds one *period*; our
+  loop is 16/32 ms of many periods, so the right seed is one loop
+  transit of pitched energy, gated hard.)
+
 - KARP needs no ECHO-screen setup anymore: **flipping TYPE to KARP
   sizes the room to a string automatically** (DELAY pulls to 1 when
   it's 0 or >2 — a NEW song sits at the ARAM max, which made the

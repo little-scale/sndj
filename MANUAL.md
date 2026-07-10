@@ -258,7 +258,9 @@ of audio RAM) and point a KARP instrument at an exciter:
 - **DAMP** — string material: low = dark nylon (the treble dies
   fast), high = bright steel. It never changes how long the string
   rings — that's SUSTAIN's job alone.
-- **BURST** — how long the pluck seed lasts.
+- **BURST** — the seed: high values are the classic KS pluck (a
+  burst about one trip around the loop, ~16-32 ms); low values *bow*
+  the string with a longer excitation instead.
 - **SUSTAIN** — the loop feedback: how long the string rings.
 - **Hear the string, not the pick**: VOL L/R is the *dry exciter*
   level — set it to 00 for pure string and put the string's volume

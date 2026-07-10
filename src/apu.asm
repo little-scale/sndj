@@ -38,6 +38,13 @@
 .DEFINE DSP_EDL      $7D
 .DEFINE DSP_C0       $0F    ; FIR coefficients C0-C7 at $0F,$1F,..,$7F
 
+; KARP BURST nibble -> exciter sustain rate: the classic KS seed is one
+; loop transit (~16-32 ms, the top of the range); low values bow the
+; string instead of endlessly droning into it
+karp_burst_sr:
+    .DB 20, 21, 22, 22, 23, 24, 25, 25
+    .DB 26, 27, 28, 28, 29, 30, 31, 31
+
 ; ARAM layout (CLAUDE.md §14.1)
 .DEFINE ARAM_DIR     $1000
 .DEFINE ARAM_SAMPLES $1200
@@ -908,7 +915,15 @@ apply_instrument:
     lsr
     lsr
     lsr
-    ora #$10                ; sustain level 0, rate 16-31
+    phx
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w karp_burst_sr,x   ; seed length: slow bow .. one loop transit
+    plx
     tay
     lda trig_voice
     asl
