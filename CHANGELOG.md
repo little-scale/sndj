@@ -5,6 +5,13 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- **Consistent playback indicators** on SONG / CHAIN / PHRASE (the
+  GROOVE convention everywhere): a plain arrow in the gutter left of
+  the data marks the playing row, the playing value carries the
+  highlight, row labels stay dim. PHRASE's playhead now follows any
+  track playing the edited phrase (it only watched track 1 before)
+  and the playing row's cells light up.
+
 - **SAVE is name-keyed** (genmddj parity): the working song stores
   under its name — a same-named file is overwritten, a new name saves
   a new file; the cursor slot plays no part. LOAD copies the file's

@@ -106,6 +106,9 @@ elsewhere pastes it. Works in PHRASE, CHAIN and SONG.
   needing the grid filled to the bottom.
 - On play, each track **enters at the first populated cell at/below
   the start row** — a column can leave early rows empty and join late.
+- **Playback indicators** read the same on SONG, CHAIN, PHRASE and
+  GROOVE: an arrow in the gutter marks the playing row, and the
+  playing value lights up (on SONG, per track).
   A fully empty column stays silent.
 
 ## 3. The screens

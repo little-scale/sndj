@@ -900,23 +900,12 @@ phrase_draw:
 .ACCU 8
     lda tmp0 + 1
     jsr text_hex8
-    ; playhead
+    ; playhead: any track walking this phrase at this row (drawn plain;
+    ; the row's cells carry the highlight)
     lda #2
     sta text_x
-    lda eng_playing
-    beq @nohead
-    lda trk_phrase
-    cmp ed_phrase
-    bne @nohead
-    lda eng_row
-    cmp tmp0 + 1
-    bne @nohead
-    rep #$20
-.ACCU 16
-    lda #ATTR_HILITE
-    sta text_attr
-    sep #$20
-.ACCU 8
+    jsr phrase_playrow
+    bcc @nohead
     lda #GLYPH_ARROW_R
     jsr text_puttile
     bra @cells
@@ -1053,12 +1042,49 @@ cell_attr:
 .ACCU 8
     rts
 @not_cursor:
+    ; playhead row: the cells carry the highlight (cursor accent wins)
+    jsr phrase_playrow
+    bcc @text
+    rep #$20
+.ACCU 16
+    lda #ATTR_HILITE
+    sta text_attr
+    sep #$20
+.ACCU 8
+    rts
+@text:
     rep #$20
 .ACCU 16
     lda #ATTR_TEXT
     sta text_attr
     sep #$20
 .ACCU 8
+    rts
+
+; carry set when any live track is playing ed_phrase at row tmp0+1
+phrase_playrow:
+    lda eng_playing
+    beq @no
+    phx
+    ldx #$0000
+@scan:
+    lda.w trk_phrase,x
+    cmp ed_phrase
+    bne @next
+    lda.w trk_prow,x
+    cmp tmp0 + 1
+    beq @yes
+@next:
+    inx
+    cpx #TRACKS
+    bne @scan
+    plx
+@no:
+    clc
+    rts
+@yes:
+    plx
+    sec
     rts
 
 draw_dashes2:

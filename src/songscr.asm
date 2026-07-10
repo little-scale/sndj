@@ -433,32 +433,34 @@ song_draw:
     clc
     adc #5
     sta text_y
-    ; row label = song_top + i; hilite while a track plays this row
+    ; row label = song_top + i (always dim; the arrow marks playback)
     stz text_x
-    lda song_top
-    clc
-    adc tmp0 + 1
-    jsr song_playrow
-    bcs @lab_play
     rep #$20
 .ACCU 16
     lda #ATTR_DIM
     sta text_attr
     sep #$20
 .ACCU 8
-    bra @lab_go
-@lab_play:
-    rep #$20
-.ACCU 16
-    lda #ATTR_HILITE
-    sta text_attr
-    sep #$20
-.ACCU 8
-@lab_go:
     lda song_top
     clc
     adc tmp0 + 1
     jsr text_hex8
+    ; playhead: any track playing this song row (drawn plain; the
+    ; playing track's cell carries the highlight)
+    lda #2
+    sta text_x
+    lda song_top
+    clc
+    adc tmp0 + 1
+    jsr song_playrow
+    bcc @no_head
+    lda #GLYPH_ARROW_R
+    jsr text_puttile
+    bra @cells_go
+@no_head:
+    lda #' ' - 32
+    jsr text_puttile
+@cells_go:
     ; 8 cells
     stz tmp0                ; track counter
 @cells:
