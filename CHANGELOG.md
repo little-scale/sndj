@@ -5,6 +5,14 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## 0.1.0-dev (unreleased)
 
+- **Patcher: six tabs** — POOL / BOOT / KITS / SLICES / FIR /
+  PALETTES (the boot instruments move out of the sample list). The
+  new SLICES tab is a chop designer: pick a pool sample and a count,
+  see the equal block-aligned grid on the waveform, click a slice to
+  audition it through the BRR path (fresh decoder state at the cut,
+  like the DSP at KON), and assign the result to a boot instrument in
+  one click.
+
 - **12 factory boot instruments** (was 8): NEW seeds instruments 0-11
   from the factory rows and their samples load into audio RAM at
   boot; the patcher's boot editor voices all 12. The factory

@@ -91,8 +91,10 @@ export a patched ROM. Everything runs locally.</p>
 <div>
 <div class="drop small" id="drop">drop sndj.sfc here (or click)</div>
 <div class="row" id="tabsbar" hidden>
-  <button class="tab active" data-tab="poolview">SAMPLES</button>
+  <button class="tab active" data-tab="poolview">POOL</button>
+  <button class="tab" data-tab="boottab">BOOT</button>
   <button class="tab" data-tab="kitview">KITS</button>
+  <button class="tab" data-tab="sliceview">SLICES</button>
   <button class="tab" data-tab="firview">FIR</button>
   <button class="tab" data-tab="palview">PALETTES</button>
 </div>
@@ -104,13 +106,30 @@ export a patched ROM. Everything runs locally.</p>
 </div>
 <div id="poolview" hidden>
   <p><button id="clearall">clear all</button></p>
+  <table id="pool"></table>
+</div>
+<div id="boottab" hidden>
   <div id="bootview" hidden>
     <p class="hint">boot instruments (the factory set NEW seeds — these
     plus the kits define what loads into audio RAM at boot; everything
     else loads on demand when an instrument references it):</p>
     <p id="bootrow" class="row"></p>
   </div>
-  <table id="pool"></table>
+</div>
+<div id="sliceview" hidden>
+  <p class="hint">chop a pool sample into equal, block-aligned slices —
+  exactly what a SLICE instrument does on the console (zero audio-RAM
+  cost: slices are directory aliases into the loaded sample). Click a
+  slice to audition it; a slice plays through to the end of the sample,
+  like the console with FADE 0.</p>
+  <div class="row">
+    <label>sample <select id="slsample"></select></label>
+    <label>slices <input type="number" id="slcount" value="8" min="1"
+      max="16" style="width:3rem"></label>
+    <label>assign to <select id="slbind"></select></label>
+    <button class="primary" id="slassign">set boot instrument</button>
+  </div>
+  <canvas id="slwave" width="640" height="160"></canvas>
 </div>
 <div id="kitview" hidden>
   <h1><small>factory kits</small> <span class="hint">(seeded into every NEW
@@ -191,8 +210,10 @@ const status = (msg, warn) => {
 };
 
 // ------------------------------------------------------------------ tabs
-const TABS = ['poolview', 'kitview', 'firview', 'palview'];
+const TABS = ['poolview', 'boottab', 'kitview', 'sliceview', 'firview', 'palview'];
 function tabAvail(id) {
+  if (id === 'boottab') return defOff >= 0;
+  if (id === 'sliceview') return entries.some(e => !isFree(e));
   if (id === 'kitview') return kitOff >= 0;
   if (id === 'firview') return firOff >= 0;
   if (id === 'palview') return palOff >= 0;
@@ -205,6 +226,7 @@ function selectTab(name) {
   });
   TABS.forEach(id => { $(id).hidden = id !== name || !tabAvail(id); });
   if (name === 'firview') firSync();
+  if (name === 'sliceview') renderSlices();
 }
 document.querySelectorAll('#tabsbar .tab').forEach(b => {
   b.onclick = () => { if (tabAvail(b.dataset.tab)) selectTab(b.dataset.tab); };
@@ -1067,6 +1089,115 @@ function audition(e, rate) {
   node.start();
   playingNode = node;
 }
+
+// -------------------------------------------------------- slice designer
+function slParams() {
+  const e = entries[+$('slsample').value || 0];
+  const n = Math.max(1, Math.min(16, +$('slcount').value || 1));
+  return { e, n };
+}
+
+function renderSlices() {
+  const pick = $('slsample');
+  const keep = pick.value;
+  pick.innerHTML = '';
+  entries.forEach((e, i) => {
+    if (isFree(e)) return;
+    const o = document.createElement('option');
+    o.value = i;
+    o.textContent = i + ' ' + e.name;
+    pick.appendChild(o);
+  });
+  if (keep && [...pick.options].some(o => o.value === keep)) pick.value = keep;
+  const bind = $('slbind');
+  const keepB = bind.value;
+  bind.innerHTML = '';
+  const TN = ['SMP', 'KIT', 'WAV', 'NSE', 'SLICE'];
+  for (let i = 0; i < 12; i++) {
+    const o = document.createElement('option');
+    o.value = i;
+    const t = defOff >= 0 ? (TN[rom[defOff + i] & 7] || '?') : '?';
+    o.textContent = 'I' + i + ' (' + t + ')';
+    bind.appendChild(o);
+  }
+  if (keepB) bind.value = keepB;
+  slDraw();
+}
+
+function slDraw() {
+  const cv = $('slwave'), g = cv.getContext('2d');
+  g.fillStyle = '#0a0c1e';
+  g.fillRect(0, 0, cv.width, cv.height);
+  const { e, n } = slParams();
+  if (!e || isFree(e)) return;
+  const pcm = S.brrDecode(e.brr);
+  const mid = cv.height / 2;
+  g.strokeStyle = '#40d0c8';
+  g.beginPath();
+  for (let x = 0; x < cv.width; x++) {
+    const a0 = Math.floor(x * pcm.length / cv.width);
+    const b0 = Math.max(a0 + 1, Math.floor((x + 1) * pcm.length / cv.width));
+    let lo = 32767, hi = -32768;
+    for (let i = a0; i < b0 && i < pcm.length; i++) {
+      if (pcm[i] < lo) lo = pcm[i];
+      if (pcm[i] > hi) hi = pcm[i];
+    }
+    g.moveTo(x + .5, mid - hi / 32768 * (mid - 2));
+    g.lineTo(x + .5, mid - lo / 32768 * (mid - 2) + 1);
+  }
+  g.stroke();
+  // equal block-aligned divisions, exactly as residency computes them
+  const blocks = e.brr.length / 9;
+  const step = Math.floor(blocks / n);
+  g.strokeStyle = '#ffb020';
+  g.fillStyle = '#ffb020';
+  g.font = '12px ui-monospace, monospace';
+  if (!step) {
+    g.fillText('sample too short for ' + n + ' slices', 8, 14);
+    return;
+  }
+  for (let k = 0; k < n; k++) {
+    const x = Math.floor(k * step * 16 * cv.width / pcm.length) + .5;
+    g.beginPath();
+    g.moveTo(x, 0);
+    g.lineTo(x, cv.height);
+    g.stroke();
+    g.fillText(k.toString(16).toUpperCase(), x + 4, 13);
+  }
+}
+
+$('slwave').onclick = ev => {
+  const { e, n } = slParams();
+  if (!e || isFree(e)) return;
+  const blocks = e.brr.length / 9;
+  const step = Math.floor(blocks / n);
+  if (!step) return;
+  const rect = $('slwave').getBoundingClientRect();
+  const frac = (ev.clientX - rect.left) / rect.width;
+  const k = Math.max(0, Math.min(n - 1, Math.floor(frac * blocks / step)));
+  // sub-BRR from the slice's block on: fresh decoder history, exactly
+  // what the DSP does at KON (early blocks with filters settle audibly
+  // for a moment — that's the hardware too)
+  audition({ brr: e.brr.slice(k * step * 9), loopBlock: null,
+             tuneSemis: e.tuneSemis, tuneFine: e.tuneFine });
+  status('slice ' + k.toString(16).toUpperCase() + ' of ' + e.name +
+    ' (' + step + ' blocks / ' + Math.round(step * 16 / 32) + ' ms at native)');
+};
+$('slcount').oninput = slDraw;
+$('slsample').onchange = slDraw;
+$('slassign').onclick = () => {
+  if (defOff < 0) return;
+  const { e, n } = slParams();
+  if (!e || isFree(e)) return;
+  const i = +$('slbind').value || 0;
+  rom[defOff + i] = 4;
+  rom[defOff + 12 + i] = +$('slsample').value || 0;
+  rom[defOff + 24 + i] = (rom[defOff + 24 + i] & 0x0F) | ((n - 1) << 4);
+  renderBoot();
+  render();
+  renderSlices();
+  status('I' + i + ' = SLICE of ' + e.name + ' \u00d7 ' + n);
+};
 
 // ----------------------------------------------------------- palettes
 function bgr15ToHex(off) {
