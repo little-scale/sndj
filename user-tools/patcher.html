@@ -72,6 +72,20 @@ pipeline the factory pool uses: root keys baked, loops landed on BRR
 blocks), audition the decoded BRR, recolour the 8 palette schemes, and
 export a patched ROM. Everything runs locally.</p>
 <div id="status"></div>
+<div class="row" id="impbar">
+  <span class="hint"><b>import settings</b> (the next drag / replace&hellip;):</span>
+  <select id="sfmode">
+    <option value="auto">auto (loop &rarr; melodic, else one-shot)</option>
+    <option value="melodic">melodic (looped, in tune)</option>
+    <option value="oneshot">one-shot (8 kHz kit drum)</option>
+  </select>
+  <label id="sftrimlab">trim semis <input type="number" id="sftrim" value="0"
+    min="-24" max="24" style="width:3.5rem"></label>
+  <label id="sfcaplab">cap ms <input type="number" id="sfcap" value="160"
+    min="20" max="500" style="width:4rem"></label>
+  <span class="hint" style="cursor:help; text-decoration:underline dotted"
+    title="melodic: a smpl/sf2 loop imports in tune (root key honoured); without one the whole file loops. Trim +12/+24 resamples the data down an octave/two (half/quarter size) — pair it with tune -12/-24 on the pool slot. One-shots resample to 8 kHz, capped at cap ms. The → column in the soundfont list shows each sample's fate under the current settings.">?</span>
+</div>
 <div class="cols">
 <div>
 <div class="drop small" id="drop">drop sndj.sfc here (or click)</div>
@@ -139,25 +153,6 @@ export a patched ROM. Everything runs locally.</p>
 <div>
 <div class="drop small" id="sf2drop">drop an .sf2 soundfont here (or click)</div>
 <input type="file" id="sf2file" hidden accept=".sf2">
-<h1><small>import settings</small> <span class="hint">&mdash; applied to
-the <b>next</b> sample you import (a drag from the list below, or a pool
-slot's replace&hellip;)</span></h1>
-<div class="row">
-  <select id="sfmode">
-    <option value="auto">auto (loop &rarr; melodic, else one-shot)</option>
-    <option value="melodic">melodic (looped, in tune)</option>
-    <option value="oneshot">one-shot (8 kHz kit drum)</option>
-  </select>
-  <label id="sftrimlab">trim semis <input type="number" id="sftrim" value="0"
-    min="-24" max="24" style="width:3.5rem"></label>
-  <label id="sfcaplab">cap ms <input type="number" id="sfcap" value="160"
-    min="20" max="500" style="width:4rem"></label>
-</div>
-<p class="hint">melodic: a smpl/sf2 loop imports in tune (root key
-honoured); without one the whole file loops. Trim +12/+24 resamples
-the data down an octave/two (half/quarter size) — pair it with tune
--12/-24 on the pool slot. One-shots resample to 8 kHz, capped. Each
-row below shows the fate the current settings give it.</p>
 <div id="sf2view" hidden>
   <h1><small id="sf2name">soundfont</small></h1>
   <table id="sf2list"></table>
