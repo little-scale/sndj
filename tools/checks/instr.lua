@@ -79,15 +79,17 @@ emu.addEventCallback(function()
     end
   end
 
-  if frames == at_instr then
+  if frames == 2 then
+    -- exact-pitch asserts need a net-zero-tune sample; poke BEFORE any
+    -- drawing so the INSTR screenshot is deterministic (it raced the
+    -- pokes by a frame and flapped the golden)
+    emu.write(0x2401, 7, emu.memType.snesWorkRam)
+    emu.write(0x2406, 0xEF, emu.memType.snesWorkRam) -- cancel BD's +17 fine
+  elseif frames == at_instr then
     check(wram(0x000C) == 4, "A+Right opened INSTR from the phrase row")
     check(wram(0x4301) == 0, "phrase row 0 instrument = 00")
     check(wram(0x2402) == 0x2F and wram(0x2403) == 0xCA,
       "factory instrument ADSR present")
-    -- exact-pitch asserts below need a zero-tune sample (factory melodics
-    -- carry loop-quantise tune corrections now)
-    emu.write(0x2401, 7, emu.memType.snesWorkRam)
-    emu.write(0x2406, 0xEF, emu.memType.snesWorkRam) -- cancel BD's +17 fine
     -- the chord: C47 on the phrase row (GRP fields are gone from INSTR)
     emu.write(0x4302, 3, emu.memType.snesWorkRam)
     emu.write(0x4303, 0x47, emu.memType.snesWorkRam)
