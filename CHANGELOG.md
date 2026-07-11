@@ -5,6 +5,11 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- patcher BOOT tab: each SMP boot instrument gets a **LOOP selector**
+  (POOL / ON / OFF) — it writes the SNDEF2 extras bits the console
+  copies into the instrument's LOOP field on a fresh song, so you can
+  ship a ROM whose boot instruments loop (or don't) the way you want
+  without touching the INSTR screen first.
 - patcher: dropping an sf2 one-shot **onto a kit slot** now bakes the
   8 kHz correction (−24) into the **pool entry's tune**, like the
   pool-slot import path, with the kit slot's tune left at 0 for

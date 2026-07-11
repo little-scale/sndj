@@ -559,6 +559,22 @@ function renderBoot() {
         };
         lab.appendChild(document.createTextNode(' x'));
         lab.appendChild(sn);
+      } else {                           // SMP: how the LOOP field boots
+        const lp = document.createElement('select');
+        ['POOL', 'ON', 'OFF'].forEach((n, v) => {
+          const o = document.createElement('option');
+          o.value = v; o.textContent = n;
+          lp.appendChild(o);
+        });
+        lp.value = (rom[defOff + 24 + i] >> 1) & 0x03;
+        lp.title = 'the instrument\'s LOOP field at boot: POOL follows the ' +
+          'sample\'s own loop, ON forces a loop (one-shots loop whole), ' +
+          'OFF forces one-shot';
+        lp.onchange = () => {
+          rom[defOff + 24 + i] = (rom[defOff + 24 + i] & ~0x06) |
+            ((+lp.value & 0x03) << 1);
+        };
+        lab.appendChild(lp);
       }
     }
     row.appendChild(lab);
