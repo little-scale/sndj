@@ -432,9 +432,7 @@ function render() {
     row.insertCell().appendChild(clr);
     // an sf2 slot dragged here imports into this pool slot
     row.ondragover = ev => {
-      const hasFile = [...ev.dataTransfer.types].includes('Files');
-      if (!sf2Loaded() && !hasFile) return;
-      ev.preventDefault();
+      ev.preventDefault();               // files, sf2 slots AND pool swaps
       ev.dataTransfer.dropEffect = 'copy';
       row.classList.add('target');
     };
@@ -448,8 +446,12 @@ function render() {
         else wavReplace(f, i);
         return;
       }
-      const [fi, idx] = ev.dataTransfer.getData('text/plain')
-        .split(',').map(Number);
+      const txt = ev.dataTransfer.getData('text/plain');
+      if (txt.startsWith('pool:')) {           // another pool row: swap slots
+        poolSwap(+txt.slice(5), i);
+        return;
+      }
+      const [fi, idx] = txt.split(',').map(Number);
       if (sf2fonts[fi] && sf2fonts[fi].samples[idx]) sf2Import(fi, idx, i);
     };
   });
