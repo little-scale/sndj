@@ -90,6 +90,10 @@ export a patched ROM. Everything runs locally.</p>
     min="20" max="500" style="width:4rem"></label>
   <span class="hint" style="cursor:help; text-decoration:underline dotted"
     title="melodic: a smpl/sf2 loop imports in tune (root key honoured); without one the whole file loops. Trim +12/+24/+36 stores the data one/two/three octaves lower (half/quarter/eighth size) and bakes the compensating tune into the slot automatically — playback pitch is unchanged, just darker. One-shots: soundfont slots resample to 8 kHz (capped at cap ms), WAVs keep full length; either way the storage rate is baked into the pool tune, so kit-slot tunes stay purely musical. The → column in the soundfont list shows each sample's fate under the current settings.">?</span>
+  <button id="reftone" title="a 523.25 Hz sine — C-5, the exact pitch every
+in-tune melodic slot should sound from its play button (the audition IS
+console note C-5: native rate + the entry tune). Toggle it on, layer the
+play button over it, listen for beating. Drums aim lower by design.">&#9833; ref C-5</button>
 </div>
 <div class="cols">
 <div>
@@ -1237,6 +1241,27 @@ async function wavToRate(f, rate) {
 }
 
 let actx = null, playingNode = null;
+// the tuning fork: C-5 = what the audition button aims at for melodics
+let refOsc = null;
+$('reftone').onclick = () => {
+  actx = actx || new AudioContext({ sampleRate: 32000 });
+  if (refOsc) {
+    refOsc.stop();
+    refOsc.disconnect();
+    refOsc = null;
+    $('reftone').classList.remove('primary');
+    return;
+  }
+  const g = actx.createGain();
+  g.gain.value = 0.15;
+  refOsc = actx.createOscillator();
+  refOsc.frequency.value = 523.251;   // C5 (sndj note C-5, index 60)
+  refOsc.connect(g);
+  g.connect(actx.destination);
+  refOsc.start();
+  $('reftone').classList.add('primary');
+};
+
 function audition(e, rate) {
   rate = rate || 32000;
   const pcm = S.brrDecode(e.brr);
