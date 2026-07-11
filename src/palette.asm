@@ -29,10 +29,17 @@ palette_boot:
     cmp #'1'
     bne @default
     lda.l $700008           ; CLONE: SLIM/DEEP persists next door
-    and #$01
+    cmp #$02                ; unwritten SRAM reads $FF: keep SLIM
+    bcs @clone_def
     sta opt_clone
+    bra @clone_ok
+@clone_def:
+    stz opt_clone
+@clone_ok:
     lda.l SRAM_OPTPAL
-    and #$07
+    cmp #$08                ; unwritten SRAM reads $FF ($FF & 7 = the
+    bcc @have               ; "palette 7 on every reset" hardware bug)
+    lda #$00
     bra @have
 @default:
     stz opt_clone

@@ -53,8 +53,13 @@ sram_check:
     sta.l SRAM_MAGIC0 + 4
     lda #$02
     sta.l SRAM_MAGIC0 + 5
-    ; seed the button-timing option bytes (garbage reads as defaults
-    ; anyway — options_boot range-checks — but fresh carts start clean)
+    ; seed every option byte: real SRAM powers up $FF, and $FF & 7 = 7
+    ; picked palette 7 on every hardware reset until this seeded
+    lda #$00
+    sta.l $700006           ; reserved
+    sta.l $700007           ; PALETTE 0
+    sta.l $700008           ; CLONE SLIM
+    sta.l $700009           ; SYNC OFF
     lda #14
     sta.l $70000A           ; KEY DELAY
     lda #3

@@ -5,6 +5,24 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- **Hardware: the mailbox is glitch-proofed.** On real silicon an
+  SPC700 port read that collides with the S-CPU's write returns mixed
+  bits (emulators don't model it); the bulk-upload loop accepted any
+  changed byte as a round counter, so uploads sheared by 3 bytes
+  (garbled instruments) or ended on a phantom zero (silent
+  instruments, different every reset — the two clocks are async, so
+  the collision phase moves each boot). The driver now double-reads
+  port 0 until stable and accepts only the expected successor counter;
+  the CPU resyncs and retries a failed upload once; the LOOP bit is
+  patched into the stream in transit (one bulk session per sample,
+  half the exposure). The APU? indicator also actually fires now: the
+  heartbeat used an exact-frame gate that ~30 fps screens could miss
+  forever — it's a frame delta like every other periodic gate.
+- **Hardware: palette 7 no longer greets every reset** — real SRAM
+  powers up as $FF and `$FF & 7 = 7`; the format path now seeds all
+  option bytes and the boot loaders range-check instead of masking
+  (unwritten CLONE also read as DEEP).
+
 - **Tables are now V · TSP · CMD** (was two command columns): per
   tick a table row can set the voice level (01-7F, X-style), bend
   the playing note by signed semitones, and run one command. $00 =

@@ -58,6 +58,7 @@ wait_cnt  db
 new_edl   db      ; latched CMD_ECHO_CFG payload (ports change under us)
 new_esa   db
 shrinking db      ; this reconfig shrinks the buffer (offset drain needed)
+bulk_ctr  db      ; bulk mode: the NEXT round counter we accept (1..255)
 .ENDE
 
 .BANK 0 SLOT 0
@@ -130,7 +131,12 @@ main:
 @no_tick:
 
     ; --- mailbox ---
+    ; double-read: on hardware a port read DURING the S-CPU's write can
+    ; return mixed bits (emulators don't model this); two agreeing reads
+    ; in a row are the real value
     mov a, rPORT0
+    cmp a, rPORT0
+    bne main
     cmp a, last_cmd
     beq main
     mov last_cmd, a
@@ -183,13 +189,18 @@ main:
     mov dest_hi, a
     mov a, last_cmd
     mov rPORT0, a           ; ack; CPU may now stream rounds
+    mov bulk_ctr, #$01      ; the CPU's counters run 1..255, skipping 0
 @bulk_wait:
+    ; double-read (see main): a glitched byte must never enter the
+    ; protocol — a wrong counter would shear the stream by 3 bytes, and
+    ; a phantom 0 would end it mid-sample (the silent-instrument bug)
     mov a, rPORT0
-    cmp a, last_cmd
-    beq @bulk_wait
-    mov last_cmd, a
+    cmp a, rPORT0
+    bne @bulk_wait
     cmp a, #$00
     beq @bulk_end           ; counter 0 = end of stream
+    cmp a, bulk_ctr
+    bne @bulk_wait          ; only the expected successor counts
     mov y, #$00
     mov a, rPORT1
     mov [dest_lo]+y, a
@@ -202,11 +213,17 @@ main:
     clrc
     adc dest_lo, #$03
     adc dest_hi, #$00
-    mov a, last_cmd
-    mov rPORT0, a           ; echo the round counter
+    mov a, bulk_ctr
+    mov rPORT0, a           ; echo the accepted counter
+    inc a
+    bne @ctr_ok
+    inc a                   ; 0 is reserved for the end marker
+@ctr_ok:
+    mov bulk_ctr, a
     bra @bulk_wait
 @bulk_end:
-    mov rPORT0, a           ; echo the 0; both sides now at seq 0
+    mov last_cmd, a         ; = 0: both sides now at seq 0
+    mov rPORT0, a
     jmp !main
 
 ; --- safe echo reconfiguration (port1 = EDL, port2 = ESA page) -----------------

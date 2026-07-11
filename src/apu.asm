@@ -154,8 +154,24 @@ apu_dsp_write:
 
 ; --- bulk upload to ARAM: up_src (CPU addr, DB), up_dest (ARAM), up_len -------
 ; up_len must be a multiple of 3 (pad; BRR blocks are 9 bytes so samples fit).
-; Carry set on timeout.
+; up_patch = byte offset to OR $02 into as it streams (the END block's
+; LOOP bit; $FFFF = none) — cleared on exit either way.
+; One transparent resync + retry on failure: a port-glitch desync on
+; real silicon must cost a retry, not a silent sample. Carry set when
+; both attempts time out.
 apu_upload_block:
+    jsr @attempt
+    bcc @done
+    jsr apu_resync          ; pull the driver out of bulk, reseed the seq
+    bcs @done
+    jsr @attempt
+@done:
+    php
+    ldx #$FFFF
+    stx up_patch
+    plp
+    rts
+@attempt:
     ldx up_dest
     lda #CMD_UPLOAD
     jsr apu_send
@@ -164,6 +180,10 @@ apu_upload_block:
     ldy #$0000
 @round:
     lda [up_src],y
+    cpy up_patch
+    bne +
+    ora #$02                ; the LOOP bit, patched in transit
++
     sta APUIO1
     iny
     lda [up_src],y
@@ -199,10 +219,30 @@ apu_upload_block:
     sec
     rts
 
+; --- resync after a mailbox desync -------------------------------------------
+; Port 0 = 0 reads as "end of stream" in bulk mode and as a NOP command
+; in the main loop — either way the driver echoes 0 and both sides land
+; at sequence 0. Carry set if even that times out (APU truly gone).
+apu_resync:
+    lda #$00
+    sta APUIO0
+    lda #$00
+    jsr apu_wait_p0
+    bcs @dead
+    stz apu_seq
+    stz apu_status
+    clc
+    rts
+@dead:
+    sec
+    rts
+
 ; --- one-time audio setup after driver upload ---------------------------------
 ; Configures the DSP and all 8 voices (sample uploads happen via
 ; residency_build once the song block exists).
 apu_audio_init:
+    ldx #$FFFF
+    stx up_patch            ; no in-stream patch until a caller asks
     ; global DSP state
     lda #DSP_DIR
     ldy #(ARAM_DIR >> 8)
@@ -1222,13 +1262,17 @@ apu_update:
 @cool_ok:
     lda apu_status
     bne @done               ; don't hammer a dead mailbox every heartbeat
-    rep #$20
-.ACCU 16
+    ; every 64 REAL frames by delta — heavy screens run the main loop
+    ; under 60 fps, and an exact frame_cnt&63==0 gate can phase-lock
+    ; into missing every boundary (the DAS lesson, third occurrence:
+    ; the APU? indicator silently never fired on ~30 fps screens)
     lda frame_cnt
-    and #$003F
-    sep #$20
-.ACCU 8
-    bne @done
+    sec
+    sbc hb_lfc
+    cmp #64
+    bcc @done
+    lda frame_cnt
+    sta hb_lfc
     lda hb_val
     inc a
     and #$3F

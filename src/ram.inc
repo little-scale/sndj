@@ -278,6 +278,9 @@ opt_kdelay   db      ; OPTIONS timing: frames before d-pad auto-repeat (4-30)
 opt_krate    db      ; OPTIONS timing: frames between repeats (1-8)
 opt_tapwin   db      ; OPTIONS timing: B double-tap window, frames (10-40)
                      ; (the three stay consecutive: OPTIONS indexes them)
+up_patch     dw      ; bulk upload: byte offset to OR $02 into on the fly
+                     ; (the END block's LOOP bit; $FFFF = none)
+hb_lfc       db      ; heartbeat: frame_cnt at the last beat (delta gate)
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

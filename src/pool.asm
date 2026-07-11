@@ -582,44 +582,15 @@ res_mark:
     clc
     adc up_len
     sta res_cursor
-    sep #$20
-.ACCU 8
-    jsr apu_upload_block
-    bcs @up_fail
-    ; patch the END block's header: OR in the LOOP bit. The mailbox
-    ; moves 3-byte rounds, so re-send the header plus its two data
-    ; bytes (up_src still points at the ROM data, up_len is intact)
-    rep #$30
-.ACCU 16
+    ; the END block's LOOP bit is OR'd in AS THE DATA STREAMS (one bulk
+    ; session per sample, half the handshake exposure of the old
+    ; patch-afterwards scheme): the header sits at up_len - 9
     lda up_len
     sec
     sbc #$0009
-    tay
+    sta up_patch
     sep #$20
 .ACCU 8
-    lda [up_src],y
-    ora #$02
-    sta.w str_buf
-    iny
-    lda [up_src],y
-    sta.w str_buf + 1
-    iny
-    lda [up_src],y
-    sta.w str_buf + 2
-    rep #$30
-.ACCU 16
-    lda res_cursor
-    sec
-    sbc #$0009
-    sta up_dest
-    lda #$0003
-    sta up_len
-    lda #str_buf
-    sta up_src
-    sep #$20
-.ACCU 8
-    lda #$7E
-    sta up_src + 2
     jsr apu_upload_block
     bcs @up_fail
     plx
