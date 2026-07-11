@@ -63,7 +63,7 @@ emu.addEventCallback(function()
     -- (samples 16-25); everything else stays in ROM until referenced
     local order = { 0, 1, 2, 3, 4, 5, 6,
                     7, 8, 9, 10, 11, 12, 13, 14,
-                    15, 20, 21, 19, 22, 16, 17, 23 }
+                    15, 17, 21, 19, 22, 23 }
     local cursor = 0x1200 + 9
     local all_ok = true
     local slot = 1
@@ -98,7 +98,7 @@ emu.addEventCallback(function()
     end
     check(all_ok, "residency: the boot set uploads in reference order (" ..
       (slot - 1) .. " resident)")
-    check(slot - 1 == 23, "boot set = instr 0-6 + kit 0 exactly (23 samples)")
+    check(slot - 1 == 21, "boot set = instr 0-6 + kit 0 exactly (21 samples)")
     check(srcn_of[7] ~= nil and srcn_of[12] ~= nil,
       "the factory kit samples made the budget")
     -- loop ownership: data always ends LOOP+END; a one-shot's directory

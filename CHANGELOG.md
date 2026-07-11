@@ -11,11 +11,12 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
   order changes). Settle the order before writing songs against the
   ROM: songs in cart saves hold indices too.
 
-- **The lean factory** (Seb): 17 samples — 7 melodics (honky-tonk,
-  xylophone, nylon guitar, trombone, steel drum, slap bass, crystal)
-  + a 10-drum kit — one KIT, boot set = 7 SMP + KIT 0, ~31 KB of BRR,
-  echo headroom to EDL 14 on a fresh song. Built to be added to:
-  31 free pool slots, kits 1-15 blank. SNDJFACT v4.
+- **The lean factory** (Seb, rev 10): 18 samples — 7 melodics
+  (xylophone, honky-tonk, nylon guitar, trombone, steel drum, slap
+  bass, crystal) + drums incl. VOICE 3 — one KIT, boot set = 7 SMP +
+  KIT 0, ~31 KB resident, echo headroom to EDL 14 on a fresh song.
+  Built to be added to: 30 free pool slots, kits 1-15 blank.
+  SNDJFACT v4.
 
 - patcher: **the pool loop is yours to toggle** — the loop cell on the
   POOL tab is clickable (looped ⇄ one-shot, with the original loop
