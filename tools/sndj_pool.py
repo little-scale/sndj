@@ -153,7 +153,12 @@ def sf2_samples(path):
         corr = struct.unpack('<b', data[r + 41:r + 42])[0]   # cents
         pcm = struct.unpack('<%dh' % (end - start),
                             data[smpl + start * 2:smpl + end * 2])
-        loop = (ls - start, le - start) if le > ls >= start else None
+        # shape-based: ripped fonts set sampleModes unreliably both ways
+        # (X-Men flags nothing; SMW flags 1 of 45). Degenerate (0,0) /
+        # sub-block loops are one-shots; the patcher's pool-tab loop
+        # toggle is the per-entry override.
+        loop = (ls - start, le - start) \
+            if (le - ls >= 16 and le > ls >= start) else None
         out.append({'name': name, 'pcm': list(pcm), 'rate': rate, 'loop': loop,
                     'root': root, 'corr': corr,
                     'preset': preset_of.get(i)})

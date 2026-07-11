@@ -380,7 +380,10 @@ function sf2Parse(bytes) {
     }
     out.push({
       name: str(r, 20), pcm, rate, root, corr,
-      loop: (le > ls && ls >= start) ? [ls - start, le - start] : null,
+      // shape-based (ripped fonts set sampleModes unreliably both ways);
+      // degenerate loops read as one-shots
+      loop: (le - ls >= 16 && le > ls && ls >= start)
+        ? [ls - start, le - start] : null,
       preset: presetOf[i] || null,
     });
   }

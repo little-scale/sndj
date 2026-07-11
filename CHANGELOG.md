@@ -5,6 +5,15 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- patcher: **the pool loop is yours to toggle** — the loop cell on the
+  POOL tab is clickable (looped ⇄ one-shot, with the original loop
+  point restorable), assigning a looped entry to a kit slot warns in
+  the status line, and degenerate soundfont/WAV loop metadata
+  (zero-length / sub-block loops) now reads as one-shot on import.
+  Ripped soundfonts set their loop flags unreliably in both
+  directions, so the import keeps honest shape-based detection and
+  the toggle is the per-entry override — kits play the pool's truth.
+
 - **Boot instruments are 8 again** (SNDEF3, was 12): one per voice,
   lining up with the MIDI channel map — and period-correct (classic
   SNES scores kept ~8-15 samples resident per song). Instruments 8-63

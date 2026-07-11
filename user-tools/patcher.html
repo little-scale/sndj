@@ -328,8 +328,35 @@ function render() {
   entries.forEach((e, i) => {
     const row = t.insertRow();
     row.innerHTML =
-      `<td>${i}</td><td></td><td>${e.brr.length}</td>` +
-      `<td>${e.loopBlock === null ? 'one-shot' : 'block ' + e.loopBlock}</td>`;
+      `<td>${i}</td><td></td><td>${e.brr.length}</td><td></td>`;
+    // loop cell: CLICK to toggle looped <-> one-shot (junk loops from
+    // sloppy soundfont/WAV metadata are one click from silence-safe;
+    // toggling back restores the original loop point)
+    const lc = row.cells[3];
+    const paint = () => {
+      lc.textContent = e.loopBlock === null
+        ? (e._savedLoop !== undefined ? 'one-shot*' : 'one-shot')
+        : 'loop@' + e.loopBlock;
+      lc.style.color = e.loopBlock === null ? '#606888' : '#40d0c8';
+    };
+    if (!isFree(e)) {
+      lc.style.cursor = 'pointer';
+      lc.title = 'click to toggle: looped <-> one-shot (kits want ' +
+        'one-shots; the console plays whatever this says)';
+      lc.onclick = () => {
+        if (e.loopBlock !== null) {
+          e._savedLoop = e.loopBlock;
+          e.loopBlock = null;
+        } else if (e._savedLoop !== undefined) {
+          e.loopBlock = e._savedLoop;
+        } else {
+          e.loopBlock = 0;               // no history: loop whole
+        }
+        paint();
+        render();
+      };
+    }
+    paint();
     const nameIn = document.createElement('input');
     nameIn.value = e.name;
     nameIn.maxLength = 8;
@@ -631,6 +658,12 @@ function renderKits() {
         } else {
           rom[off] = +pick.value;
           if (!rom[off + 2]) { rom[off + 1] = 0; rom[off + 2] = 0x50; }
+          const pe = entries[+pick.value];
+          if (pe && pe.loopBlock !== null) {
+            status('kit ' + k + ' slot ' + sl + ': ' + pe.name +
+              ' is a LOOPED entry — it will ring forever on the console. ' +
+              'Click its loop cell on the POOL tab to make it one-shot.', 1);
+          }
         }
         render();            // the boot set changed: badges + ARAM bar follow
       };
