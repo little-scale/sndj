@@ -53,7 +53,9 @@ gest({ right = true })                    -- instr column
 gest({ b = true })                        -- instr 00 at row 0
 gest({ a = true, right = true })          -- INSTR
 local at_instr = t
-t = t + 8                                 -- let the packed layout settle
+t = t + 20                                -- let the packed layout settle
+                                          -- (VRAM queue drains over several
+                                          -- frames; +8 raced it and flapped)
 local shot_at = t - 2
 local after_edit = t + 4
 gest({ a = true, left = true })           -- back to PHRASE

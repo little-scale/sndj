@@ -72,6 +72,7 @@ Reset:
     jsr apu_audio_init      ; factory sample + directory + voice 0 config
 +
     jsr song_init           ; fresh song block (NEW)
+    jsr live_pending_reset  ; boot WRAM is 0 = "chain 0 queued" — seed $FF
     jsr sram_check          ; format SNDJ1 SRAM on first boot
     lda apu_status
     bne +

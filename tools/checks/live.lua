@@ -2,8 +2,8 @@
 -- boundaries, mute/solo via the X modifier silences voices, ENVX
 -- telemetry reaches the CPU mirror, Select round-trips LIVE.
 --
--- Non-frozen addresses (from src/ram.inc): $E0 trk_pending, $E8 trk_mute,
--- $E9 envx_mirror, $20 trk_chain, $30 trk_prow.
+-- Non-frozen addresses (from src/ram.inc): $E8 trk_pending, $F0 trk_mute,
+-- $F1 envx_mirror, $20 trk_chain, $30 trk_prow.
 
 local frames = 0
 local _booted = false

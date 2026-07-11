@@ -400,11 +400,14 @@ song_snap_window:
 @done:
     rts
 
-; carry set when track tmp0 is live and its song row = the row being
-; drawn (song_top + tmp0+1) — the per-track playhead test
-song_track_head:
+; A = the gap-column marker for (track tmp0, visible row song_top +
+; tmp0+1): X = a queued STOP draining at the playing cell, flashing
+; triangle = a cued chain (fires at the boundary), steady triangle =
+; the playing position (song row, or the launched cell for LIVE's
+; standalone chains), space = nothing
+song_head_glyph:
     lda eng_playing
-    beq @no_h
+    beq @none
     phx
     rep #$30
 .ACCU 16
@@ -413,21 +416,55 @@ song_track_head:
     tax
     sep #$20
 .ACCU 8
-    lda.w trk_phrase,x
-    cmp #$FF
-    beq @no_hx
     lda song_top
     clc
     adc tmp0 + 1
-    cmp.w trk_songrow,x
-    bne @no_hx
+    sta tmp1                ; the absolute row this cell draws
+    lda.w trk_pending,x
+    cmp #$FF
+    beq @playing
+    cmp #$FE
+    bne @cued
+    ; stop queued: X over the playing cell while it drains
+    lda.w trk_live_row,x
+    cmp tmp1
+    bne @playing
     plx
-    sec
+    lda #'X' - 32
     rts
-@no_hx:
+@cued:
+    ; a cued chain flashes at its cell (and the playing marker stays)
+    lda.w trk_pend_row,x
+    cmp tmp1
+    bne @playing
+    lda frame_cnt
+    and #$10
+    beq @none_x
     plx
-@no_h:
-    clc
+    lda #GLYPH_ARROW_R
+    rts
+@playing:
+    lda.w trk_phrase,x
+    cmp #$FF
+    beq @none_x
+    lda.w trk_songrow,x
+    cmp #$FF
+    beq @live_pos
+    cmp tmp1
+    bne @none_x
+    bra @arrow
+@live_pos:
+    lda.w trk_live_row,x
+    cmp tmp1
+    bne @none_x
+@arrow:
+    plx
+    lda #GLYPH_ARROW_R
+    rts
+@none_x:
+    plx
+@none:
+    lda #' ' - 32
     rts
 
 ; carry set when any live track's song row equals A (absolute row)
@@ -476,8 +513,9 @@ song_draw:
     clc
     adc tmp0 + 1
     jsr text_hex8
-    ; 8 cells, each with its own playhead triangle in the gap column
-    ; to its left — every playing track is an independent head
+    ; 8 cells, each with its own marker in the gap column to its left:
+    ; steady triangle = playing here, flashing triangle = cued to play
+    ; next, X = stopping at the boundary (LIVE)
     stz tmp0                ; track counter
 @cells:
     lda tmp0
@@ -492,15 +530,8 @@ song_draw:
     sta text_attr
     sep #$20
 .ACCU 8
-    jsr song_track_head
-    bcc @no_head
-    lda #GLYPH_ARROW_R
+    jsr song_head_glyph
     jsr text_puttile
-    bra @head_done
-@no_head:
-    lda #' ' - 32
-    jsr text_puttile
-@head_done:
     jsr song_cell_attr
     ; cell value
     rep #$30

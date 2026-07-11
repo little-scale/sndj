@@ -144,11 +144,11 @@ live_update:
 @draw:
     jmp live_draw
 
-; queue the cursor cell's chain on its track (launches now if stopped)
+; queue the cursor cell's chain on its track (launches now if stopped).
+; An EMPTY cell queues a STOP ($FE): the track finishes its phrase and
+; halts at the boundary — the grid shows an X while it drains.
 live_queue_cursor:
     jsr song_cursor_cell    ; A = chain under cursor ($FF = empty)
-    cmp #$FF
-    beq @done
     pha
     lda song_cx
     rep #$30
@@ -158,7 +158,21 @@ live_queue_cursor:
     sep #$20
 .ACCU 8
     pla
+    cmp #$FF
+    bne @launch
+    ; empty cell: queue a stop (only meaningful on a playing track)
+    lda eng_playing
+    beq @done
+    lda.w trk_phrase,x
+    cmp #$FF
+    beq @done
+    lda #$FE
     sta.w trk_pending,x
+    rts
+@launch:
+    sta.w trk_pending,x
+    lda song_cy
+    sta.w trk_pend_row,x
     lda eng_playing
     bne @done
     jsr engine_play_live
@@ -189,11 +203,26 @@ live_launch_row:
     cmp #$FF
     beq @next
     sta.w trk_pending,x
+    lda song_cy
+    sta.w trk_pend_row,x
 @next:
     inx
     cpx #TRACKS
     bne @scan
     jmp engine_play_live
+
+; clear all queued launches/stops ($FF = nothing pending). Boot WRAM is
+; zero, and 0 is a valid chain id — without this the first LIVE launch
+; reads "chain 0 queued" on every track and starts all eight.
+live_pending_reset:
+    ldx #$0000
+    lda #$FF
+@clr:
+    sta.w trk_pending,x
+    inx
+    cpx #TRACKS
+    bne @clr
+    rts
 
 ; key off any newly muted voices so they don't ring
 live_mute_koff:
@@ -217,6 +246,8 @@ engine_play_live:
     cmp #$FF
     beq @next
     sta.w trk_chain,x
+    lda.w trk_pend_row,x
+    sta.w trk_live_row,x    ; the playhead marks the launched cell
     lda #$FF
     sta.w trk_pending,x
     sta.w trk_songrow,x     ; standalone chain semantics (loops)

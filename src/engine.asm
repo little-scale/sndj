@@ -513,6 +513,7 @@ engine_go:
     sta eng_row
     stz eng_tickwait
     stz eng_gpos
+    stz eng_barrow          ; play start = a bar boundary
     lda apu_tick
     sta eng_tick_last
     lda #$01
@@ -521,6 +522,7 @@ engine_go:
 
 engine_stop:
     stz eng_playing
+    jsr live_pending_reset  ; stale LIVE cues must not fire next launch
     lda #DSP_KOF
     ldy #$00FF              ; release all voices
     jsr apu_dsp_write
@@ -604,6 +606,21 @@ engine_tick:
 
     ; advance + trigger every track
 engine_tick_row:
+    ; the LIVE bar clock: every 16 rows is a boundary where launches
+    ; queued on HALTED tracks fire (playing tracks fire at their own
+    ; phrase wrap)
+    lda eng_barrow
+    bne +
+    lda #$01
+    sta eng_barflag
+    bra ++
++
+    stz eng_barflag
+++
+    lda eng_barrow
+    inc a
+    and #$0F
+    sta eng_barrow
     ldx #$0000
 @each:
     jsr track_row
@@ -719,11 +736,24 @@ engine_tick_slave:
 ; (LIVE-queued launch beats everything; standalone phrase loops; chain end
 ; walks the song grid or loops a standalone chain.) May halt the track.
 track_chain_step:
-    ; a LIVE-queued chain launches exactly here (quantised)
+    ; a LIVE-queued chain launches exactly here (quantised); a queued
+    ; STOP ($FE) halts the track and keys its voice off instead
     lda.w trk_pending,x
     cmp #$FF
     beq @no_launch
+    cmp #$FE
+    bne @do_launch
+    lda #$FF
+    sta.w trk_pending,x
+    sta.w trk_phrase,x      ; halt
+    lda.w bit_for_track,x
+    ora koff_mask
+    sta koff_mask
+    rts
+@do_launch:
     sta.w trk_chain,x
+    lda.w trk_pend_row,x
+    sta.w trk_live_row,x    ; the cell the playhead marks from now on
     lda #$FF
     sta.w trk_pending,x
     sta.w trk_songrow,x     ; behave as a standalone (looping) chain
@@ -805,6 +835,26 @@ track_row:
     lda.w trk_phrase,x
     cmp #$FF
     bne @alive
+    ; a queued launch on a halted track fires at the bar boundary
+    lda eng_barflag
+    beq @stay_halted
+    lda.w trk_pending,x
+    cmp #$FE
+    bcs @stay_halted        ; nothing queued ($FF) / a stop ($FE)
+    sta.w trk_chain,x
+    lda.w trk_pend_row,x
+    sta.w trk_live_row,x
+    lda #$FF
+    sta.w trk_pending,x
+    sta.w trk_songrow,x     ; standalone (looping) chain
+    sta.w trk_prow,x        ; start sentinel: row 0 plays this tick
+    lda #$00
+    sta.w trk_cpos,x
+    jsr track_load_chain_entry
+    lda.w trk_phrase,x
+    cmp #$FF
+    bne @alive
+@stay_halted:
     rts
 @alive:
     lda #$04

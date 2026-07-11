@@ -283,6 +283,18 @@ up_patch     dw      ; bulk upload: byte offset to OR $02 into on the fly
 hb_lfc       db      ; heartbeat: frame_cnt at the last beat (delta gate)
 pal_buf2     ds 8    ; CGRAM colours 16-19 (ATTR_PLAY palette), drained
                      ; with pal_buf by the NMI
+; !! this ENUM ends exactly at $0400 = SHADOW_BG3. It is FULL: new
+; variables go in the $0C00 block below (the tilemap shadow silently
+; shreds anything placed past this point — it cost a debugging hour)
+.ENDE
+
+; overflow block: above the BG3 shadow ($0400-$0BFF), below the stack
+.ENUM $0C00
+trk_live_row ds 8    ; LIVE: the song row each track's playing chain was
+                     ; launched from (standalone chains lose songrow)
+trk_pend_row ds 8    ; LIVE: the row of the QUEUED chain (cue marker)
+eng_barrow   db      ; rows since play start, mod 16 (the LIVE bar)
+eng_barflag  db      ; this row tick starts a bar (halted launches fire)
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

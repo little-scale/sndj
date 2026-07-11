@@ -5,6 +5,20 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- **LIVE cue/stop markers** (Seb): a steady **▸** marks each track's
+  playing cell, a *flashing* **▸** marks a cued chain waiting for its
+  boundary, and an **X** marks a track draining toward a queued stop
+  (**B on an empty cell queues the stop** — the track finishes its
+  phrase and goes quiet).
+- **Cues on silent tracks now fire** — at the next bar (16 rows), so
+  a chain launched on an idle track lands in time with the others
+  (before, a cue on a halted track never fired at all).
+- Fixed: **the first LIVE launch after power-on started all eight
+  tracks** — the pending-launch slots live in boot-zeroed RAM where
+  0 reads as "chain 0 queued"; they are now seeded at boot and
+  cleared on stop (regression check `livecue.lua`).
+- HELP pages reordered (Seb): INSTRUMENT TYPES and SAMPLES AND
+  MEMORY are pages 4–5, the command reference pages 6–7.
 - HELP grows two pages (now 8): **SAMPLES AND MEMORY** (the ROM pool
   vs audio RAM, what loads at boot, on-demand loading, the echo
   trade) and **INSTRUMENT TYPES** (all six, one screen).

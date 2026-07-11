@@ -111,13 +111,13 @@ elsewhere pastes it. Works in PHRASE, CHAIN and SONG.
 - On play, each track **enters at the first populated cell at/above
   the start row** — the chain covering that row keeps sounding, so
   starting mid-song sounds like the song sounds there.
-- **Playback indicators**: the gutter triangle, and only that. On
-  CHAIN, PHRASE and GROOVE it marks the playing row; on SONG a
-  triangle appears on **every row some track is playing** — the 8
-  tracks are independent playheads (they walk their own chains and
-  loop their own blocks; there is no single "song position"), so you
-  may see several triangles at once. Cells are never painted over.
-  A fully empty column stays silent.
+- **Playback indicators**: the triangle, and only that. On CHAIN,
+  PHRASE and GROOVE a gutter triangle marks the playing row; on SONG
+  **each playing track gets its own triangle**, in the gap left of
+  the cell it is playing — the 8 tracks are independent playheads
+  (they walk their own chains and loop their own blocks; there is no
+  single "song position"). Cells are never painted over. A fully
+  empty column stays silent.
 
 ## 3. The screens
 
@@ -425,10 +425,27 @@ the hex in on the FIR screen.
 
 ## 11. Live mode
 
-Set MODE to LIVE on PROJECT (or press **Select**): the SONG position
-becomes a clip launcher. Each track launches chains quantised to the
-row/bar; X-modifier mutes and solos, and muted tracks show a dash in
-the header.
+Set MODE to LIVE on PROJECT (or press **Select**): the SONG grid
+becomes a clip launcher. **B** on a cell queues that chain on its
+track; from stopped it launches right away.
+
+- A chain queued on a *playing* track takes over at the track's next
+  phrase boundary. A chain queued on a *silent* track fires at the
+  next bar (16 rows) so it lands in time with the others.
+- **B on an empty cell queues a stop**: the track finishes its
+  phrase and goes quiet.
+- Launched chains loop on their own cell — LIVE never walks the song
+  grid downward.
+
+The grid tells you what's happening: a steady **▸** marks each
+track's playing cell, a *flashing* **▸** marks a cued chain waiting
+for its boundary, and an **X** marks a track draining toward a
+queued stop.
+
+X-modifier mutes and solos (hold X, ↑/↓ mute, ←/→ solo), and muted
+tracks show a dash in the header. **Start** from stopped launches
+every populated cell on the cursor row at once; **Start** while
+playing stops everything.
 
 ## 12. Saving — the FILES screen
 
