@@ -3,6 +3,21 @@
 All notable changes to sndj. First release will be **v0.1**; versions
 increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
+## unreleased
+
+- patcher: dropping an sf2 one-shot **onto a kit slot** now bakes the
+  8 kHz correction (−24) into the **pool entry's tune**, like the
+  pool-slot import path, with the kit slot's tune left at 0 for
+  musical detuning. Before, the correction lived in the kit slot, so
+  the same pool sample played two octaves sharp from the pool tab's
+  play button — and would have on the console too through SMP/SLICE.
+- patcher: the pool's audio-RAM column now mirrors the console
+  exactly and names its reasons — **boot** (referenced on the BOOT
+  tab; sample 0 is always resident because a fresh song points
+  instruments 12-63 at it — previously missed), **kit** (pulled in by
+  a kit slot with volume, any of the 16 kits), or **·** (ROM only,
+  loads on demand).
+
 ## v0.11 — 2026-07-11
 
 - **Hardware: the mailbox is glitch-proofed.** On real silicon an

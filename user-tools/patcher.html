@@ -324,7 +324,7 @@ function render() {
   const t = $('pool');
   t.innerHTML = '<tr><th>#</th><th>name</th><th>BRR bytes</th><th>loop</th>' +
     '<th>tune</th><th>RAM</th><th></th><th></th><th></th></tr>';
-  const resident = bootResident();
+  const refs = bootRefs();
   entries.forEach((e, i) => {
     const row = t.insertRow();
     row.innerHTML =
@@ -364,12 +364,16 @@ function render() {
     tune.appendChild(document.createTextNode(':'));
     tune.appendChild(fine);
     const ram = row.insertCell();
-    const boot = !resident || resident.has(i);
-    ram.textContent = boot ? 'boot' : '\u00B7';
-    ram.title = boot ? 'loaded into audio RAM at boot (referenced by the ' +
-      'factory instruments/kits)' : 'ROM only — loads on demand when an ' +
-      'instrument or kit slot references it';
-    ram.style.color = boot ? '#40d0c8' : '#606888';
+    const byInst = !refs || refs.inst.has(i);
+    const byKit = !byInst && refs && refs.kits.has(i);
+    ram.textContent = byInst ? 'boot' : byKit ? 'kit' : '\u00B7';
+    ram.title = byInst
+      ? (i === 0 && refs && !bootTabRefs(refs, i)
+        ? 'always in audio RAM: a fresh song points instruments 12-63 at sample 0'
+        : 'in audio RAM at boot: referenced on the BOOT tab')
+      : byKit ? 'in audio RAM at boot: referenced by a kit slot (KITS tab)'
+      : 'ROM only — loads on demand when an instrument or kit slot references it';
+    ram.style.color = byInst ? '#40d0c8' : byKit ? '#2f9a94' : '#606888';
     const play = document.createElement('button');
     play.textContent = 'play';
     play.onclick = () => audition(e);
@@ -443,26 +447,44 @@ function render() {
 // ------------------------------------------------------- boot residency
 // mirror of the console's residency_build: the boot-resident set is
 // every pool sample referenced by the factory instruments (SNDEF2,
-// SMP type) or a kit slot with vol > 0 (SNKIT0). The rest of the pool
-// costs no ARAM until a song references it.
+// SMP/SLICE types), PLUS sample 0 (a fresh song seeds instruments
+// 12-63 as SMP on sample 0, so it always uploads), PLUS every kit
+// slot with vol > 0 (SNKIT0 — the console scans all 16 kits so any
+// song row can pick any kit). The rest of the pool costs no ARAM
+// until a song references it.
 let defOff = -1;
 
-function bootResident() {
+function bootTabRefs(refs, i) {
+  for (let n = 0; n < 12; n++) {
+    const t = rom[defOff + n] & 7;
+    if ((t === 0 || t === 4) && (rom[defOff + 12 + n] & 0x3F) === i) return true;
+  }
+  return false;
+}
+
+function bootRefs() {
   if (defOff < 0) return null;           // old ROM: assume everything
-  const set = new Set();
+  const inst = new Set([0]);             // instruments 12-63 = SMP sample 0
   for (let i = 0; i < 12; i++) {
     const t = rom[defOff + i] & 7;
-    if (t === 0 || t === 4) set.add(rom[defOff + 12 + i] & 0x3F);
+    if (t === 0 || t === 4) inst.add(rom[defOff + 12 + i] & 0x3F);
   }
+  const kits = new Set();
   if (kitOff >= 0) {
     for (let k = 0; k < 16; k++) {
       for (let sl = 0; sl < 16; sl++) {
         const off = kitSlotOff(k, sl);
-        if (rom[off + 2]) set.add(rom[off] & 0x3F);
+        if (rom[off + 2]) kits.add(rom[off] & 0x3F);
       }
     }
   }
-  return set;
+  return { inst, kits };
+}
+
+function bootResident() {
+  const r = bootRefs();
+  if (!r) return null;
+  return new Set([...r.inst, ...r.kits]);
 }
 
 function renderBoot() {
@@ -653,10 +675,15 @@ function renderKits() {
           const brr = S.brrEncode(prep.pcm, null);
           const name = (sample.preset || sample.name).toUpperCase()
             .replace(/[^A-Z0-9 ]/g, '').slice(0, 8) || 'DRUM';
-          entries[free] = { name, loopBlock: null, brr };
-          rom.set([free, 0xE8, 0x50, 0], off);
+          // the 8 kHz correction lives in the POOL ENTRY (same as the
+          // pool-slot import path), so the sample plays right from ANY
+          // consumer — pool audition, SMP, SLICE — not just this kit
+          // slot; the slot tune stays free for musical detuning
+          entries[free] = { name, loopBlock: null, brr,
+                            tuneSemis: -24, tuneFine: 0 };
+          rom.set([free, 0, 0x50, 0], off);
           status('kit ' + k + ' slot ' + sl + ' = ' + name +
-            ' (one-shot into pool #' + free + ', tune -24)');
+            ' (one-shot into pool #' + free + ', -24 baked into the entry)');
           render();
         } catch (err) {
           status('kit import failed: ' + err.message, 1);
