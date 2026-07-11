@@ -1022,6 +1022,14 @@ The list every agent reads before touching `src/`:
 12. **SAVEFORMAT.md moves in the same commit** as any WRAM song-block or
     SRAM layout change; **DESIGN.md** in the same commit as any settled-
     decision change.
+13. **Mailbox port reads are glitch-guarded** (hardware-found, v0.11):
+    an SPC700 read of $2140-3 during the S-CPU's write returns mixed
+    bits on real silicon (emulators don't model it). Every APU-side
+    poll double-reads until two reads agree, and bulk mode accepts
+    only the expected successor counter or the 0 end marker — never
+    "anything that changed". CPU side resyncs + retries one failed
+    upload. Real SRAM powers up $FF: every option byte is seeded at
+    format and range-checked at boot, never masked.
 
 ---
 

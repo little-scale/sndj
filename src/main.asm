@@ -7,7 +7,7 @@
 ; restores them; interrupt entry re-asserts.
 ; ============================================================================
 
-.DEFINE VERSION "0.1"       ; drives the splash and `make dist` filenames
+.DEFINE VERSION "0.11"       ; drives the splash and `make dist` filenames
 
 .MEMORYMAP
   DEFAULTSLOT 0

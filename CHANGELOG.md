@@ -3,7 +3,7 @@
 All notable changes to sndj. First release will be **v0.1**; versions
 increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
-## unreleased
+## v0.11 — 2026-07-11
 
 - **Hardware: the mailbox is glitch-proofed.** On real silicon an
   SPC700 port read that collides with the S-CPU's write returns mixed
