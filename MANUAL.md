@@ -201,11 +201,10 @@ Any type can go on any of the 8 voices — there are no special
 channels. Eight kits at once is legal. **The first 8 instruments are
 the factory boot set** — their samples land in audio RAM at power-on,
 and the patcher's boot-instruments editor voices all 8 (type, sample
-/ kit / bank, slice count). The stock rows: **00-06 pitched SMP
-melodics** (the SMW four — xylophone, steel drum, e-piano, slap bass —
-plus strings, recorder, guitar), **07 = KIT 0** (SMW percussion), and
-**08-11 = SMP on sample 0**, ready to re-voice. Slots 12-63 also start
-as SMP on sample 0. Audio RAM only holds what the song *references* —
+/ kit / bank, loop, slice count). The stock rows: **00-06 pitched
+SMP melodics** (xylophone, honky-tonk piano, nylon guitar, trombone,
+steel drum, slap bass, crystal) and **07 = KIT 0** (the sndj drum
+kit). Slots 08-63 start as SMP on sample 0, ready to re-voice. Audio RAM only holds what the song *references* —
 point an instrument or kit slot at any pool sample and it loads on the
 spot, so the rest of the pool costs nothing until you use it (the ECHO
 screen's RAM/FREE line shows the live balance).

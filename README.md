@@ -24,19 +24,19 @@ await real-hardware bring-up. What works today:
 - **8-track sequencer** — phrases (16 rows), chains, 128-row song grid,
   per-entry transpose; groove-driven timing clocked by the APU's own
   crystal (tempo and pitch are region-free by construction)
-- **All thirteen screens** — SONG, CHAIN, PHRASE, INSTR, TABLE, WAVE,
-  KIT, GROOVE, ECHO, FIR, FILES, PROJECT, OPTIONS (plus the LIVE view)
-  on the sibling 2-D map (A+d-pad), with the shared B-grammar
-  everywhere and play indicators on every playing surface
+- **All fourteen screens** — SONG, CHAIN, PHRASE, INSTR, TABLE, WAVE,
+  KIT, GROOVE, ECHO, FIR, FILES, PROJECT, OPTIONS, HELP (plus the
+  LIVE view) on the sibling 2-D map (A+d-pad), with the shared
+  B-grammar everywhere and play indicators on every playing surface
 - **Six instrument types** — sample (SMP), kit (KIT), drawn wavetable
   (WAV), noise (NSE), **SLICE** (chop any pool sample into up to 16
   parts for free — the note picks the slice) and **KARP** (Karplus-
   Strong on the echo loop: the room becomes a plucked string, a
   technique no commercial SNES soundtrack ever shipped); hardware
-  ADSR, GRP chord spans, per-instrument VIB/TRM and loop overrides.
-  The factory boots 12 instruments and audio RAM only holds what
-  songs reference — the rest of the pool loads on demand, with the
-  live RAM/FREE balance on the ECHO screen
+  ADSR, C-command chord fans, per-instrument VIB/TRM and loop
+  overrides. The factory boots 8 instruments (one per voice) and
+  audio RAM only holds what songs reference — the rest of the pool
+  loads on demand, with the live RAM/FREE balance on the ECHO screen
 - **The complete 24-command set** — one executor shared by phrases and
   tables (summary below)
 - **Echo & FIR** — the SNES's room as an instrument: delay with live
@@ -51,19 +51,22 @@ await real-hardware bring-up. What works today:
 - **Save/load** — 16 variable-packed, journalled songs in 32 KB SRAM
   (SNDJ1 v2); a power cut can't eat the previous good save
 - **LIVE mode** — quantised chain launching, mute/solo, ENVX meters
-- **Browser tools** — zero-toolchain, fully local: `user-tools/
-  patcher.html` is a tabbed ROM workshop (sample pool with SoundFont
-  drag-import and bit-exact BRR audition, drum-kit builder, boot
-  instruments, FIR designer with live response plot, palettes, ROM +
-  audio-RAM budget meters); `user-tools/savetool.html` manages cart
-  saves and `.sndj` song files (CLI twin: `tools/savetool.py`). Both
-  import `user-tools/sndj.js` — the shared library with a
-  sample-accurate S-DSP model and a BRR codec byte-matched to the
-  Python reference
+- **Browser tools** — zero-toolchain, fully local, all importing
+  `user-tools/sndj.js` (a sample-accurate S-DSP model, a BRR codec
+  byte-matched to the Python reference, and a **reference sequencer**
+  that mirrors the console engine at ~100x realtime):
+  `patcher.html` — tabbed ROM workshop (pool with SoundFont
+  drag-import, bit-exact BRR audition and slot reordering, boot
+  instruments, kit builder, slice designer, FIR designer with live
+  response plot, palettes, budget meters); `savetool.html` — cart
+  saves and `.sndj` files with a per-song **play button**;
+  `als2sndj.html` — Ableton/.mid/MML in both directions (ALS.md);
+  `spcexport.html` — listen, render **WAV**, or export a standard
+  **`.spc`** that plays in any SPC player
 
-Still to come: hardware verification of sync/MIDI (M12/M14), the sync
-OUT master, the JS reference sequencer with Ableton/WAV/.spc export
-(M15), release (M16).
+Still to come: hardware bring-up of sync/MIDI rigs (M12/M14) and the
+sync OUT master; the factory lives in `factory/` and is built to be
+extended.
 
 ## Controls
 
@@ -107,14 +110,17 @@ make test       # host-side unit tests (BRR, RLE, sndj.js, tools)
 make shot-diff  # golden-screenshot comparison
 ```
 
-`make check` runs 31 Lua suites (300+ assertions) against machine state:
+`make check` runs 36 Lua suites (350+ assertions) against machine state:
 DSP registers, ARAM bytes, WRAM song data, screen shadow maps, timing.
 Every hardware-relevant bug found so far has a regression check.
 
 ## Documents
 
+- **MANUAL.md** — the player's guide (screens, commands, the room)
 - **CLAUDE.md** — the master plan and agent guide (the contract)
 - **SAVEFORMAT.md** — WRAM song block + SRAM byte layouts
+- **HARDWARE.md** — real-silicon notes and errata
+- **ALS.md** — the Ableton/MIDI/MML converter's mapping
 - **CHANGELOG.md** — per-milestone user-facing notes
 
 MIT. Built on the work of the SNES/SFC homebrew and reverse-engineering

@@ -67,7 +67,7 @@ Naming (⚖ SETTLED unless Seb objects):
 | Song file          | `.sndj`                     |
 | Save format magic  | `SNDJ1` (family: SMDJ3/4)   |
 | SPC driver blob    | `build/driver.spc700.bin`   |
-| Reference JS lib   | `tools/sndj.js`             |
+| Reference JS lib   | `user-tools/sndj.js`        |
 | ESP32 bridge repo  | `sndj-link-esp32`         |
 
 Voices (8): `V1`–`V8`, all hosted by the S-DSP. Unlike the siblings there is
@@ -265,7 +265,7 @@ Adding a file = add an `.INCLUDE` *and* a Makefile prerequisite.
 
 ### 4.3 Headless verification (`make test`, `make check`, `make shot`)
 
-- **`make test`** — host-side tests, no emulator: `node tools/sndj.js`
+- **`make test`** — host-side tests, no emulator: `node user-tools/sndj.js`
   self-test (format geometry, RLE codec), `python tools/test_brr.py`
   (BRR encoder round-trip vs the reference decoder, bit-exact), the
   **65816-RLE mirror** (the asm unpacker vs the Python packer, the
@@ -353,8 +353,9 @@ sndj/
     patcher.html  savetool.html   (FIR designer + kit builder live
                                     inside patcher.html)
     als2sndj.html  spcexport.html  sramconvert.html
-  samples/            sample sources; samples/pool.bin = production bank
-  instrument-patches/ factory instrument/kit presets
+  factory/            factory.sndjfact — THE factory (pool + kits +
+                      boot instruments + FIR + palettes); make bakes it
+  samples/            sample sources (drum-machine WAV folders)
   songs/              bundled demo song(s)
   art/                logo (tri-pixel-editor source + exports)
   CLAUDE.md  DESIGN.md  MANUAL.md  SAVEFORMAT.md  HARDWARE.md
@@ -479,7 +480,7 @@ INSTR/TABLE (the room below the voices), MIDI sits above PHRASE
   parity and save-format simplicity. ⚖ SETTLED: one command column in v1.
 - **INSTR** — the instrument editor, type-switched (§9): SMP / KIT / WAV /
   NSE. Common block: name, type, envelope (ADSR or GAIN), vol, pan,
-  echo send (EON), pitch-mod flag, GRP (chord/unison group span), TSP.
+  echo send (EON), pitch-mod flag, TSP. (GRP removed 2026-07-11.)
 - **KIT** — kit builder: 12–16 slots, each = sample id + tune + vol +
   ADSR-override + echo flag. A kit is playable on *any* voice (the SNES has
   no F6-style special channel — kits are just instruments).
@@ -523,7 +524,7 @@ All 8 voices are DSP sample voices; instrument type decides behaviour:
 
 | Type | Plays on | Essence |
 |------|----------|---------|
-| **SMP** | V1–V8 | Melodic BRR sample: sample id, loop on/off, fine-tune, ADSR/GAIN, pan, EON, PMOD flag, GRP span, drive via commands/tables |
+| **SMP** | V1–V8 | Melodic BRR sample: sample id, loop on/off, fine-tune, ADSR/GAIN, pan, EON, PMOD flag, drive via commands/tables |
 | **KIT** | V1–V8 | Note row selects a kit slot (sample+tune+vol+env packaged); the drum idiom of F6/KIT, but on any voice, up to 8 kits at once |
 | **WAV** | V1–V8 | Drawn 32-sample single-cycle wavetable, looped BRR; `B` command switches banks per tick for wave-sequencing |
 | **NSE** | V1–V8 | DSP noise (NON on): pitch column sets the *global* noise clock (32 rates) — like the siblings, noise "frequency" is one shared resource; last-writer-wins is the documented rule |
@@ -546,11 +547,9 @@ Instrument parameters worth calling out:
   `xx` — free granular/mangle material, and the closest thing to a
   wave-start command a sampler this size can give.
 
-Factory content: `instrument-patches/` ships a preset bank (marker-wrapped
-in ROM, patchable): basses, keys, pads, the classic "SNES strings",
-a chip-adjacent WAV set matching the siblings' default waves (sibling
-continuity: a song sketched on smsggdj should have tonal cousins here),
-plus two kits (acoustic-ish, 909-ish). PRESETS.md documents them.
+Factory content lives in `factory/factory.sndjfact` (Seb's curated
+set — 7 melodics + a drum kit, 8 boot instruments, lean by design so
+musicians extend it); the patcher exports/imports the same container.
 
 ## 10. Command set
 
@@ -788,7 +787,7 @@ all importing **`user-tools/sndj.js`** — the single shared library containing:
 the `.sndj`/`SNDJ1` format geometry, the RLE codec, the BRR encoder/decoder,
 the ARAM budget calculator, **a reference implementation of the sequencer
 engine**, and **a bit-exact JS model of the S-DSP** (gaussian table, BRR
-decode, ADSR/GAIN, echo + FIR, noise, PMON). `node tools/sndj.js` self-tests
+decode, ADSR/GAIN, echo + FIR, noise, PMON). `node user-tools/sndj.js` self-tests
 all of it; `make test` runs it. The DSP model is the keystone: it is what
 lets every tool below *play actual SNES sound in the browser*.
 
