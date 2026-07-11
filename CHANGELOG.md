@@ -5,6 +5,12 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- **The lean factory** (Seb): 17 samples — 7 melodics (honky-tonk,
+  xylophone, nylon guitar, trombone, steel drum, slap bass, crystal)
+  + a 10-drum kit — one KIT, boot set = 7 SMP + KIT 0, ~31 KB of BRR,
+  echo headroom to EDL 14 on a fresh song. Built to be added to:
+  31 free pool slots, kits 1-15 blank. SNDJFACT v4.
+
 - patcher: **the pool loop is yours to toggle** — the loop cell on the
   POOL tab is clickable (looped ⇄ one-shot, with the original loop
   point restorable), assigning a looped entry to a kit slot warns in

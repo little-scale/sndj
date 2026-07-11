@@ -105,7 +105,8 @@ emu.addEventCallback(function()
     check(wram(0x430C) == 0, "block cut cleared row 3 (Y+B, Y)")
     check(wram(0x0016) == 0, "not playing yet")
     -- zero-tune sample for the exact pitch asserts below
-    emu.write(0x2401, 12, emu.memType.snesWorkRam)
+    emu.write(0x2401, 7, emu.memType.snesWorkRam)
+    emu.write(0x2406, 0xEF, emu.memType.snesWorkRam) -- cancel BD's +17 fine
   elseif frames == 132 then
     check(wram(0x0016) == 1, "Start began playback")
   elseif frames == 180 then

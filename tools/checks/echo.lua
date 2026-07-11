@@ -76,11 +76,12 @@ nudge("up", 45)
 local edl4 = t
 nudge("up", 55)
 nudge("up", 60)
-nudge("up", 70)              -- 8 -> 12 (the factory-set ceiling)
-nudge("up", 80)              -- must clamp, not wrap
+nudge("up", 70)              -- 8 -> 12
+nudge("up", 80)              -- 12 -> 14: the lean factory's ceiling; clamps
 local edl_clamp = t
 nudge("down", 80)
 nudge("down", 70)
+nudge("down", 60)
 nudge("down", 60)
 local edl0 = t
 -- FIR field (down 5) -> preset 1
@@ -137,11 +138,11 @@ emu.addEventCallback(function()
     check(dsp(0x6C) == 0x00, "FLG re-enabled after reconfig")
     check(aram_intact(aram_snap), "samples intact at EDL 4")
   elseif frames == edl_clamp then
-    check(dsp(0x7D) == 12, "EDL climbs to the factory-set ceiling (12) and clamps")
-    check(dsp(0x6D) == 0xA0, "ESA tracks EDL 12")
+    check(dsp(0x7D) == 14, "EDL climbs to the factory-set ceiling (14) and clamps")
+    check(dsp(0x6D) == 0x90, "ESA tracks EDL 14")
     check(aram_intact(aram_snap), "samples intact at the ceiling")
   elseif frames == edl0 then
-    check(dsp(0x7D) == 0, "EDL walked back down (12 - 12 = 0)")
+    check(dsp(0x7D) == 0, "EDL walked back down (14 -> 0, clamped)")
     check(dsp(0x6D) == 0xFF, "ESA parks at EDL 0")
     check(aram_intact(aram_snap), "samples intact after the whole walk")
   elseif frames == fir1 then

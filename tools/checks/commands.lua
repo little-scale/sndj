@@ -214,7 +214,8 @@ emu.addEventCallback(function()
     poke(0x2000, 0)
     poke(0x3700, 0)
     poke(0x3701, 0)
-    poke(0x2401, 12)          -- instr 0 -> BONGO 2: pool tune 0, exact pitches
+    poke(0x2401, 7)           -- instr 0 -> BD
+    poke(0x2406, 0xEF)        -- FINE -17 cancels the pool fine: exact pitches
     cur = 1
     phase = "setup"
   end

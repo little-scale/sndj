@@ -111,8 +111,8 @@ emu.addEventCallback(function()
       "uploads force LOOP+END on the final block")
     check(aram(0x1002 + s7 * 4) + aram(0x1003 + s7 * 4) * 256 == 0x1200,
       "one-shot directory entries loop into the silent stub")
-    check(wram(0x3200) == 7 and wram(0x3201) == 0xE8 and wram(0x3202) == 0x50,
-      "kit 0 slot 0 = kick (pool 7, tune -24)")
+    check(wram(0x3200) == 7 and wram(0x3201) == 0x00 and wram(0x3202) == 0x50,
+      "kit 0 slot 0 = BD (pool 7, slot tune 0 — corrections live in the entry)")
     check(wram(0x3242) == 0 and wram(0x3282) == 0,
       "kits 1-2 ship empty (blank canvases for the builder)")
     check(wram(0x27A0) == 0 and wram(0x27A1) == 0,
@@ -134,16 +134,18 @@ emu.addEventCallback(function()
     -- C-4 -> kit slot 0 -> SW KICK (pool 16)
     check(dsp(0x04) == srcn_of[7], "kit slot 0 routed to the kick (SRCN " ..
       tostring(srcn_of[7]) .. ")")
-    check(dsp(0x02) + dsp(0x03) * 256 == 0x0400,
-      "8 kHz factory drum tuned -24 ($0400)")
+    check(dsp(0x02) + dsp(0x03) * 256 == 0x1010,
+      "BD kit pitch = native + the entry's +17 fine ($1010)")
     check(dsp(0x00) == 0x50 and dsp(0x01) == 0x50, "kit slot volume applied")
     check(kick_peak > 0, "kick envelope ran (peak " .. kick_peak .. ")")
   elseif frames == 80 then
-    -- row 4: F-4 -> slot 5 (SW BONGO, pool 21), tuned +12
+    -- row 4: F-4 -> slot 5 (BG 2, pool 12: entry -24), slot tune +12
     check(dsp(0x04) == srcn_of[12], "kit slot 5 routed to BONGO 2 (SRCN " ..
       tostring(srcn_of[12]) .. ")")
-    check(dsp(0x02) + dsp(0x03) * 256 == 0x2000,
-      "per-slot tune +12 doubled the pitch")
+    local p5 = dsp(0x02) + dsp(0x03) * 256
+    check(p5 == 0x0800,
+      "slot tune +12 over the entry's -24 lands C-4 ($" ..
+      string.format("%04X", p5) .. ")")
     if fails == 0 then
       print("ALL PASS pool.lua")
       emu.stop(0)

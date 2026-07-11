@@ -75,7 +75,8 @@ emu.addEventCallback(function()
     -- instrument 0: SLICE of pool 12, 3 slices (the gesture makes it 4),
     -- ATK F + FADE 8, TUNE 0
     poke(0x2400, 4)
-    poke(0x2401, 12)
+    poke(0x2401, 7)
+    poke(0x2406, 0xEF)        -- cancel BD's +17 pool fine
     poke(0x2402, 0x8F)
     poke(0x2407, 0x20)
     poke(0x2409, 0)
@@ -96,9 +97,9 @@ emu.addEventCallback(function()
     local a0 = aram(0x1000 + srcns[1] * 4) + aram(0x1001 + srcns[1] * 4) * 256
     for k = 1, 3 do
       local ak = aram(0x1000 + (srcns[1] + k) * 4) + aram(0x1001 + (srcns[1] + k) * 4) * 256
-      if ak ~= a0 + k * 180 then ok = false end
+      if ak ~= a0 + k * 288 then ok = false end
     end
-    check(ok, "4 alias entries at equal 180-byte (20-block) steps")
+    check(ok, "4 alias entries at equal 288-byte (32-block) steps (BD/4)")
     check(pitches[1] == 0x1000 and pitches[4] == 0x1000,
       "slices play at native pitch (notes pick, not tune)")
     check(dsp(0x05) == 0x8F,

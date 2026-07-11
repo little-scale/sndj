@@ -86,7 +86,8 @@ emu.addEventCallback(function()
       "factory instrument ADSR present")
     -- exact-pitch asserts below need a zero-tune sample (factory melodics
     -- carry loop-quantise tune corrections now)
-    emu.write(0x2401, 12, emu.memType.snesWorkRam)
+    emu.write(0x2401, 7, emu.memType.snesWorkRam)
+    emu.write(0x2406, 0xEF, emu.memType.snesWorkRam) -- cancel BD's +17 fine
     -- the chord: C47 on the phrase row (GRP fields are gone from INSTR)
     emu.write(0x4302, 3, emu.memType.snesWorkRam)
     emu.write(0x4303, 0x47, emu.memType.snesWorkRam)
@@ -119,9 +120,9 @@ emu.addEventCallback(function()
     check(p0 == 0x0800, "voice 0 = C-4 ($" .. string.format("%04X", p0) .. ")")
     check(p1 == 0x0A14, "voice 1 = E-4 ($" .. string.format("%04X", p1) .. ")")
     check(p2 == 0x0BFC, "voice 2 = G-4 ($" .. string.format("%04X", p2) .. ")")
-    -- sample 23 is boot-resident via kit 0; its SRCN comes from the
+    -- BD (pool 7) is boot-resident via kit 0; its SRCN comes from the
     -- residency map, not a fixed order
-    local srcn = wram(0x0097 + 12)
+    local srcn = wram(0x0097 + 7)
     check(srcn > 0 and dsp(0x04) == srcn and dsp(0x14) == srcn and
       dsp(0x24) == srcn,
       "chord members use the resident sample (SRCN " .. srcn .. ")")
