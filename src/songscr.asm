@@ -445,8 +445,8 @@ song_draw:
     clc
     adc tmp0 + 1
     jsr text_hex8
-    ; playhead: any track playing this song row (drawn plain; the
-    ; playing track's cell carries the highlight)
+    ; playhead: a triangle on any row a live track is playing — the
+    ; sole playback indicator (one appears per distinct row in play)
     lda #2
     sta text_x
     lda song_top
@@ -803,32 +803,8 @@ song_cell_attr:
 .ACCU 8
     rts
 @no_blk_hl:
-    lda eng_playing
-    beq @plain
-    phx
-    rep #$30
-.ACCU 16
-    lda tmp0
-    and #$00FF
-    tax
-    sep #$20
-.ACCU 8
-    lda.w trk_phrase,x
-    cmp #$FF
-    beq @plain_x
-    lda.w trk_songrow,x
-    plx
-    cmp tmp1
-    bne @plain
-    rep #$20
-.ACCU 16
-    lda #ATTR_PLAY  
-    sta text_attr
-    sep #$20
-.ACCU 8
-    rts
-@plain_x:
-    plx
+    ; the gutter triangle is the ONLY playback indicator (Seb):
+    ; cells never get painted over
 @plain:
     rep #$20
 .ACCU 16

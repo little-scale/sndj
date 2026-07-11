@@ -106,13 +106,12 @@ elsewhere pastes it. Works in PHRASE, CHAIN and SONG.
   needing the grid filled to the bottom.
 - On play, each track **enters at the first populated cell at/below
   the start row** — a column can leave early rows empty and join late.
-- **Playback indicators**: an arrow in the gutter marks the playing
-  row on CHAIN, PHRASE and GROOVE. On SONG every track is its own
-  playhead (they walk their own chains and loop their own blocks;
-  there is no single "song position"), so each playing track's cell
-  renders as a **soft grey block** — 8 independent heads — plus the
-  gutter arrow on any playing row. The cursor's full-brightness
-  inversion always reads distinctly.
+- **Playback indicators**: the gutter triangle, and only that. On
+  CHAIN, PHRASE and GROOVE it marks the playing row; on SONG a
+  triangle appears on **every row some track is playing** — the 8
+  tracks are independent playheads (they walk their own chains and
+  loop their own blocks; there is no single "song position"), so you
+  may see several triangles at once. Cells are never painted over.
   A fully empty column stays silent.
 
 ## 3. The screens
