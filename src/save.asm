@@ -58,8 +58,10 @@ sram_check:
     lda #$00
     sta.l $700006           ; reserved
     sta.l $700007           ; PALETTE 0
-    sta.l $700008           ; CLONE SLIM
     sta.l $700009           ; SYNC OFF
+    lda #$01
+    sta.l $700008           ; CLONE DEEP (the default)
+    lda #$00
     lda #14
     sta.l $70000A           ; KEY DELAY
     lda #3

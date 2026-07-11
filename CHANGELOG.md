@@ -5,6 +5,12 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- HELP grows two pages (now 8): **SAMPLES AND MEMORY** (the ROM pool
+  vs audio RAM, what loads at boot, on-demand loading, the echo
+  trade) and **INSTRUMENT TYPES** (all six, one screen).
+- **CLONE defaults to DEEP** (Seb) — fresh/unset carts clone chains
+  with independent phrases; an explicit SLIM choice still persists.
+
 - **Start honours the song cursor from EVERY screen**: drill into a
   chain or phrase and Start sounds the context you're looking at
   (the shared transport plays from the SONG cursor row everywhere).

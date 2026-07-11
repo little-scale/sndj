@@ -29,12 +29,13 @@ palette_boot:
     cmp #'1'
     bne @default
     lda.l $700008           ; CLONE: SLIM/DEEP persists next door
-    cmp #$02                ; unwritten SRAM reads $FF: keep SLIM
+    cmp #$02                ; unwritten SRAM reads $FF: default DEEP
     bcs @clone_def
     sta opt_clone
     bra @clone_ok
 @clone_def:
-    stz opt_clone
+    lda #$01                ; DEEP is the default (Seb, 2026-07-12)
+    sta opt_clone
 @clone_ok:
     lda.l SRAM_OPTPAL
     cmp #$08                ; unwritten SRAM reads $FF ($FF & 7 = the
@@ -42,7 +43,8 @@ palette_boot:
     lda #$00
     bra @have
 @default:
-    stz opt_clone
+    lda #$01                ; DEEP is the default clone depth
+    sta opt_clone
     lda #$00
 @have:
     jsr palette_apply

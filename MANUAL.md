@@ -468,7 +468,7 @@ console's sound chip, using the ROM's own samples.
 | Option | Meaning |
 |--------|---------|
 | **PALETTE** | two-colour UI schemes (cursors render as negatives) |
-| **CLONE** | SLIM / DEEP chain cloning (§4) |
+| **CLONE** | SLIM / DEEP chain cloning (§4) — DEEP is the default |
 | **VIDEO** | readout of the console standard — NTSC 60 Hz / PAL 50 Hz. Display only: pitch and tempo come from the audio crystal and never change. |
 | **SYNC** | clock sync / MIDI takeover mode (§13a) |
 | **KEY DELAY** | frames a d-pad direction is held before it auto-repeats (4–30, default 14) |
