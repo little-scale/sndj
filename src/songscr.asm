@@ -76,8 +76,8 @@ song_cell_addr:
     rts
 
 song_update:
-    ; Start: stop, or play the arrangement AT the cursor row (LSDJ
-    ; feel — each track enters at the chain covering that row)
+    ; Start: stop, or play the arrangement at the cursor row (the
+    ; shared transport — engine_toggle honours song_cy from any screen)
     rep #$20
 .ACCU 16
     lda pad_pressed
@@ -85,12 +85,7 @@ song_update:
     sep #$20
 .ACCU 8
     beq @no_start
-    lda eng_playing
-    beq @start_here
-    jsr engine_stop
-    bra @no_start
-@start_here:
-    jsr engine_play_from_cursor
+    jsr engine_toggle
 @no_start:
     ; A held + B: play the song from the cursor row (genmddj C+B)
     lda a_down

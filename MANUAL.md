@@ -95,11 +95,12 @@ elsewhere pastes it. Works in PHRASE, CHAIN and SONG.
 
 ### Transport
 
-- **Start** is the song transport: stop when playing; on SONG it
-  plays **the arrangement at the cursor row** — every track enters at
-  the chain at-or-above that row (the one "covering" it) and loops
-  its block from there; a column with nothing above stays silent.
-  On other screens Start plays the song from the top.
+- **Start** is the song transport on every screen: stop when
+  playing, else play **the arrangement at the SONG cursor row** —
+  every track enters at the chain at-or-above that row (the one
+  "covering" it) and loops its block from there; a column with
+  nothing above stays silent. Drill from a song cell into its chain
+  or phrase and Start sounds exactly the context you're looking at.
 - **A+B** is *contextual*: if anything is playing, it stops. Else on
   SONG it plays all tracks from the cursor row; on CHAIN it plays
   just that chain from its top; on PHRASE it loops just that phrase

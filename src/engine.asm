@@ -529,14 +529,16 @@ engine_stop:
     jsr apu_dsp_write
     jmp sync_stop
 
-; Start: the transport — stop if playing, else play the whole song,
-; whatever screen you're on (contextual play lives on A+B)
+; Start: the transport — stop if playing, else play the arrangement
+; AT THE SONG CURSOR ROW, whatever screen you're on (Seb, 2026-07-12:
+; drilling into a chain/phrase and pressing Start must sound the
+; context you're looking at). A+B stays the solo-this-screen gesture.
 engine_toggle:
     lda eng_playing
     beq @start
     jmp engine_stop
 @start:
-    jmp engine_play
+    jmp engine_play_from_cursor
 
 ; --- per-frame: consume tick deltas from the APU -------------------------------
 engine_update:

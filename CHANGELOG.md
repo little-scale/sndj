@@ -5,6 +5,9 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- **Start honours the song cursor from EVERY screen**: drill into a
+  chain or phrase and Start sounds the context you're looking at
+  (the shared transport plays from the SONG cursor row everywhere).
 - **Start on SONG plays the arrangement AT the cursor row** (Seb —
   the LSDJ feel): every track enters at the chain at-or-above that
   row (the one covering it) and loops its block; columns with nothing
