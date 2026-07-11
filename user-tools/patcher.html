@@ -6,66 +6,66 @@
 <script src="sndj.js"></script>
 <style>
   :root { color-scheme: dark; }
-  body { font-family: ui-monospace, Menlo, monospace; background: #101228;
-         color: #dee2e8; max-width: 1780px; margin: 2rem auto; padding: 0 1rem; }
-  h1 { color: #ffb020; font-size: 1.3rem; }
-  h1 small { color: #606888; font-weight: normal; }
-  .drop { border: 2px dashed #606888; border-radius: 8px; padding: 2rem;
-          text-align: center; color: #606888; margin: 1rem 0; cursor: pointer; }
+  body { font-family: ui-monospace, Menlo, monospace; background: #000;
+         color: #fff; max-width: 1780px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { color: #fff; font-size: 1.3rem; }
+  h1 small { color: #888; font-weight: normal; }
+  .drop { border: 1px dashed #888; padding: 2rem;
+          text-align: center; color: #888; margin: 1rem 0; cursor: pointer; }
   .drop.small { padding: 1rem; }
-  .drop.armed { border-color: #40d0c8; color: #40d0c8; }
+  .drop.armed { border-color: #fff; color: #fff; }
   .drop.off { opacity: .35; cursor: default; }
   .cols { display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap; }
   /* each column scrolls on its own: the sf2 list stays put while the
      pool scrolls to the target slot (and vice versa) during drags */
   .cols > div { flex: 1 1 0; min-width: min(100%, 460px); overflow-x: auto;
                 max-height: calc(100vh - 3rem); overflow-y: auto;
-                position: sticky; top: 1rem; }
+                position: sticky; top: 1rem;
+                border: 1px solid #fff; padding: 0 1rem 1rem; }
   .cols > div:first-child { flex: 1.5 1 0; min-width: min(100%, 640px); }
   #pool td, #kits td { white-space: nowrap; }
   table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
   td, th { padding: .3rem .45rem; text-align: left;
-           border-bottom: 1px solid #2a2e48; }
-  th { color: #606888; font-weight: normal; }
-  button { background: #2a2e48; color: #dee2e8; border: 1px solid #606888;
-           border-radius: 4px; padding: .3rem .8rem; cursor: pointer;
-           font: inherit; }
-  button:hover { border-color: #ffb020; color: #ffb020; }
-  button.primary { border-color: #40d0c8; color: #40d0c8; }
-  #status { color: #40d0c8; min-height: 1.4em; margin: .6rem 0; }
-  .warn { color: #ff6060; }
-  .bar { height: 8px; background: #2a2e48; border-radius: 4px; overflow: hidden; }
-  .bar div { height: 100%; background: #40d0c8; }
-  .bar div.over { background: #ff6060; }
-  .hint { color: #606888; font-size: .85rem; }
+           border-bottom: 1px solid #333; }
+  th { color: #888; font-weight: normal; border-bottom: 1px solid #fff; }
+  button { background: #000; color: #fff; border: 1px solid #fff;
+           padding: .3rem .8rem; cursor: pointer; font: inherit; }
+  button:hover { background: #fff; color: #000; }
+  button.primary { background: #fff; color: #000; }
+  button.primary:hover { background: #000; color: #fff; }
+  #status { color: #fff; min-height: 1.4em; margin: .6rem 0; }
+  .warn { background: #fff; color: #000; padding: 0 .3rem; }
+  .bar { height: 8px; background: #222; border: 1px solid #888; }
+  .bar div { height: 100%; background: #fff; }
+  .bar div.over { background: repeating-linear-gradient(45deg,
+                  #fff, #fff 4px, #000 4px, #000 8px); }
+  .hint { color: #888; font-size: .85rem; }
   #sf2list tr[draggable] { cursor: grab; }
   #sf2list tr[draggable]:active { cursor: grabbing; }
-  #pool tr.target td, #kits tr.target td { background: #16324a; }
+  #pool tr.target td, #kits tr.target td { background: #222; }
   #pool tr.target td:first-child, #kits tr.target td:first-child {
-    box-shadow: inset 3px 0 #40d0c8; }
+    box-shadow: inset 3px 0 #fff; }
   .row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
-  input[type=number] { background: #2a2e48; color: #dee2e8;
-                       border: 1px solid #606888; border-radius: 4px;
-                       font: inherit; padding: .2rem .3rem; }
-  select { background: #2a2e48; color: #dee2e8; border: 1px solid #606888;
-           border-radius: 4px; font: inherit; padding: .25rem .4rem; }
-  canvas { width: 100%; background: #0a0c1e; border: 1px solid #2a2e48;
-           border-radius: 6px; }
+  input[type=number], input[type=text] { background: #000; color: #fff;
+                       border: 1px solid #888; font: inherit;
+                       padding: .2rem .3rem; }
+  select { background: #000; color: #fff; border: 1px solid #888;
+           font: inherit; padding: .25rem .4rem; }
+  canvas { width: 100%; background: #000; border: 1px solid #fff; }
   .taps { display: grid; grid-template-columns: repeat(8, 1fr); gap: .5rem;
           margin: 1rem 0; }
   .tap { text-align: center; }
   .tap input[type=range] { writing-mode: vertical-lr; direction: rtl;
         height: 110px; width: 100%; }
-  .tap input[type=text] { width: 100%; background: #2a2e48; color: #dee2e8;
-        border: 1px solid #606888; border-radius: 4px; text-align: center;
-        font: inherit; box-sizing: border-box; }
-  .tap label { color: #606888; font-size: .85em; }
-  #firsum { color: #606888; }
-  #firsum.hot { color: #ff6060; }
-  .fold { color: #ffb020; cursor: pointer; }
+  .tap input[type=text] { width: 100%; text-align: center;
+        box-sizing: border-box; }
+  .tap label { color: #888; font-size: .85em; }
+  #firsum { color: #888; }
+  #firsum.hot { background: #fff; color: #000; padding: 0 .3rem; }
+  .fold { color: #fff; cursor: pointer; text-decoration: underline; }
   #tabsbar { gap: .3rem; margin: 1rem 0 .3rem; }
-  .tab { border-radius: 6px 6px 0 0; opacity: .65; }
-  .tab.active { border-color: #40d0c8; color: #40d0c8; opacity: 1; }
+  .tab { opacity: .55; }
+  .tab.active { background: #fff; color: #000; opacity: 1; }
   .tab:disabled { opacity: .25; cursor: default; }
 </style>
 </head>
@@ -187,7 +187,7 @@ play button over it, listen for beating. Drums aim lower by design.">&#9833; ref
       <button id="firstop">stop</button>
     </div>
     <div class="row">
-      <b style="color:#ffb020">KARP</b>
+      <b style="color:#fff">KARP</b>
       <label>note <select id="karpnote"></select></label>
       <label>damp <input type="range" id="karpdamp" min="16" max="127"
         value="100" style="width:100px"></label>
@@ -347,8 +347,8 @@ function render() {
       ev.dataTransfer.effectAllowed = 'move';
     };
     if (i === swapArm) {
-      handle.style.background = '#40d0c8';
-      handle.style.color = '#101228';
+      handle.style.background = '#fff';
+      handle.style.color = '#000';
     }
     handle.onclick = () => {
       if (swapArm < 0) {
@@ -374,7 +374,7 @@ function render() {
       lc.textContent = e.loopBlock === null
         ? (e._savedLoop !== undefined ? 'one-shot*' : 'one-shot')
         : 'loop@' + e.loopBlock;
-      lc.style.color = e.loopBlock === null ? '#606888' : '#40d0c8';
+      lc.style.color = e.loopBlock === null ? '#888' : '#fff';
     };
     if (!isFree(e)) {
       lc.style.cursor = 'pointer';
@@ -437,7 +437,7 @@ function render() {
         : 'in audio RAM at boot: referenced on the BOOT tab')
       : byKit ? 'in audio RAM at boot: referenced by a kit slot (KITS tab)'
       : 'ROM only — loads on demand when an instrument or kit slot references it';
-    ram.style.color = byInst ? '#40d0c8' : byKit ? '#2f9a94' : '#606888';
+    ram.style.color = byInst ? '#fff' : byKit ? '#bbb' : '#555';
     const play = document.createElement('button');
     play.textContent = 'play';
     play.onclick = () => audition(e);
@@ -703,7 +703,7 @@ function renderKits() {
     hc.colSpan = 6;
     hc.innerHTML = '<b>' + (kitExpand[k] ? '\u25BE' : '\u25B8') +
       ' KIT ' + k + '</b> <span class="hint">(' + used + ' slots)</span>';
-    hc.style.color = '#ffb020';
+    hc.style.color = '#fff';
     hc.style.cursor = 'pointer';
     hc.onclick = () => { kitExpand[k] = !kitExpand[k]; renderKits(); };
     if (!kitExpand[k]) continue;
@@ -887,19 +887,19 @@ function firPlot() {
   const c = $('firplot'), g = c.getContext('2d');
   const dbY = db => ((12 - db) / 48) * c.height;
   g.clearRect(0, 0, c.width, c.height);
-  g.strokeStyle = '#2a2e48';
+  g.strokeStyle = '#333';
   for (let db = 12; db >= -36; db -= 12) {
     const y = dbY(db);
     g.beginPath(); g.moveTo(0, y); g.lineTo(c.width, y); g.stroke();
-    g.fillStyle = '#606888';
+    g.fillStyle = '#888';
     g.fillText(db + ' dB', 4, y - 3);
   }
-  g.fillStyle = '#606888';
+  g.fillStyle = '#888';
   [2, 4, 8, 16].forEach(k => {
     const x = (k * 1000 / 16000) * c.width;
     g.fillText(k + 'k', x - 14, c.height - 4);
   });
-  g.strokeStyle = '#40d0c8';
+  g.strokeStyle = '#fff';
   g.lineWidth = 2;
   g.beginPath();
   for (let px = 0; px < c.width; px++) {
@@ -1069,7 +1069,7 @@ function renderSf2() {
     hc.innerHTML = '<b>' + (font.collapsed ? '\u25B8' : '\u25BE') + ' ' +
       font.name + '</b>' + (font.collapsed ?
         ' <span class="hint">(' + font.samples.length + ' samples)</span>' : '');
-    hc.style.color = '#ffb020';
+    hc.style.color = '#fff';
     hc.style.cursor = 'pointer';
     hc.title = font.collapsed ? 'expand' : 'collapse';
     hc.onclick = () => { font.collapsed = !font.collapsed; renderSf2(); };
@@ -1435,7 +1435,7 @@ function renderSlices() {
 
 function slDraw() {
   const cv = $('slwave'), g = cv.getContext('2d');
-  g.fillStyle = '#0a0c1e';
+  g.fillStyle = '#000';
   g.fillRect(0, 0, cv.width, cv.height);
   const { e, n, bounds } = slParams();
   $('slinfo').textContent = '';
@@ -1443,7 +1443,7 @@ function slDraw() {
   const pcm = S.brrDecode(e.brr);
   const blocks = e.brr.length / 9;
   const mid = cv.height / 2;
-  g.strokeStyle = '#40d0c8';
+  g.strokeStyle = '#fff';
   g.beginPath();
   for (let x = 0; x < cv.width; x++) {
     const a0 = Math.floor(x * pcm.length / cv.width);
@@ -1464,13 +1464,13 @@ function slDraw() {
   if (slTrim.e < blocks) g.fillRect(bx(slTrim.e), 0, cv.width - bx(slTrim.e), cv.height);
   g.font = '12px ui-monospace, monospace';
   if (!bounds) {
-    g.fillStyle = '#ffb020';
+    g.fillStyle = '#fff';
     g.fillText('too short for ' + n + ' slices', 8, 14);
     return;
   }
   // cut boundaries: internal ones carry a grab handle
-  g.strokeStyle = '#ffb020';
-  g.fillStyle = '#ffb020';
+  g.strokeStyle = '#fff';
+  g.fillStyle = '#fff';
   for (let k = 0; k < n; k++) {
     const x = Math.floor(bx(bounds[k])) + .5;
     g.beginPath();
@@ -1481,8 +1481,8 @@ function slDraw() {
     if (k > 0) g.fillRect(x - 3, 0, 7, 7);
   }
   // trim handles
-  g.strokeStyle = '#ff6060';
-  g.fillStyle = '#ff6060';
+  g.strokeStyle = '#fff';
+  g.fillStyle = '#fff';
   for (const blk of [slTrim.s, slTrim.e]) {
     const x = Math.min(cv.width - .5, Math.max(.5, Math.floor(bx(blk)) + .5));
     g.beginPath();

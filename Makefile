@@ -42,10 +42,10 @@ $(BUILD)/logo.bin $(BUILD)/logo.inc: tools/makelogo.py art/sndj-logo.png | $(BUI
 $(BUILD)/help.inc: tools/makehelp.py help.txt tools/commands.csv | $(BUILD)
 	python3 tools/makehelp.py help.txt $(BUILD)/help.inc
 
-$(BUILD)/schemes.bin $(BUILD)/kits.bin $(BUILD)/defaults.bin $(BUILD)/tables.inc $(BUILD)/karptab.inc: tools/maketables.py tools/commands.csv $(wildcard samples/factory.sndjfact) $(wildcard samples/kits.bin) | $(BUILD)
+$(BUILD)/schemes.bin $(BUILD)/kits.bin $(BUILD)/defaults.bin $(BUILD)/tables.inc $(BUILD)/karptab.inc: tools/maketables.py tools/commands.csv $(wildcard factory/factory.sndjfact) $(wildcard samples/kits.bin) | $(BUILD)
 	python3 tools/maketables.py $(BUILD)
 
-$(BUILD)/pool.bin: tools/sndj_pool.py tools/sndj_brr.py $(wildcard samples/factory.sndjfact) $(wildcard samples/pool.bin) | $(BUILD)
+$(BUILD)/pool.bin: tools/sndj_pool.py tools/sndj_brr.py $(wildcard factory/factory.sndjfact) $(wildcard samples/pool.bin) | $(BUILD)
 	python3 tools/sndj_pool.py $@
 
 # SPC700 driver blob

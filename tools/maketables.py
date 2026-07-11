@@ -150,8 +150,8 @@ def kits_bin():
     # the committed factory (.sndjfact from patcher.html) is the truth;
     # a bare kits.bin also works; else generate from the table
     import os.path
-    if os.path.exists('samples/factory.sndjfact'):
-        with open('samples/factory.sndjfact', 'rb') as f:
+    if os.path.exists('factory/factory.sndjfact'):
+        with open('factory/factory.sndjfact', 'rb') as f:
             d = f.read()
         assert d[:8] == b'SNDJFACT' and d[8] in (1, 2, 3, 4), 'factory.sndjfact: bad magic'
         plen = d[12] | (d[13] << 8) | (d[14] << 16)
@@ -176,8 +176,8 @@ def defaults_bin():
     # 12-wide rows (the brief SNDEF2 era): take the first 8 of each;
     # v1/v2 are 8-wide already.
     import os.path
-    if os.path.exists('samples/factory.sndjfact'):
-        with open('samples/factory.sndjfact', 'rb') as f:
+    if os.path.exists('factory/factory.sndjfact'):
+        with open('factory/factory.sndjfact', 'rb') as f:
             d = f.read()
         plen = d[12] | (d[13] << 8) | (d[14] << 16)
         off = 16 + plen + 1024

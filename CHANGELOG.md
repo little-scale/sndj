@@ -5,6 +5,11 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- patcher: **monochrome** — black, white text, white-bordered columns
+  and sections (the tool now dresses like the console). The factory
+  file moves to **`factory/factory.sndjfact`** (its own folder + a
+  README on how to update it); `make` reads it from there.
+
 - patcher: **drag a pool slot's number onto another row to swap the
   two slots** — kit slots and boot instruments reference pool indices,
   so they're remapped in the same move (the sounds stay put, the
