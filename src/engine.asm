@@ -289,14 +289,15 @@ track_load_songrow:
     plx
     sta.w trk_chain,x
     cmp #$FF
-    beq @scan_down
+    beq @scan_up
     lda #$00
     sta.w trk_cpos,x
     jmp track_load_chain_entry
-@scan_down:
-    ; sibling contract (genmddj 5.4): a track ENTERS at the first
-    ; populated cell at/below the start row. Tight flat walk - a naive
-    ; loader re-entry per row cost ~2 frames of Start latency
+@scan_up:
+    ; the track enters at the chain COVERING the start row: the first
+    ; populated cell at/ABOVE it (Seb, 2026-07-12 — play-from-row means
+    ; "the arrangement at this row"; a column whose last chain sits
+    ; higher up is still sounding there). Nothing above = silent.
     phx
     rep #$30
 .ACCU 16
@@ -313,10 +314,10 @@ track_load_songrow:
     sep #$20
 .ACCU 8
 @scan:
-    iny
-    inx
-    cpy #SONG_ROWS
-    bcs @scan_halt
+    cpy #$0000
+    beq @scan_halt
+    dey
+    dex
     lda.l $7E0000 + SB_SONG,x
     cmp #$FF
     beq @scan

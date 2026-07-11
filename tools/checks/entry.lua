@@ -1,7 +1,8 @@
--- entry.lua — song-column entry semantics (genmddj DESIGN §5.4): a track
--- enters at the FIRST POPULATED CELL at/below the start row, so a chain
--- placed at row 1 with row 0 empty still sounds from Start; a fully
--- empty column halts. (The user-reported track-8 silence bug.)
+-- entry.lua — song-column entry semantics (Seb, 2026-07-12): playing
+-- from a row means "the arrangement AT that row" — each track enters
+-- at the first populated cell at/ABOVE the start row (the chain
+-- covering it). Nothing above = the column is silent. SONG's Start
+-- plays from the cursor row (LSDJ feel).
 
 local frames = 0
 local _booted = false
@@ -45,21 +46,48 @@ emu.addEventCallback(function()
     poke(0x4340, 61)         -- phrase 1 row 0: C-5 i0
     poke(0x4341, 0)
   elseif frames == 44 then
-    pad = { start = true }
+    pad = { start = true }             -- Start at cursor row 0
   elseif frames == 46 then
     pad = {}
   elseif frames == 60 then
     check(wram(0x16) == 1, "playing")
-    check(wram(0x27) == 1, "track 8 entered at its first populated row (chain 1)")
-    check(wram(0x3F) == 1, "track 8's song row is 1")
+    check(wram(0x20) == 0 and wram(0x38) == 0,
+      "track 1 covers row 0 (chain 0)")
+    check(wram(0x2F) == 0xFF,
+      "track 8 has nothing at/above row 0: silent")
+    -- stop, cursor down 3, Start again: row 3 is covered by both
+  elseif frames == 66 then
+    pad = { start = true }             -- stop
+  elseif frames == 68 then
+    pad = {}
+  elseif frames == 72 then
+    pad = { down = true }
+  elseif frames == 74 then
+    pad = {}
+  elseif frames == 78 then
+    pad = { down = true }
+  elseif frames == 80 then
+    pad = {}
+  elseif frames == 84 then
+    pad = { down = true }
+  elseif frames == 86 then
+    pad = {}
+  elseif frames == 90 then
+    pad = { start = true }             -- play the arrangement at row 3
+  elseif frames == 92 then
+    pad = {}
+  elseif frames == 106 then
+    check(wram(0x16) == 1, "playing from row 3")
+    check(wram(0x20) == 0 and wram(0x38) == 0,
+      "track 1 entered the chain covering row 3 (chain 0 at row 0)")
+    check(wram(0x27) == 1 and wram(0x3F) == 1,
+      "track 8 entered the chain covering row 3 (chain 1 at row 1)")
     check(wram(0x2F) ~= 0xFF, "track 8 is not halted")
-    -- both voices sound (one batched KON covers both)
     local p0 = dsp(0x02) + dsp(0x03) * 256
     local p7 = dsp(0x72) + dsp(0x73) * 256
     check(p0 == 0x0800 and p7 == 0x1000,
       "both entries pitched their voices ($" ..
       string.format("%04X/$%04X", p0, p7) .. ")")
-    -- tracks 1-6 (fully empty columns) stay halted
     check(wram(0x29) == 0xFF and wram(0x2E) == 0xFF,
       "empty columns halt as before")
     if fails == 0 then

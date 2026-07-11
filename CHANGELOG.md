@@ -5,6 +5,16 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- **Start on SONG plays the arrangement AT the cursor row** (Seb —
+  the LSDJ feel): every track enters at the chain at-or-above that
+  row (the one covering it) and loops its block; columns with nothing
+  above stay silent. Entry semantics flipped from at/below to
+  at/above everywhere (starting mid-song now sounds like the song
+  sounds there). A+B on SONG remains the same gesture.
+- **Per-track playhead triangles on SONG**: each playing track shows
+  a triangle in the gap to its cell's left — 8 independent heads,
+  still nothing painted over the numbers.
+
 - **Signal metering is out for now** (Seb): the LIVE header shows
   mute dashes only — no ENVX bars. The driver's ENVX telemetry keeps
   streaming (checks use it, and a future readout can too).

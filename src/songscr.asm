@@ -76,7 +76,8 @@ song_cell_addr:
     rts
 
 song_update:
-    ; Start: toggle song playback
+    ; Start: stop, or play the arrangement AT the cursor row (LSDJ
+    ; feel — each track enters at the chain covering that row)
     rep #$20
 .ACCU 16
     lda pad_pressed
@@ -84,7 +85,12 @@ song_update:
     sep #$20
 .ACCU 8
     beq @no_start
-    jsr engine_toggle
+    lda eng_playing
+    beq @start_here
+    jsr engine_stop
+    bra @no_start
+@start_here:
+    jsr engine_play_from_cursor
 @no_start:
     ; A held + B: play the song from the cursor row (genmddj C+B)
     lda a_down
@@ -399,6 +405,36 @@ song_snap_window:
 @done:
     rts
 
+; carry set when track tmp0 is live and its song row = the row being
+; drawn (song_top + tmp0+1) — the per-track playhead test
+song_track_head:
+    lda eng_playing
+    beq @no_h
+    phx
+    rep #$30
+.ACCU 16
+    lda tmp0
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w trk_phrase,x
+    cmp #$FF
+    beq @no_hx
+    lda song_top
+    clc
+    adc tmp0 + 1
+    cmp.w trk_songrow,x
+    bne @no_hx
+    plx
+    sec
+    rts
+@no_hx:
+    plx
+@no_h:
+    clc
+    rts
+
 ; carry set when any live track's song row equals A (absolute row)
 song_playrow:
     sta es3
@@ -445,31 +481,31 @@ song_draw:
     clc
     adc tmp0 + 1
     jsr text_hex8
-    ; playhead: a triangle on any row a live track is playing — the
-    ; sole playback indicator (one appears per distinct row in play)
-    lda #2
-    sta text_x
-    lda song_top
-    clc
-    adc tmp0 + 1
-    jsr song_playrow
-    bcc @no_head
-    lda #GLYPH_ARROW_R
-    jsr text_puttile
-    bra @cells_go
-@no_head:
-    lda #' ' - 32
-    jsr text_puttile
-@cells_go:
-    ; 8 cells
+    ; 8 cells, each with its own playhead triangle in the gap column
+    ; to its left — every playing track is an independent head
     stz tmp0                ; track counter
 @cells:
     lda tmp0
     asl
     clc
     adc tmp0
-    adc #3                  ; x = 3 + track*3
+    adc #2                  ; x = 2 + track*3: the gap column
     sta text_x
+    rep #$20
+.ACCU 16
+    lda #ATTR_TEXT
+    sta text_attr
+    sep #$20
+.ACCU 8
+    jsr song_track_head
+    bcc @no_head
+    lda #GLYPH_ARROW_R
+    jsr text_puttile
+    bra @head_done
+@no_head:
+    lda #' ' - 32
+    jsr text_puttile
+@head_done:
     jsr song_cell_attr
     ; cell value
     rep #$30

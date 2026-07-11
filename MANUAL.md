@@ -95,8 +95,11 @@ elsewhere pastes it. Works in PHRASE, CHAIN and SONG.
 
 ### Transport
 
-- **Start** is the song transport everywhere: play the whole song
-  from the top / stop.
+- **Start** is the song transport: stop when playing; on SONG it
+  plays **the arrangement at the cursor row** — every track enters at
+  the chain at-or-above that row (the one "covering" it) and loops
+  its block from there; a column with nothing above stays silent.
+  On other screens Start plays the song from the top.
 - **A+B** is *contextual*: if anything is playing, it stops. Else on
   SONG it plays all tracks from the cursor row; on CHAIN it plays
   just that chain from its top; on PHRASE it loops just that phrase
@@ -104,8 +107,9 @@ elsewhere pastes it. Works in PHRASE, CHAIN and SONG.
 - A chain that ends in the song grid loops back to the top of its
   track's contiguous block — so a 4-row loop keeps looping without
   needing the grid filled to the bottom.
-- On play, each track **enters at the first populated cell at/below
-  the start row** — a column can leave early rows empty and join late.
+- On play, each track **enters at the first populated cell at/above
+  the start row** — the chain covering that row keeps sounding, so
+  starting mid-song sounds like the song sounds there.
 - **Playback indicators**: the gutter triangle, and only that. On
   CHAIN, PHRASE and GROOVE it marks the playing row; on SONG a
   triangle appears on **every row some track is playing** — the 8
