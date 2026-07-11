@@ -5,6 +5,12 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- patcher: **drag a pool slot's number onto another row to swap the
+  two slots** — kit slots and boot instruments reference pool indices,
+  so they're remapped in the same move (the sounds stay put, the
+  order changes). Settle the order before writing songs against the
+  ROM: songs in cart saves hold indices too.
+
 - **The lean factory** (Seb): 17 samples — 7 melodics (honky-tonk,
   xylophone, nylon guitar, trombone, steel drum, slap bass, crystal)
   + a 10-drum kit — one KIT, boot set = 7 SMP + KIT 0, ~31 KB of BRR,

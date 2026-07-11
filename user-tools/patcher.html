@@ -333,6 +333,15 @@ function render() {
     const row = t.insertRow();
     row.innerHTML =
       `<td>${i}</td><td></td><td>${e.brr.length}</td><td></td>`;
+    const handle = row.cells[0];
+    handle.draggable = true;
+    handle.style.cursor = 'grab';
+    handle.title = 'drag onto another slot to swap the two (kit slots ' +
+      'and boot instruments follow)';
+    handle.ondragstart = ev => {
+      ev.dataTransfer.setData('text/plain', 'pool:' + i);
+      ev.dataTransfer.effectAllowed = 'move';
+    };
     // loop cell: CLICK to toggle looped <-> one-shot (junk loops from
     // sloppy soundfont/WAV metadata are one click from silence-safe;
     // toggling back restores the original loop point)
@@ -516,6 +525,38 @@ function bootResident() {
   const r = bootRefs();
   if (!r) return null;
   return new Set([...r.inst, ...r.kits]);
+}
+
+// drag one pool row's index cell onto another row: swap the two slots.
+// Kit slots and boot instruments reference pool INDICES, so they are
+// remapped in the same move — the sounds don't change, the order does.
+// (Songs in cart saves also hold indices: settle the pool order before
+// writing songs against the ROM.)
+function poolSwap(a, b) {
+  if (a === b || !entries[a] || !entries[b]) return;
+  const t = entries[a];
+  entries[a] = entries[b];
+  entries[b] = t;
+  const remap = v => (v === a ? b : v === b ? a : v);
+  if (kitOff >= 0) {
+    for (let k = 0; k < 16; k++) {
+      for (let sl = 0; sl < 16; sl++) {
+        const off = kitSlotOff(k, sl);
+        if (rom[off + 2]) rom[off] = remap(rom[off] & 0x3F);
+      }
+    }
+  }
+  if (defOff >= 0) {
+    for (let i = 0; i < 8; i++) {
+      const ty = rom[defOff + i] & 7;
+      if (ty === 0 || ty === 4) {
+        rom[defOff + 8 + i] = remap(rom[defOff + 8 + i] & 0x3F);
+      }
+    }
+  }
+  status('pool #' + a + ' \u21C4 #' + b +
+    ' — kit slots and boot instruments follow the swap');
+  render();
 }
 
 function renderBoot() {
