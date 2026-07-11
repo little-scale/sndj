@@ -843,15 +843,7 @@ chain_cell_attr:
 .ACCU 8
     rts
 @plain:
-    jsr chain_playrow
-    bcc @text
-    rep #$20
-.ACCU 16
-    lda #ATTR_PLAY  
-    sta text_attr
-    sep #$20
-.ACCU 8
-    rts
+    ; the gutter arrow alone marks playback (one head per screen here)
 @text:
     rep #$20
 .ACCU 16

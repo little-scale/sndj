@@ -1050,15 +1050,7 @@ cell_attr:
     rts
 @not_cursor:
     ; playhead row: the cells carry the highlight (cursor accent wins)
-    jsr phrase_playrow
-    bcc @text
-    rep #$20
-.ACCU 16
-    lda #ATTR_PLAY  
-    sta text_attr
-    sep #$20
-.ACCU 8
-    rts
+    ; the gutter arrow alone marks playback
 @text:
     rep #$20
 .ACCU 16

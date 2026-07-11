@@ -5,13 +5,14 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
-- **Playheads you can actually see**: the playing cell on SONG (one
-  per track — 8 independent heads), and the playing row on CHAIN,
-  PHRASE and GROOVE, render as a soft grey block (new ATTR_PLAY,
-  BG3 palette 4) instead of a highlight that was pixel-identical to
-  plain text in the 2-colour schemes — the per-track indicator has
-  been invisible since the beginning. The cursor's full inversion
-  stays distinct; the gutter arrow still marks any playing row.
+- **Playheads you can actually see**: on SONG each playing track's
+  cell renders as a soft grey block (new ATTR_PLAY, BG3 palette 4) —
+  8 independent heads — replacing a highlight that was
+  pixel-identical to plain text in the 2-colour schemes (the
+  per-track indicator had been invisible since the beginning). On
+  CHAIN/PHRASE/GROOVE the gutter arrow alone marks the single
+  playing row (Seb: no row paint needed there). The cursor's full
+  inversion stays distinct.
 
 - patcher: **monochrome** — black, white text, white-bordered columns
   and sections (the tool now dresses like the console). The factory

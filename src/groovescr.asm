@@ -221,15 +221,7 @@ groove_draw:
 .ACCU 8
     bra @val
 @not_cur:
-    jsr gv_playrow
-    bcc @plain
-    rep #$20
-.ACCU 16
-    lda #ATTR_PLAY  
-    sta text_attr
-    sep #$20
-.ACCU 8
-    bra @val
+    ; the gutter arrow alone marks playback
 @plain:
     rep #$20
 .ACCU 16
