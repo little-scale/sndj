@@ -324,6 +324,8 @@ $('clearall').onclick = () => {
   render();
 };
 
+let swapArm = -1;     // click-click slot swap: the armed source index
+
 function render() {
   const t = $('pool');
   t.innerHTML = '<tr><th>#</th><th>name</th><th>BRR bytes</th><th>loop</th>' +
@@ -336,11 +338,33 @@ function render() {
     const handle = row.cells[0];
     handle.draggable = true;
     handle.style.cursor = 'grab';
-    handle.title = 'drag onto another slot to swap the two (kit slots ' +
-      'and boot instruments follow)';
+    handle.style.userSelect = 'none';   // a text-selection drag would
+    handle.style.webkitUserSelect = 'none';   // hijack the element drag
+    handle.title = 'swap slots: drag onto another row, or click this ' +
+      'number then click another (kit slots and boot instruments follow)';
     handle.ondragstart = ev => {
       ev.dataTransfer.setData('text/plain', 'pool:' + i);
       ev.dataTransfer.effectAllowed = 'move';
+    };
+    if (i === swapArm) {
+      handle.style.background = '#40d0c8';
+      handle.style.color = '#101228';
+    }
+    handle.onclick = () => {
+      if (swapArm < 0) {
+        swapArm = i;
+        status('swap: slot #' + i + ' armed — click another slot number ' +
+          '(or this one to cancel)');
+        render();
+      } else if (swapArm === i) {
+        swapArm = -1;
+        status('swap cancelled');
+        render();
+      } else {
+        const from = swapArm;
+        swapArm = -1;
+        poolSwap(from, i);
+      }
     };
     // loop cell: CLICK to toggle looped <-> one-shot (junk loops from
     // sloppy soundfont/WAV metadata are one click from silence-safe;
