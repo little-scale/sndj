@@ -170,26 +170,29 @@ def kits_bin():
 
 
 def defaults_bin():
-    # SNDEF2: 12 boot instruments as three rows (types, samples/kits/
-    # banks, extras — record byte 7: SLICES-1 high nibble, EON bit 0).
-    # Older factory files carry 8-wide rows (v1 two, v2 three): re-stride
-    # and pad the new slots with SMP on sample 0.
+    # SNDEF3: 8 boot instruments (one per voice / MIDI channel) as three
+    # rows (types, samples/kits/banks, extras — record byte 7: SLICES-1
+    # high nibble, LOOP bits 1-2, EON bit 0). v3 factory files carry
+    # 12-wide rows (the brief SNDEF2 era): take the first 8 of each;
+    # v1/v2 are 8-wide already.
     import os.path
     if os.path.exists('samples/factory.sndjfact'):
         with open('samples/factory.sndjfact', 'rb') as f:
             d = f.read()
         plen = d[12] | (d[13] << 8) | (d[14] << 16)
         off = 16 + plen + 1024
+        out = bytearray(24)
         if d[8] >= 3:
-            return d[off:off + 36]
+            for r in range(3):
+                out[r * 8:r * 8 + 8] = d[off + r * 12:off + r * 12 + 8]
+            return bytes(out)
         rows = 3 if d[8] == 2 else 2
-        out = bytearray(36)
         for r in range(rows):
-            out[r * 12:r * 12 + 8] = d[off + r * 8:off + r * 8 + 8]
+            out[r * 8:r * 8 + 8] = d[off + r * 8:off + r * 8 + 8]
         return bytes(out)
-    return bytes((0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
-                  0, 1, 2, 3, 4, 5, 6, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+    return bytes((0, 0, 0, 0, 0, 0, 0, 1,
+                  0, 1, 2, 3, 4, 5, 6, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0))
 
 
 # --- command help (tools/commands.csv: the single source of truth) ----------
@@ -225,7 +228,7 @@ def main(build_dir):
     with open(f'{build_dir}/kits.bin', 'wb') as f:
         f.write(kits)
     defs = defaults_bin()
-    assert len(defs) == 36, 'defaults.bin must be 36 bytes'
+    assert len(defs) == 24, 'defaults.bin must be 24 bytes (SNDEF3: 8x3)'
     with open(f'{build_dir}/defaults.bin', 'wb') as f:
         f.write(defs)
     with open(f'{build_dir}/tables.inc', 'w') as f:

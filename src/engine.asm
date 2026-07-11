@@ -91,9 +91,9 @@ song_init:
     inx
     cpx #GROOVE_SZ
     bne @groove
-    ; factory instruments 0-11: the boot set (SNDEF2 rows) — 12 voiced
-    ; slots whose samples land in ARAM at boot; the stock rows are 0-6
-    ; pitched SMP on pool samples 0-6, 7 = KIT 0, 8-11 = SMP sample 0
+    ; factory instruments 0-7: the boot set (SNDEF3 rows) — 8 voiced
+    ; slots (one per voice / MIDI channel) whose samples land in ARAM
+    ; at boot; stock rows: 0-6 SMP on pool samples 0-6, 7 = KIT 0
     ldx #$0000
 @finstr:
     rep #$30
@@ -158,10 +158,10 @@ song_init:
     sep #$20
 .ACCU 8
     inx
-    cpx #$000C
+    cpx #$0008
     bne @finstr
-    ; 12-63: SMP on sample 0 — every slot plays out of the box, but the
-    ; factory boot set stays 0-11: residency follows REFERENCES, so a
+    ; 8-63: SMP on sample 0 — every slot plays out of the box, but the
+    ; factory boot set stays 0-7: residency follows REFERENCES, so a
     ; sample only costs ARAM once an instrument or kit slot points at
     ; it (edits rebuild the resident set on the spot)
 @autoinstr:

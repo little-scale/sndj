@@ -198,9 +198,9 @@ sound. An instrument's **TYPE** decides what the voice does:
 | **KARP** | Karplus-Strong: the echo loop becomes a plucked string — the note rings the room's nearest partial, tuned by a per-note FIR pull. One string per song (it owns the echo section) |
 
 Any type can go on any of the 8 voices — there are no special
-channels. Eight kits at once is legal. **The first 12 instruments are
+channels. Eight kits at once is legal. **The first 8 instruments are
 the factory boot set** — their samples land in audio RAM at power-on,
-and the patcher's boot-instruments editor voices all 12 (type, sample
+and the patcher's boot-instruments editor voices all 8 (type, sample
 / kit / bank, slice count). The stock rows: **00-06 pitched SMP
 melodics** (the SMW four — xylophone, steel drum, e-piano, slap bass —
 plus strings, recorder, guitar), **07 = KIT 0** (SMW percussion), and

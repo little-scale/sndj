@@ -122,7 +122,7 @@ export a patched ROM. Everything runs locally.</p>
     <p class="hint">boot instruments (the factory set NEW seeds — these
     plus the kits define what loads into audio RAM at boot; everything
     else loads on demand when an instrument references it):</p>
-    <p id="bootrow" class="row"></p>
+    <table id="bootrow"></table>
   </div>
 </div>
 <div id="sliceview" hidden>
@@ -287,7 +287,7 @@ async function loadRom(f) {
   } catch (err) { status('pool parse failed: ' + err.message, 1); return; }
   palOff = S.findMarker(rom, 'SNPAL0');
   kitOff = S.findMarker(rom, 'SNKIT0');
-  defOff = S.findMarker(rom, 'SNDEF2');
+  defOff = S.findMarker(rom, 'SNDEF3');
   firOff = S.findMarker(rom, 'SNFIR0');
   if (firOff >= 0) {
     firTaps = Array.from(rom.slice(firOff + 40, firOff + 48)).map(s8);
@@ -369,7 +369,7 @@ function render() {
     ram.textContent = byInst ? 'boot' : byKit ? 'kit' : '\u00B7';
     ram.title = byInst
       ? (i === 0 && refs && !bootTabRefs(refs, i)
-        ? 'always in audio RAM: a fresh song points instruments 12-63 at sample 0'
+        ? 'always in audio RAM: a fresh song points instruments 8-63 at sample 0'
         : 'in audio RAM at boot: referenced on the BOOT tab')
       : byKit ? 'in audio RAM at boot: referenced by a kit slot (KITS tab)'
       : 'ROM only — loads on demand when an instrument or kit slot references it';
@@ -446,7 +446,7 @@ function render() {
 
 // ------------------------------------------------------- boot residency
 // mirror of the console's residency_build: the boot-resident set is
-// every pool sample referenced by the factory instruments (SNDEF2,
+// every pool sample referenced by the factory instruments (SNDEF3,
 // SMP/SLICE types), PLUS sample 0 (a fresh song seeds instruments
 // 12-63 as SMP on sample 0, so it always uploads), PLUS every kit
 // slot with vol > 0 (SNKIT0 — the console scans all 16 kits so any
@@ -455,19 +455,19 @@ function render() {
 let defOff = -1;
 
 function bootTabRefs(refs, i) {
-  for (let n = 0; n < 12; n++) {
+  for (let n = 0; n < 8; n++) {
     const t = rom[defOff + n] & 7;
-    if ((t === 0 || t === 4) && (rom[defOff + 12 + n] & 0x3F) === i) return true;
+    if ((t === 0 || t === 4) && (rom[defOff + 8 + n] & 0x3F) === i) return true;
   }
   return false;
 }
 
 function bootRefs() {
   if (defOff < 0) return null;           // old ROM: assume everything
-  const inst = new Set([0]);             // instruments 12-63 = SMP sample 0
-  for (let i = 0; i < 12; i++) {
+  const inst = new Set([0]);             // instruments 8-63 = SMP sample 0
+  for (let i = 0; i < 8; i++) {
     const t = rom[defOff + i] & 7;
-    if (t === 0 || t === 4) inst.add(rom[defOff + 12 + i] & 0x3F);
+    if (t === 0 || t === 4) inst.add(rom[defOff + 8 + i] & 0x3F);
   }
   const kits = new Set();
   if (kitOff >= 0) {
@@ -489,12 +489,13 @@ function bootResident() {
 
 function renderBoot() {
   if (defOff < 0) { $('bootview').hidden = true; return; }
-  const row = $('bootrow');
-  row.innerHTML = '';
+  const tab = $('bootrow');
+  tab.innerHTML = '<tr><th></th><th>type</th><th>sound</th>' +
+    '<th>loop / slices</th></tr>';
   const TYPES = ['SMP', 'KIT', 'WAV', 'NSE', 'SLICE'];
-  for (let i = 0; i < 12; i++) {
-    const lab = document.createElement('label');
-    lab.textContent = 'I' + i + ' ';
+  for (let i = 0; i < 8; i++) {
+    const row = tab.insertRow();
+    row.insertCell().textContent = 'I' + i;
     const t = rom[defOff + i] & 7;
     const tsel = document.createElement('select');
     TYPES.forEach((n, v) => {
@@ -505,35 +506,36 @@ function renderBoot() {
     tsel.value = Math.min(t, 4);
     tsel.title = 'boot type for instrument ' + i;
     tsel.onchange = () => { rom[defOff + i] = +tsel.value; renderBoot(); render(); };
-    lab.appendChild(tsel);
-    lab.appendChild(document.createTextNode(' '));
+    row.insertCell().appendChild(tsel);
+    const sound = row.insertCell();
+    const extra = row.insertCell();
     if (t === 1) {                       // kit id
       const kin = document.createElement('input');
       kin.type = 'number';
       kin.min = 0; kin.max = 15;
-      kin.value = rom[defOff + 12 + i] & 0x0F;
+      kin.value = rom[defOff + 8 + i] & 0x0F;
       kin.title = 'kit id';
       kin.style.width = '2.6rem';
-      kin.oninput = () => { rom[defOff + 12 + i] = (+kin.value || 0) & 0x0F; };
-      lab.appendChild(kin);
+      kin.oninput = () => { rom[defOff + 8 + i] = (+kin.value || 0) & 0x0F; };
+      sound.appendChild(kin);
     } else if (t === 2) {                // WAV bank
       const bin = document.createElement('input');
       bin.type = 'number';
       bin.min = 0; bin.max = 7;
-      bin.value = rom[defOff + 12 + i] & 0x07;
+      bin.value = rom[defOff + 8 + i] & 0x07;
       bin.title = 'wave bank';
       bin.style.width = '2.6rem';
-      bin.oninput = () => { rom[defOff + 12 + i] = (+bin.value || 0) & 0x07; };
-      lab.appendChild(bin);
+      bin.oninput = () => { rom[defOff + 8 + i] = (+bin.value || 0) & 0x07; };
+      sound.appendChild(bin);
     } else if (t === 3) {                // NSE clock (0 = follow the note)
       const cin = document.createElement('input');
       cin.type = 'number';
       cin.min = 0; cin.max = 32;
-      cin.value = rom[defOff + 12 + i];
+      cin.value = rom[defOff + 8 + i];
       cin.title = 'noise clock (0 = note)';
       cin.style.width = '2.6rem';
-      cin.oninput = () => { rom[defOff + 12 + i] = Math.min(32, +cin.value || 0); };
-      lab.appendChild(cin);
+      cin.oninput = () => { rom[defOff + 8 + i] = Math.min(32, +cin.value || 0); };
+      sound.appendChild(cin);
     } else {                             // SMP / SLICE: a pool sample
       const pick = document.createElement('select');
       entries.forEach((e, n) => {
@@ -542,23 +544,23 @@ function renderBoot() {
         o.textContent = n + ' ' + e.name;
         pick.appendChild(o);
       });
-      pick.value = rom[defOff + 12 + i] & 0x3F;
+      pick.value = rom[defOff + 8 + i] & 0x3F;
       pick.title = 'boot sample for instrument ' + i;
-      pick.onchange = () => { rom[defOff + 12 + i] = +pick.value; render(); };
-      lab.appendChild(pick);
+      pick.onchange = () => { rom[defOff + 8 + i] = +pick.value; render(); };
+      sound.appendChild(pick);
       if (t === 4) {                     // slices: equal divisions of the blob
         const sn = document.createElement('input');
         sn.type = 'number';
         sn.min = 1; sn.max = 16;
-        sn.value = ((rom[defOff + 24 + i] >> 4) & 0x0F) + 1;
+        sn.value = ((rom[defOff + 16 + i] >> 4) & 0x0F) + 1;
         sn.title = 'slices (equal divisions)';
         sn.style.width = '2.6rem';
         sn.oninput = () => {
           const n = Math.max(1, Math.min(16, +sn.value || 1));
-          rom[defOff + 24 + i] = (rom[defOff + 24 + i] & 0x0F) | ((n - 1) << 4);
+          rom[defOff + 16 + i] = (rom[defOff + 16 + i] & 0x0F) | ((n - 1) << 4);
         };
-        lab.appendChild(document.createTextNode(' x'));
-        lab.appendChild(sn);
+        extra.appendChild(document.createTextNode('x'));
+        extra.appendChild(sn);
       } else {                           // SMP: how the LOOP field boots
         const lp = document.createElement('select');
         ['POOL', 'ON', 'OFF'].forEach((n, v) => {
@@ -566,18 +568,17 @@ function renderBoot() {
           o.value = v; o.textContent = n;
           lp.appendChild(o);
         });
-        lp.value = (rom[defOff + 24 + i] >> 1) & 0x03;
+        lp.value = (rom[defOff + 16 + i] >> 1) & 0x03;
         lp.title = 'the instrument\'s LOOP field at boot: POOL follows the ' +
           'sample\'s own loop, ON forces a loop (one-shots loop whole), ' +
           'OFF forces one-shot';
         lp.onchange = () => {
-          rom[defOff + 24 + i] = (rom[defOff + 24 + i] & ~0x06) |
+          rom[defOff + 16 + i] = (rom[defOff + 16 + i] & ~0x06) |
             ((+lp.value & 0x03) << 1);
         };
-        lab.appendChild(lp);
+        extra.appendChild(lp);
       }
     }
-    row.appendChild(lab);
   }
   $('bootview').hidden = false;
 }
@@ -1296,7 +1297,7 @@ function renderSlices() {
   const keepB = bind.value;
   bind.innerHTML = '';
   const TN = ['SMP', 'KIT', 'WAV', 'NSE', 'SLICE'];
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 8; i++) {
     const o = document.createElement('option');
     o.value = i;
     const t = defOff >= 0 ? (TN[rom[defOff + i] & 7] || '?') : '?';
@@ -1475,8 +1476,8 @@ $('slassign').onclick = () => {
   const baked = slBake();
   const i = +$('slbind').value || 0;
   rom[defOff + i] = 4;
-  rom[defOff + 12 + i] = idx;
-  rom[defOff + 24 + i] = (rom[defOff + 24 + i] & 0x0F) | ((n - 1) << 4);
+  rom[defOff + 8 + i] = idx;
+  rom[defOff + 16 + i] = (rom[defOff + 16 + i] & 0x0F) | ((n - 1) << 4);
   renderBoot();
   render();
   renderSlices();

@@ -5,6 +5,13 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- **Boot instruments are 8 again** (SNDEF3, was 12): one per voice,
+  lining up with the MIDI channel map — and period-correct (classic
+  SNES scores kept ~8-15 samples resident per song). Instruments 8-63
+  still auto-populate as SMP on sample 0, so every slot plays out of
+  the box. The patcher BOOT tab is a **proper aligned table** now
+  (label / type / sound / loop-or-slices columns — the KIT row no
+  longer breaks the grid) and reads/writes the SNDEF3 rows.
 - patcher BOOT tab: each SMP boot instrument gets a **LOOP selector**
   (POOL / ON / OFF) — it writes the SNDEF2 extras bits the console
   copies into the instrument's LOOP field on a fresh song, so you can
