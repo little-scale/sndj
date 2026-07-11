@@ -1,8 +1,9 @@
--- instr.lua — M6 gate: INSTR screen edits the instrument record, and a GRP
+-- instr.lua — M6 gate: INSTR screen edits the instrument record, and a C-command
 -- span renders a 3-voice chord (root+4+7 semitones) from ONE phrase column.
 --
 -- Path: SONG -> chain 00 -> phrase 00 (note C-4, instr 00) -> INSTR:
--- GRP=2, OFS1=4, OFS2=7 -> play phrase -> voices 0/1/2 = C-4/E-4/G-4.
+-- C47 on the row -> play phrase -> voices 0/1/2 = C-4/E-4/G-4.
+-- (Per-instrument GRP removed 2026-07-11: chords are the C command.)
 
 local frames = 0
 local _booted = false
@@ -52,15 +53,7 @@ gest({ right = true })                    -- instr column
 gest({ b = true })                        -- instr 00 at row 0
 gest({ a = true, right = true })          -- INSTR
 local at_instr = t
-for _ = 1, 14 do gest({ down = true }) end -- to GRP (skipping hidden; LOOP added one)
-chord({ right = true })                   -- GRP 0 -> 1
-chord({ right = true })                   -- GRP 1 -> 2
-gest({ down = true })                     -- OFS1
-for _ = 1, 4 do chord({ right = true }) end -- +4 (L/R steps 1; U/D = octave)
-gest({ down = true })                     -- OFS2
-chord({ up = true })                      -- +12
-for _ = 1, 5 do chord({ left = true }) end  -- -5 -> 7
-t = t + 6                                 -- settle: the drawn value lags the edit
+t = t + 8                                 -- let the packed layout settle
 local shot_at = t - 2
 local after_edit = t + 4
 gest({ a = true, left = true })           -- back to PHRASE
@@ -94,6 +87,9 @@ emu.addEventCallback(function()
     -- exact-pitch asserts below need a zero-tune sample (factory melodics
     -- carry loop-quantise tune corrections now)
     emu.write(0x2401, 12, emu.memType.snesWorkRam)
+    -- the chord: C47 on the phrase row (GRP fields are gone from INSTR)
+    emu.write(0x4302, 3, emu.memType.snesWorkRam)
+    emu.write(0x4303, 0x47, emu.memType.snesWorkRam)
   elseif frames == shot_at then
     local out = os.getenv("SNDJ_INSTR_SHOT")
     if out then
@@ -104,9 +100,8 @@ emu.addEventCallback(function()
       print("info: instr screenshot -> " .. out)
     end
   elseif frames == after_edit then
-    check(wram(0x2408) == 2, "GRP span = 2")
-    check(wram(0x2409) == 4, "OFS1 = 4 semitones")
-    check(wram(0x240A) == 7, "OFS2 = 7 semitones")
+    check(wram(0x4302) == 3 and wram(0x4303) == 0x47,
+      "C47 sits on the phrase row")
   elseif frames == at_phrase + 2 then
     check(wram(0x000C) == 1, "back on PHRASE")
   elseif frames == playing - 8 then
@@ -129,7 +124,7 @@ emu.addEventCallback(function()
     local srcn = wram(0x0097 + 12)
     check(srcn > 0 and dsp(0x04) == srcn and dsp(0x14) == srcn and
       dsp(0x24) == srcn,
-      "GRP members use the resident sample (SRCN " .. srcn .. ")")
+      "chord members use the resident sample (SRCN " .. srcn .. ")")
   elseif frames == done then
     if fails == 0 then
       print("ALL PASS instr.lua")

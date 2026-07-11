@@ -177,10 +177,10 @@ always real copies.
 
 The INSTR screen groups its fields — identity / envelope / mix / tune
 & motion / chord span / table — and hides what a type never reads:
-KIT keeps envelope and echo but drops VOL, FINE, VIB and GRP (the kit
+KIT keeps envelope and echo but drops VOL, FINE and VIB (the kit
 slots own volume and tune); NSE drops SAMPLE and everything pitched;
 WAV shows everything with SAMPLE reading **BANK**; SLICE swaps the
-ADSR for **ATTACK + FADE** and GRP for **TUNE**. The **INSTR number is
+ADSR for **ATTACK + FADE** and gains **TUNE**. The **INSTR number is
 itself the first field** — nudge it (B + d-pad) to switch which
 instrument you're editing, or **Y + ↑/↓** flips previous/next (TABLE
 and PHRASE answer the same gesture).
@@ -231,9 +231,6 @@ screen's RAM/FREE line shows the live balance).
   *left*. Put a quiet sine (WAV) on the left track, melody on the
   right: FM-flavoured growls and bells. The screen shows the pairing
   (`V4 ← V3`).
-- **GRP** — chord span: the instrument drives 1 or 2 extra voices to
-  its right with per-member semitone offsets. A pad track that plays
-  full triads from one phrase column.
 - **VIB** — vibrato, two nibbles **speed**·**depth** (`00` = none): a
   triangle pitch wobble that runs on every note this instrument
   plays. The `V` command overrides it for one note (`V00` = hold that
@@ -295,7 +292,7 @@ aliases into the sample the song already loaded. Then:
   softens the front.
 - **TUNE** transposes the whole slice set in semitones (notes pick
   slices, so pitch lives here); FINE trims cents.
-- Slices ignore GRP, and pitch commands act on the playing slice —
+- Pitch commands act on the playing slice —
   `L` slides a break in flight.
 
 A 16-slice break costs 16 of the 56 sample directory slots while its
@@ -345,7 +342,7 @@ Values are hex (`xy` = two nibbles).
 |-----|------|--------------|
 | `A xy` | arpeggio | cycle root, +x, +y semitones each tick |
 | `B 0x` | wave bank | switch a WAV voice to bank x (wave-sequencing) |
-| `C xy` | chord | fan +x / +y semitones onto the two voices to the right; `C00` back to GRP |
+| `C xy` | chord | fan +x / +y semitones onto the two voices to the right; `C00` chord off |
 | `D 0x` | delay | trigger this row's note x ticks late |
 | `F xy` | fine tune | per-track detune, signed 1/256 semitones |
 | `G xy` | groove | set the groove pair: x ticks / y ticks per row (G66 straight, G84 swing) |

@@ -533,10 +533,10 @@ Instrument parameters worth calling out:
 
 - **ENV**: `ADSR a/d/s/r` or `GAIN mode/value`. GAIN's re-triggerable ramps
   are exposed to the command set (`Q` — §10) for hardware tremolo/gate.
-- **GRP** (from genmddj's GROUP): an instrument on voice *n* may drive
-  voices *n+1..n+k* with per-member semitone offsets — unisons, fifths,
-  full chords from one phrase column. With 8 voices this is much more
-  spacious than on the Mega Drive; a 4-note pad from one track is routine.
+- **GRP** — ⚖ REMOVED (Seb, 2026-07-11): per-instrument groups are out;
+  the `C xy` command's two-voice chord fanout, echo and hardware
+  envelopes cover the idiom. Record bytes 8/10/11 stay reserved
+  (byte 9 is SLICE TUNE).
 - **PMOD**: flag = "this voice is modulated by its left neighbour".
   The INSTR screen shows the pairing explicitly (`V4 ← V3`), and the manual
   documents the idiom: put a sine WAV on the left voice as the modulator,

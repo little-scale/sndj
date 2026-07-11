@@ -64,7 +64,9 @@ if_vis:
     .DB $15              ; VIB  (pitch wobble: SMP/WAV/SLICE)
     .DB $1D              ; TRM  (KIT: slot volume domain)
     .DB $10              ; TUNE (SLICE only)
-    .DB $05, $05, $05, $05   ; GRP+OFS (kit ids aren't pool samples; NSE unison is noise)
+    .DB $00, $00, $00, $00   ; GRP+OFS removed (Seb 2026-07-11): the C
+                             ; command's chords + echo/envelopes cover it;
+                             ; record bytes stay reserved so indices hold
     .DB $3F, $3F         ; TBL/TBS
 
 if_labels:

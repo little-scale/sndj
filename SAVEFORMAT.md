@@ -28,7 +28,8 @@ Instrument record (16 bytes): type (0 SMP, 1 KIT, 2 WAV, 3 NSE,
 flags (bit 0 = EON echo send; bits 1-2 = the SMP LOOP override:
 0 pool default / 1 force loop / 2 force one-shot; bits 4-7 = SLICES-1
 for the SLICE type),
-GRP span, GRP offsets x3, TABLE (byte 12, >= 32 = none), TBS (byte 13,
+reserved x4 (bytes 8-11 — held GRP until 2026-07-11; byte 9 doubles as
+SLICE TUNE), TABLE (byte 12, >= 32 = none), TBS (byte 13,
 ticks per table row, 0 = note-sync), VIB (byte 14, vibrato speed/depth
 nibbles), TRM (byte 15, tremolo speed/depth nibbles).
 
@@ -43,7 +44,7 @@ into equal, block-aligned divisions; byte 2 = ATK nibble (low, the
 shared ADSR position) + FADE nibble (high — the hardware sustain rate
 the trigger synthesizes: 0 = ring/bleed, F = fastest cut); byte 9
 (OFS 1's byte) = TUNE, signed whole semitones for the whole slice set.
-Bytes 3 (ADSR2) and 8/10/11 (GRP) are unused by the SLICE trigger.
+Bytes 3 (ADSR2) and 8/10/11 (reserved) are unused by the SLICE trigger.
 
 Cell conventions: note 0 = empty, 1-96 = C-0..B-7, 97 = OFF; instrument
 $FF = none; command 0 = none, 1-26 = A-Z.

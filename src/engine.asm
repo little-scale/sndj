@@ -1642,7 +1642,9 @@ cmd_surround:
     sta.w trk_instr_active,x
     jmp track_vol_write
 
-; --- GRP: instrument on track X drives voices X+1..X+span with offsets --------
+; --- chord fanout: the C command drives voices X+1/X+2 with its two
+; nibble offsets. (Per-instrument GRP removed, Seb 2026-07-11 — the
+; record bytes 8/10/11 are reserved; byte 9 stays SLICE TUNE.)
 ; trig_note = the (transposed) base note index. Preserves X.
 grp_fanout:
     lda.w trk_instr,x
@@ -1654,28 +1656,12 @@ grp_fanout:
     sta trig_id
     txa
     sta grp_track
-    ; the C command overrides the record's GRP with a 2-voice chord
     lda.w trk_chord,x
-    beq @from_rec
+    beq @none
     lda #$02
     sta grp_span
     bra @go
-@from_rec:
-    rep #$30
-.ACCU 16
-    lda trig_id
-    and #$00FF
-    asl
-    asl
-    asl
-    asl
-    tax
-    sep #$20
-.ACCU 8
-    lda.l $7E0000 + SB_INSTR + 8,x  ; span
-    and #$03
-    sta grp_span
-    bne @go
+@none:
     jmp @out
 @go:
     lda #$01
@@ -1700,8 +1686,6 @@ grp_fanout:
 .ACCU 8
     lda.w trk_chord,x
     plx
-    cmp #$00                ; plx set the flags; re-test the chord byte
-    beq @rec_ofs
     ; m=1 -> x nibble, m=2 -> y nibble
     pha
     lda grp_m
@@ -1716,25 +1700,6 @@ grp_fanout:
     lsr
     lsr
     lsr
-    bra @ofs_have
-@rec_ofs:
-    rep #$30
-.ACCU 16
-    lda trig_id
-    and #$00FF
-    asl
-    asl
-    asl
-    asl
-    sta tmp2
-    lda grp_m
-    and #$00FF
-    clc
-    adc tmp2
-    tax
-    sep #$20
-.ACCU 8
-    lda.l $7E0000 + SB_INSTR + 8,x
 @ofs_have:
     clc
     adc trig_note

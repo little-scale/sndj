@@ -1509,22 +1509,18 @@ function seqTriggerNote(seq, t, rawNote) {
   seqGrpFanout(seq, t);
 }
 
-// GRP / C-command chord: fan the trigger out to the voices to the right
+// C-command chord: fan the trigger onto the two voices to the right.
+// (Per-instrument GRP removed 2026-07-11; record bytes 8/10/11 reserved.)
 function seqGrpFanout(seq, t) {
-  const g = seq.trig, b = seq.block, trk = seq.tracks[t];
-  if (trk.instr === 0xFF) return;
+  const g = seq.trig, trk = seq.tracks[t];
+  if (trk.instr === 0xFF || !trk.chord) return;
   const id = g.id;
-  const r = SEQ_SB.INSTR + id * 16;
-  const span = trk.chord ? 2 : b[r + 8] & 0x03;
-  if (!span) return;
   const baseNote = g.note;
-  for (let m = 1; m <= span; m++) {
+  for (let m = 1; m <= 2; m++) {
     const voice = t + m;
     if (voice >= 8) break;
     g.voice = voice;
-    const ofs = trk.chord
-      ? (m === 1 ? trk.chord >> 4 : trk.chord & 0x0F)
-      : i8(b[r + 8 + m]);
+    const ofs = m === 1 ? trk.chord >> 4 : trk.chord & 0x0F;
     let note = (baseNote + ofs) & 0xFF;
     if (note >= SEQ_NOTE_MAX) note = SEQ_NOTE_MAX - 1;
     seqApply(seq, id);
