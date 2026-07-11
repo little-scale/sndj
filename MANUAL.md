@@ -101,10 +101,13 @@ elsewhere pastes it. Works in PHRASE, CHAIN and SONG.
   "covering" it) and loops its block from there; a column with
   nothing above stays silent. Drill from a song cell into its chain
   or phrase and Start sounds exactly the context you're looking at.
-- **A+B** is *contextual*: if anything is playing, it stops. Else on
-  SONG it plays all tracks from the cursor row; on CHAIN it plays
-  just that chain from its top; on PHRASE it loops just that phrase
-  from its top.
+- **A+B** is *contextual*. Stopped: on SONG it plays all tracks from
+  the cursor row; on CHAIN it plays just that chain from its top; on
+  PHRASE it loops just that phrase from its top. Playing: on SONG
+  with the cursor on a *playing* track it stops **that track alone**
+  — the chain finishes its phrase and goes quiet, showing an **X** in
+  place of its playhead while it drains; on a silent track (or any
+  other screen) it stops everything.
 - A chain that ends in the song grid loops back to the top of its
   track's contiguous block — so a 4-row loop keeps looping without
   needing the grid filled to the bottom.

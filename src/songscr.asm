@@ -99,7 +99,28 @@ song_update:
     beq @no_ab
     lda eng_playing
     beq @ab_play
-    jsr engine_stop         ; A+B while playing = stop, on every screen
+    ; playing: A+B on a playing track queues a STOP for that track
+    ; alone — it drains to the boundary under an X marker (Seb,
+    ; 2026-07-12: don't re-trigger, don't kill the transport). On a
+    ; silent track A+B keeps the stop-everything escape.
+    lda song_cx
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda.w trk_phrase,x
+    cmp #$FF
+    beq @ab_stop_all
+    lda.w trk_pending,x
+    cmp #$FE
+    beq @ab_used            ; already draining
+    lda #$FE
+    sta.w trk_pending,x
+    bra @ab_used
+@ab_stop_all:
+    jsr engine_stop
     bra @ab_used
 @ab_play:
     jsr engine_play_from_cursor
@@ -425,8 +446,13 @@ song_head_glyph:
     beq @playing
     cmp #$FE
     bne @cued
-    ; stop queued: X over the playing cell while it drains
+    ; stop queued: X over the playing cell while it drains (the cell
+    ; is the song row for arrangement tracks, live_row for launches)
+    lda.w trk_songrow,x
+    cmp #$FF
+    bne +
     lda.w trk_live_row,x
++
     cmp tmp1
     bne @playing
     plx

@@ -6,7 +6,12 @@
 -- rows (~10 frames each at groove 6). Walk: row0 -> row1 -> back to
 -- row0 (block loop, never halts).
 --
--- WRAM: eng_playing $16, trk_songrow[0] $38, ui_mode $0C.
+-- A+B while playing (Seb, 2026-07-12): on a PLAYING track it queues
+-- that track's stop alone (drains under the X marker); only on a
+-- silent track does it stop everything.
+--
+-- WRAM: eng_playing $16, trk_phrase[0] $28, trk_songrow[0] $38,
+-- trk_pending[0] $E8, ui_mode $0C.
 
 local frames = 0
 local _booted = false
@@ -29,6 +34,7 @@ local row_seen = { [0] = false, [1] = false }
 local tick_a = 0
 local looped = false
 local last_row = -1
+local drained = false
 
 emu.addEventCallback(function() emu.setInput(pad, 0) end, emu.eventType.inputPolled)
 
@@ -65,36 +71,50 @@ emu.addEventCallback(function()
     check(wram(0x16) == 1, "still playing after the block end")
     check(row_seen[1], "walked into song row 1")
     check(looped, "chain block looped back to its top row")
-    -- A+B while playing = stop (on SONG)
+    -- A+B on the PLAYING cursor track = queue that track's stop
     pad = { a = true }
   elseif frames == 562 then
     pad = { a = true, b = true }
   elseif frames == 564 then
     pad = {}
-  elseif frames == 570 then
-    check(wram(0x16) == 0, "A+B stopped the transport")
+  elseif frames == 568 then
+    check(wram(0xE8) == 0xFE, "A+B queued the cursor track's stop")
+    check(wram(0x16) == 1, "transport keeps running while it drains")
+  elseif frames > 568 and frames <= 740 then
+    if not drained and wram(0x28) == 0xFF then drained = true end
+  elseif frames == 742 then
+    check(drained, "queued stop drained the track at the boundary")
+    check(wram(0x16) == 1, "transport still running (track-level stop)")
+    -- A+B with the cursor track now silent = stop everything
     pad = { a = true }
-  elseif frames == 572 then
+  elseif frames == 744 then
     pad = { a = true, b = true }
-  elseif frames == 574 then
+  elseif frames == 746 then
     pad = {}
-  elseif frames == 580 then
+  elseif frames == 752 then
+    check(wram(0x16) == 0, "A+B on a silent track stopped the transport")
+    pad = { a = true }
+  elseif frames == 754 then
+    pad = { a = true, b = true }
+  elseif frames == 756 then
+    pad = {}
+  elseif frames == 762 then
     check(wram(0x16) == 1, "A+B while stopped plays from the cursor")
     -- Start on PHRASE must be the global transport (stop), not phrase solo
     pad = { start = true }
-  elseif frames == 582 then
+  elseif frames == 764 then
     pad = {}
-  elseif frames == 588 then
+  elseif frames == 770 then
     check(wram(0x16) == 0, "Start stopped the transport")
     -- a block of chains with no phrases must halt gracefully, not hang
     poke(0x2000, 1)          -- chain 1 is factory-empty (all $FF entries)
     poke(0x2001, 0xFF)
-  elseif frames == 592 then
+  elseif frames == 774 then
     pad = { start = true }
-  elseif frames == 594 then
+  elseif frames == 776 then
     pad = {}
     tick_a = wram(0x1D1) + wram(0x1D2) * 256
-  elseif frames == 650 then
+  elseif frames == 840 then
     local tick_b = wram(0x1D1) + wram(0x1D2) * 256
     check(tick_b ~= tick_a, "main loop alive after an all-empty block")
     check(wram(0x28) == 0xFF, "empty-walk guard halted the track")
