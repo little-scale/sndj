@@ -153,7 +153,7 @@ def kits_bin():
     if os.path.exists('samples/factory.sndjfact'):
         with open('samples/factory.sndjfact', 'rb') as f:
             d = f.read()
-        assert d[:8] == b'SNDJFACT' and d[8] in (1, 2, 3), 'factory.sndjfact: bad magic'
+        assert d[:8] == b'SNDJFACT' and d[8] in (1, 2, 3, 4), 'factory.sndjfact: bad magic'
         plen = d[12] | (d[13] << 8) | (d[14] << 16)
         return d[16 + plen:16 + plen + 1024]
     if os.path.exists('samples/kits.bin'):
@@ -182,7 +182,9 @@ def defaults_bin():
         plen = d[12] | (d[13] << 8) | (d[14] << 16)
         off = 16 + plen + 1024
         out = bytearray(24)
-        if d[8] >= 3:
+        if d[8] >= 4:                      # 8-wide, verbatim
+            return bytes(d[off:off + 24])
+        if d[8] == 3:                      # the brief 12-wide era: first 8
             for r in range(3):
                 out[r * 8:r * 8 + 8] = d[off + r * 12:off + r * 12 + 8]
             return bytes(out)

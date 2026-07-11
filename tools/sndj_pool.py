@@ -357,7 +357,7 @@ def factory_pool():
     if not os.path.exists(fact):
         return None
     d = open(fact, 'rb').read()
-    assert d[:8] == b'SNDJFACT' and d[8] == 1, 'factory.sndjfact: bad magic'
+    assert d[:8] == b'SNDJFACT' and d[8] in (1, 2, 3, 4), 'factory.sndjfact: bad magic'
     plen = d[12] | (d[13] << 8) | (d[14] << 16)
     return d[16:16 + plen]
 

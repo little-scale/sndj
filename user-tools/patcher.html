@@ -1530,22 +1530,23 @@ $('pal').oninput = e => {
 };
 
 // ---------------------------------------------------- factory container
-// "SNDJFACT" v3: everything the factory is, in one small shareable file
+// "SNDJFACT" v4: everything the factory is, in one small shareable file
 // (and the exact payload the build bakes from). v2 grew the boot-
 // instrument block 16 -> 24 bytes (the SLICES/EON extras row); v3
-// widened it to 12 instruments (36 bytes, 12-byte rows).
+// briefly widened it to 12 instruments (36 bytes); v4 is back to the
+// 8-wide, 24-byte block (SNDEF3 — one instrument per voice).
 function factoryExport() {
   const pool = S.poolBuild(entries);
-  const out = new Uint8Array(16 + pool.length + 1024 + 36 + 64 + 128);
+  const out = new Uint8Array(16 + pool.length + 1024 + 24 + 64 + 128);
   out.set([...'SNDJFACT'].map(c => c.charCodeAt(0)), 0);
-  out[8] = 3;
+  out[8] = 4;
   out[12] = pool.length & 255;
   out[13] = (pool.length >> 8) & 255;
   out[14] = (pool.length >> 16) & 255;
   let o = 16;
   out.set(pool, o); o += pool.length;
   out.set(rom.subarray(kitOff, kitOff + 1024), o); o += 1024;
-  out.set(rom.subarray(defOff, defOff + 36), o); o += 36;
+  out.set(rom.subarray(defOff, defOff + 24), o); o += 24;
   out.set(rom.subarray(firOff, firOff + 64), o); o += 64;
   out.set(rom.subarray(palOff, palOff + 128), o);
   const a = document.createElement('a');
@@ -1559,7 +1560,7 @@ function factoryExport() {
 async function factoryImport(f) {
   const d = new Uint8Array(await f.arrayBuffer());
   const ver = d[8];
-  if (String.fromCharCode(...d.slice(0, 8)) !== 'SNDJFACT' || ver < 1 || ver > 3) {
+  if (String.fromCharCode(...d.slice(0, 8)) !== 'SNDJFACT' || ver < 1 || ver > 4) {
     status(f.name + ': not a SNDJFACT file', 1);
     return;
   }
@@ -1573,13 +1574,18 @@ async function factoryImport(f) {
   }
   o += plen;
   rom.set(d.subarray(o, o + 1024), kitOff); o += 1024;
-  if (ver >= 3) {
-    rom.set(d.subarray(o, o + 36), defOff); o += 36;
-  } else {                               // 8-wide rows: re-stride, pad
+  rom.fill(0, defOff, defOff + 24);      // the SNDEF3 block: 8x3
+  if (ver === 4) {
+    rom.set(d.subarray(o, o + 24), defOff); o += 24;
+  } else if (ver === 3) {                // 12-wide rows: keep the first 8
+    for (let r = 0; r < 3; r++) {
+      rom.set(d.subarray(o + r * 12, o + r * 12 + 8), defOff + r * 8);
+    }
+    o += 36;
+  } else {                               // v1/v2: 8-wide rows already
     const rows = ver === 2 ? 3 : 2;
-    rom.fill(0, defOff, defOff + 36);
     for (let r = 0; r < rows; r++) {
-      rom.set(d.subarray(o + r * 8, o + r * 8 + 8), defOff + r * 12);
+      rom.set(d.subarray(o + r * 8, o + r * 8 + 8), defOff + r * 8);
     }
     o += rows * 8;
   }
