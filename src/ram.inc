@@ -281,6 +281,8 @@ opt_tapwin   db      ; OPTIONS timing: B double-tap window, frames (10-40)
 up_patch     dw      ; bulk upload: byte offset to OR $02 into on the fly
                      ; (the END block's LOOP bit; $FFFF = none)
 hb_lfc       db      ; heartbeat: frame_cnt at the last beat (delta gate)
+pal_buf2     ds 8    ; CGRAM colours 16-19 (ATTR_PLAY palette), drained
+                     ; with pal_buf by the NMI
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

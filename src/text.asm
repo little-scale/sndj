@@ -65,6 +65,8 @@ text_puts:
     lda text_attr
     cmp #ATTR_ACCENT
     beq @inv
+    cmp #ATTR_PLAY
+    beq @inv
     pla
     bra @pl
 @inv:
@@ -97,6 +99,8 @@ text_puttile:
     pha
     lda text_attr
     cmp #ATTR_ACCENT
+    beq @invert
+    cmp #ATTR_PLAY
     beq @invert
     pla
     bra @plain

@@ -53,6 +53,15 @@ Vec_NMI:
     inx
     cpx #$0020
     bne @pal
+    lda #$10
+    sta CGADD               ; colours 16-19: the ATTR_PLAY palette
+    ldx #$0000
+@pal2:
+    lda.w pal_buf2,x
+    sta CGDATA
+    inx
+    cpx #$0008
+    bne @pal2
     stz pal_dirty
 @no_pal:
     ; --- pads: wait for auto-read completion, then latch raw state ---

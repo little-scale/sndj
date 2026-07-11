@@ -225,7 +225,7 @@ groove_draw:
     bcc @plain
     rep #$20
 .ACCU 16
-    lda #ATTR_HILITE
+    lda #ATTR_PLAY  
     sta text_attr
     sep #$20
 .ACCU 8

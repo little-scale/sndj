@@ -129,6 +129,10 @@
 .DEFINE ATTR_ACCENT $2400     ; palette 1, priority
 .DEFINE ATTR_HILITE $2800     ; palette 2, priority
 .DEFINE ATTR_DIM    $2C00     ; palette 3, priority
+.DEFINE ATTR_PLAY   $3000     ; palette 4, priority — the playhead cell:
+                              ; negative glyphs in the DIM shade (a soft
+                              ; grey block, distinct from the cursor's
+                              ; full inversion and from plain text)
 
 ; Extra font glyphs (tile indices; ASCII glyphs are tile = char-32)
 .DEFINE GLYPH_BLOCK    64

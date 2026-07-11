@@ -46,7 +46,7 @@ palette_boot:
     lda #$00
 @have:
     jsr palette_apply
-    ; force-blank: write CGRAM 0-15 directly and clear the dirty flag
+    ; force-blank: write CGRAM 0-19 directly and clear the dirty flag
     stz CGADD
     ldx #$0000
 @cg:
@@ -55,6 +55,15 @@ palette_boot:
     inx
     cpx #$0020
     bne @cg
+    lda #$10
+    sta CGADD               ; colours 16-19: the ATTR_PLAY palette
+    ldx #$0000
+@cg2:
+    lda.w pal_buf2,x
+    sta CGDATA
+    inx
+    cpx #$0008
+    bne @cg2
     stz pal_dirty
     rts
 
@@ -126,6 +135,13 @@ palette_apply:
     sta.w pal_buf + 8
     sta.w pal_buf + 16
     sta.w pal_buf + 24
+    ; palette 4 (ATTR_PLAY): the negative glyph's block draws in the
+    ; DIM shade — holes show the backdrop, so digits read bg-coloured
+    sta.w pal_buf2 + 0      ; colour 16 (unused by glyphs; keep bg)
+    lda pal_tmp
+    sta.w pal_buf2 + 2
+    sta.w pal_buf2 + 4
+    sta.w pal_buf2 + 6
     sep #$20
 .ACCU 8
     lda #$01

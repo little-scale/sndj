@@ -5,6 +5,14 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- **Playheads you can actually see**: the playing cell on SONG (one
+  per track — 8 independent heads), and the playing row on CHAIN,
+  PHRASE and GROOVE, render as a soft grey block (new ATTR_PLAY,
+  BG3 palette 4) instead of a highlight that was pixel-identical to
+  plain text in the 2-colour schemes — the per-track indicator has
+  been invisible since the beginning. The cursor's full inversion
+  stays distinct; the gutter arrow still marks any playing row.
+
 - patcher: **monochrome** — black, white text, white-bordered columns
   and sections (the tool now dresses like the console). The factory
   file moves to **`factory/factory.sndjfact`** (its own folder + a

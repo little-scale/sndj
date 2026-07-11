@@ -107,8 +107,12 @@ elsewhere pastes it. Works in PHRASE, CHAIN and SONG.
 - On play, each track **enters at the first populated cell at/below
   the start row** — a column can leave early rows empty and join late.
 - **Playback indicators** read the same on SONG, CHAIN, PHRASE and
-  GROOVE: an arrow in the gutter marks the playing row, and the
-  playing value lights up (on SONG, per track).
+  GROOVE: an arrow in the gutter marks any playing row, and the
+  playing value renders as a **soft grey block** — on SONG that's one
+  block per track, because every track is its own playhead (they walk
+  their own chains and loop their own blocks; there is no single
+  "song position"). The cursor's full-brightness inversion always
+  reads distinctly from the grey playheads.
   A fully empty column stays silent.
 
 ## 3. The screens
