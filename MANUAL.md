@@ -50,7 +50,7 @@ press means.** There are no simultaneous-press timing windows.
 | **B** | *edit*: tap = insert / act · hold + d-pad = nudge the value under the cursor (left/right small, up/down big) · double-tap = paste / clone · hold B + tap **A** = cut |
 | **Y** | *context*: hold + ←/→ = previous/next channel · hold + ↑/↓ = previous/next chain, phrase, kit or table (on those screens) · Y+B = block select |
 | **A** | *screens*: hold + d-pad = navigate the screen map · **A+B** = contextual play (see below) |
-| **Start** | play / stop the whole song, from any screen |
+| **Start** | play / stop the whole song from any screen — the arrangement enters at the song cursor row |
 | **L / R** | channel left / right (shortcut for Y+←/→) |
 | **Select** | jump to LIVE and back |
 | **X** | mute / solo (hold + ↑/↓ mute, ←/→ solo, on SONG/LIVE) |
@@ -556,18 +556,20 @@ Y+B          block select
 Zero-toolchain browser apps — download the folder, open the HTML,
 everything runs locally:
 
-- **patcher.html** — the ROM workshop, in tabs: **SAMPLES** (replace
+- **patcher.html** — the ROM workshop, in tabs: **POOL** (replace
   pool slots from WAVs — sampler-loop WAVs import melodic, in tune —
   or dropped SoundFonts — several stack at once,
-  drag a font slot onto a pool slot — with per-slot tune and rename,
-  and ROM + audio-RAM budget meters that mirror the console's math),
-  **KITS** (the factory drum kits: drag a one-shot straight onto a kit
-  slot), **FIR** (the echo filter designer: response plot, tap
+  drag a font slot onto a pool slot — with per-slot tune, rename,
+  loop toggle and slot reordering, a C-5 reference tone, and ROM +
+  audio-RAM budget meters that mirror the console's math), **BOOT**
+  (the 8 boot instruments — type, sound, loop/slices — so you control
+  what preloads into audio RAM), **KITS** (the factory drum kits:
+  drag a one-shot straight onto a kit slot), **SLICES** (the chop
+  designer), **FIR** (the echo filter designer: response plot, tap
   sliders, echo-loop audition, writes the 8 ROM presets), and
-  **PALETTES**. Boot instruments are editable too, so you control what
-  preloads into audio RAM. Every audition runs through a bit-exact
-  model of the console's BRR + Gaussian playback, so what you hear in
-  the browser is what the cart plays.
+  **PALETTES**. Every audition runs through a bit-exact model of the
+  console's BRR + Gaussian playback, so what you hear in the browser
+  is what the cart plays.
 - **savetool.html** — song manager for cart saves (§12).
 - **spcexport.html** — listen to and share your songs: drop a
   `.sndj` (or a cart save and pick a slot) plus the ROM. A **listen**

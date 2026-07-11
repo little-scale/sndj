@@ -50,7 +50,10 @@ await real-hardware bring-up. What works today:
   reserved pending the cross-sibling wiring decision
 - **Save/load** — 16 variable-packed, journalled songs in 32 KB SRAM
   (SNDJ1 v2); a power cut can't eat the previous good save
-- **LIVE mode** — quantised chain launching, mute/solo
+- **LIVE mode** — quantised chain launching (phrase boundary on a
+  playing track, next bar on a silent one) with cue/stop markers:
+  steady ▸ = playing cell, flashing ▸ = cued, X = draining to a
+  queued stop; per-track playheads, mute/solo
 - **Browser tools** — zero-toolchain, fully local, all importing
   `user-tools/sndj.js` (a sample-accurate S-DSP model, a BRR codec
   byte-matched to the Python reference, and a **reference sequencer**
@@ -79,7 +82,7 @@ press means** — no simultaneous-press timing windows.
 | **B** | tap = insert / audition · hold + d-pad = nudge · double-tap = paste / mint / clone · hold + **A** = cut |
 | **Y** (hold) | + ←/→ channel · + ↑/↓ page · + B block select |
 | **A** (hold) | + d-pad navigate the screen map · **A+B** contextual play / stop |
-| **Start** | play / stop the song |
+| **Start** | play / stop the song (from the song cursor row) |
 | **L / R** | channel − / + |
 | **Select** | jump to LIVE and back |
 | **X** (hold) | + ↑/↓ mute · + ←/→ solo (SONG/LIVE) |
@@ -110,7 +113,7 @@ make test       # host-side unit tests (BRR, RLE, sndj.js, tools)
 make shot-diff  # golden-screenshot comparison
 ```
 
-`make check` runs 36 Lua suites (350+ assertions) against machine state:
+`make check` runs 37 Lua suites (350+ assertions) against machine state:
 DSP registers, ARAM bytes, WRAM song data, screen shadow maps, timing.
 Every hardware-relevant bug found so far has a regression check.
 
