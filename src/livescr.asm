@@ -2,8 +2,8 @@
 ; A grid of song-row chain cells like SONG, but B queues the cursor cell's
 ; chain on its track, launching exactly at that track's next phrase
 ; boundary (quantised). X held + up/down mutes the cursor track, X held +
-; left/right solos it. ENVX meters ride the header — the chip's own
-; envelopes, streamed up by the driver. Select toggles LIVE from anywhere.
+; left/right solos it. Muted tracks dash the header (signal metering
+; is out for now). Select toggles LIVE from anywhere.
 
 .ACCU 8
 .INDEX 16
@@ -231,7 +231,9 @@ engine_play_live:
     jmp engine_go
 
 live_draw:
-    ; ENVX meters in the header (driver telemetry, the chip's own envelopes)
+    ; mute state per track (a dim dash) — signal metering is out for
+    ; now (Seb, 2026-07-12); the ENVX telemetry keeps flowing for
+    ; checks and any future readout
     stz ui_cnt
 @meters:
     lda ui_cnt
@@ -265,24 +267,11 @@ live_draw:
 @meter_on:
     rep #$20
 .ACCU 16
-    lda #ATTR_HILITE
+    lda #ATTR_TEXT
     sta text_attr
     sep #$20
 .ACCU 8
-    lda.w envx_mirror,x
-    lsr
-    lsr
-    lsr
-    lsr
-    lsr                     ; level 0-3 (ENVX is 7 bits)
-    cmp #$04
-    bcc @lvl
-    lda #$03
-@lvl:
-    sta es0
-    lda #GLYPH_BLOCK14      ; glyphs run full(64)..quarter(67)
-    sec
-    sbc es0                 ; level 0 -> 1/4, 3 -> full
+    lda #' ' - 32
     jsr text_puttile
 @meter_next:
     inc ui_cnt

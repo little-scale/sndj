@@ -50,7 +50,7 @@ await real-hardware bring-up. What works today:
   reserved pending the cross-sibling wiring decision
 - **Save/load** — 16 variable-packed, journalled songs in 32 KB SRAM
   (SNDJ1 v2); a power cut can't eat the previous good save
-- **LIVE mode** — quantised chain launching, mute/solo, ENVX meters
+- **LIVE mode** — quantised chain launching, mute/solo
 - **Browser tools** — zero-toolchain, fully local, all importing
   `user-tools/sndj.js` (a sample-accurate S-DSP model, a BRR codec
   byte-matched to the Python reference, and a **reference sequencer**

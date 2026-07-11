@@ -5,6 +5,9 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- **Signal metering is out for now** (Seb): the LIVE header shows
+  mute dashes only — no ENVX bars. The driver's ENVX telemetry keeps
+  streaming (checks use it, and a future readout can too).
 - **Playback = the gutter triangle, full stop** (Seb): cells are
   never painted over. On SONG a triangle marks every row some track
   is playing (the 8 tracks are independent heads, so several can

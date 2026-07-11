@@ -422,9 +422,8 @@ the hex in on the FIR screen.
 
 Set MODE to LIVE on PROJECT (or press **Select**): the SONG position
 becomes a clip launcher. Each track launches chains quantised to the
-row/bar; X-modifier mutes and solos. The per-voice envelope meters in
-the header are driven by the chip's real envelope values — an honest
-performance display.
+row/bar; X-modifier mutes and solos, and muted tracks show a dash in
+the header.
 
 ## 12. Saving — the FILES screen
 
