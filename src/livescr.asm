@@ -146,7 +146,10 @@ live_update:
 
 ; queue the cursor cell's chain on its track (launches now if stopped).
 ; An EMPTY cell queues a STOP ($FE): the track finishes its phrase and
-; halts at the boundary — the grid shows an X while it drains.
+; halts at the boundary — the grid shows an X while it drains. B on
+; the cell the track is PLAYING queues the same stop (Seb, 2026-07-12:
+; don't re-trigger the chain you're hearing); any other cell queues
+; its chain.
 live_queue_cursor:
     jsr song_cursor_cell    ; A = chain under cursor ($FF = empty)
     pha
@@ -159,8 +162,26 @@ live_queue_cursor:
 .ACCU 8
     pla
     cmp #$FF
-    bne @launch
-    ; empty cell: queue a stop (only meaningful on a playing track)
+    beq @stop_q
+    ; occupied cell: on the track's playing cell, stop; else launch
+    pha
+    lda eng_playing
+    beq @not_playing
+    lda.w trk_phrase,x
+    cmp #$FF
+    beq @not_playing
+    ; the playing cell: song row for arrangement tracks, live_row
+    ; for launched chains (same resolution as the playhead glyph)
+    lda.w trk_songrow,x
+    cmp #$FF
+    bne +
+    lda.w trk_live_row,x
++
+    cmp song_cy
+    bne @not_playing
+    pla                     ; cursor is on the chain being heard
+@stop_q:
+    ; queue a stop (only meaningful on a playing track)
     lda eng_playing
     beq @done
     lda.w trk_phrase,x
@@ -169,7 +190,8 @@ live_queue_cursor:
     lda #$FE
     sta.w trk_pending,x
     rts
-@launch:
+@not_playing:
+    pla
     sta.w trk_pending,x
     lda song_cy
     sta.w trk_pend_row,x

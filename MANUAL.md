@@ -101,13 +101,10 @@ elsewhere pastes it. Works in PHRASE, CHAIN and SONG.
   "covering" it) and loops its block from there; a column with
   nothing above stays silent. Drill from a song cell into its chain
   or phrase and Start sounds exactly the context you're looking at.
-- **A+B** is *contextual*. Stopped: on SONG it plays all tracks from
-  the cursor row; on CHAIN it plays just that chain from its top; on
-  PHRASE it loops just that phrase from its top. Playing: on SONG
-  with the cursor on a *playing* track it stops **that track alone**
-  — the chain finishes its phrase and goes quiet, showing an **X** in
-  place of its playhead while it drains; on a silent track (or any
-  other screen) it stops everything.
+- **A+B** is *contextual*: if anything is playing, it stops. Else on
+  SONG it plays all tracks from the cursor row; on CHAIN it plays
+  just that chain from its top; on PHRASE it loops just that phrase
+  from its top. (Per-track stops live in LIVE mode — §11.)
 - A chain that ends in the song grid loops back to the top of its
   track's contiguous block — so a 4-row loop keeps looping without
   needing the grid filled to the bottom.
@@ -435,8 +432,10 @@ track; from stopped it launches right away.
 - A chain queued on a *playing* track takes over at the track's next
   phrase boundary. A chain queued on a *silent* track fires at the
   next bar (16 rows) so it lands in time with the others.
-- **B on an empty cell queues a stop**: the track finishes its
-  phrase and goes quiet.
+- **B on the cell a track is playing queues its stop** — it never
+  re-triggers the chain you're hearing. **B on an empty cell queues
+  the same stop.** Either way the track finishes its phrase and goes
+  quiet.
 - Launched chains loop on their own cell — LIVE never walks the song
   grid downward.
 

@@ -7,7 +7,9 @@
 --
 -- Also gates the new semantics: a chain queued on a HALTED track fires
 -- at the next bar boundary (16 rows); B on an EMPTY cell of a playing
--- track queues a STOP ($FE) that drains at the phrase boundary.
+-- track — or on the cell the track is PLAYING (don't re-trigger the
+-- chain you're hearing) — queues a STOP ($FE) that drains at the
+-- phrase boundary.
 --
 -- Non-frozen addresses (src/ram.inc): $E8 trk_pending, $C00 trk_live_row,
 -- $C08 trk_pend_row, $20 trk_chain, $28 trk_phrase.
@@ -51,10 +53,21 @@ local stopped_q = t
 local drain_until = stopped_q + 220
 t = drain_until + 4
 script[t] = { start = true } ; t = t + 2 ; script[t] = {} ; t = t + 6
-local done = t + 4
+local stopped_chk = t + 4
+t = stopped_chk + 2
+for _ = 1, 3 do gest({ up = true }, 2) end     -- cursor back to (0,0)
+for _ = 1, 7 do gest({ left = true }, 2) end
+gest({ b = true }, 8)                -- relaunch chain 0 on V1
+local relaunched = t
+gest({ b = true }, 4)                -- B on the PLAYING cell = stop it
+local selfstop = t
+local drain2_until = selfstop + 220
+t = drain2_until + 4
+local done = t
 
 local fired_frame, fired_pending = nil, nil
 local drained_frame = nil
+local selfdrain_frame = nil
 
 emu.addEventCallback(function() emu.setInput(pad, 0) end, emu.eventType.inputPolled)
 
@@ -113,9 +126,21 @@ emu.addEventCallback(function()
     check(wram(0xE8 + 7) == 0xFF, "stop consumed the pending slot")
     check(wram(0x28) == 0, "track 1 kept playing through it all")
     poke(0xE8 + 2, 5)          -- stale cue: engine_stop must clear it
-  elseif frames == done then
+  elseif frames == stopped_chk then
     check(wram(0x16) == 0, "Start stopped the transport")
     check(wram(0xE8 + 2) == 0xFF, "engine_stop cleared stale pendings")
+  elseif frames == relaunched then
+    check(wram(0x16) == 1 and wram(0x28) == 0,
+      "relaunched chain 0 on track 1")
+  elseif frames == selfstop then
+    check(wram(0xE8) == 0xFE, "B on the playing cell queued its stop")
+  elseif frames > selfstop and frames <= drain2_until then
+    if selfdrain_frame == nil and wram(0x28) == 0xFF then
+      selfdrain_frame = frames
+    end
+  elseif frames == done then
+    check(selfdrain_frame ~= nil, "playing-cell stop drained the track")
+    check(wram(0x16) == 1, "transport kept running (track-level stop)")
     if fails == 0 then
       print("ALL PASS livecue.lua")
       emu.stop(0)

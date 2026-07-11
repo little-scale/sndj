@@ -5,11 +5,12 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
-- **A+B on a playing SONG track stops that track alone** (Seb): the
-  chain drains to its phrase boundary under an **X** marker instead
-  of re-triggering or killing the transport; A+B on a silent track
-  still stops everything. The X marker now also tracks arrangement
-  playheads, not just LIVE launches.
+- **LIVE: B on the cell a track is playing queues that track's stop**
+  (Seb) — it drains to the phrase boundary under the **X** marker
+  instead of re-triggering the chain you're hearing (B on any other
+  populated cell still queues its chain; SONG's A+B stays the global
+  stop). The X marker now also tracks arrangement playheads, not
+  just LIVE launches.
 - **LIVE cue/stop markers** (Seb): a steady **▸** marks each track's
   playing cell, a *flashing* **▸** marks a cued chain waiting for its
   boundary, and an **X** marks a track draining toward a queued stop

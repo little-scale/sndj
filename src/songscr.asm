@@ -99,29 +99,8 @@ song_update:
     beq @no_ab
     lda eng_playing
     beq @ab_play
-    ; playing: A+B on a playing track queues a STOP for that track
-    ; alone — it drains to the boundary under an X marker (Seb,
-    ; 2026-07-12: don't re-trigger, don't kill the transport). On a
-    ; silent track A+B keeps the stop-everything escape.
-    lda song_cx
-    rep #$30
-.ACCU 16
-    and #$00FF
-    tax
-    sep #$20
-.ACCU 8
-    lda.w trk_phrase,x
-    cmp #$FF
-    beq @ab_stop_all
-    lda.w trk_pending,x
-    cmp #$FE
-    beq @ab_used            ; already draining
-    lda #$FE
-    sta.w trk_pending,x
-    bra @ab_used
-@ab_stop_all:
-    jsr engine_stop
-    bra @ab_used
+    jsr engine_stop         ; A+B while playing = stop, on every screen
+    bra @ab_used            ; (per-track stops live in LIVE mode)
 @ab_play:
     jsr engine_play_from_cursor
 @ab_used:
