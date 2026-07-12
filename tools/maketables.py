@@ -3,10 +3,9 @@
 
 Emits into the build directory:
   schemes.bin  — 8 palette schemes x 16 bytes (marker-wrapped SNPAL0 in ROM;
-                 the engine builds CGRAM + the HDMA gradient from these at
-                 apply time). Per scheme, little-endian 15-bit BGR words:
-                 bg, text, dim, accent, hilite, then padding (solid
-                 backdrop — no gradient).
+                 the engine builds strict two-colour CGRAM from these at apply
+                 time). Per scheme: bg, text, then padding; little-endian
+                 15-bit BGR words and a solid backdrop.
 
 Scheme 0 is the sndj house style; 1-7 follow genmddj's palette set
 (BLK / WHT / KIDD / AMBR / CYAN / PINK / MINT) so the family reads the
@@ -21,13 +20,13 @@ def bgr15(r, g, b):
 
 
 # --- palette schemes ---------------------------------------------------------
-# Slots per scheme: bg, text, dim, accent, hilite, gradient top, gradient
-# bottom. Scheme 0 is the house style; 1-7 mirror genmddj (its MD nibble
-# levels mapped through the MD DAC ramp to 8-bit).
+# Stored slots per scheme: bg and text, then padding. Scheme 0 is the house
+# style; 1-7 mirror genmddj (its MD nibble levels mapped through the MD DAC
+# ramp to 8-bit). Runtime rendering uses only these two exact colours.
 
 SCHEMES = [
-    # genmddj's 8 schemes: two colours each (bg, text). The cursor and
-    # playheads render as palette negatives; dim derives from the pair.
+    # genmddj's 8 schemes: two colours each (bg, text). Cursors and
+    # playheads render as negatives; rulers and empty cells use full text.
     ('BLK ', (0, 0, 0),       (255, 255, 255)),
     ('WHT ', (255, 255, 255), (0, 0, 0)),
     ('KIDD', (0, 87, 206),    (255, 255, 0)),

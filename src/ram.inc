@@ -188,7 +188,7 @@ gv_row       db      ; GROOVE screen: step cursor
 ed_lastgroove db     ; GROOVE insert buffer
 pj_cur       db      ; PROJECT field cursor
 pj_arm       db      ; PROJECT NEW confirm armed
-pal_tmp      dw      ; palette_apply dim-blend scratch
+pal_tmp      dw      ; reserved palette scratch (kept to preserve WRAM layout)
 fl_freed     db      ; FILES: PURGE result count for the status line
 pg_i         dw      ; purge scan indices
 pg_j         dw

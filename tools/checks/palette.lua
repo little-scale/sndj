@@ -77,7 +77,17 @@ emu.addEventCallback(function()
     check(wram(0x1D4) == 1, "B+Right selected scheme 1 (WHT)")
     check(palbuf(0) == 0x7FFF and palbuf(2) == 0x0000,
       "pal_buf holds white bg / black text")
+    local strict = true
+    for i = 0, 15 do
+      local c = palbuf(i)
+      if c ~= 0x7FFF and c ~= 0x0000 then strict = false end
+    end
+    check(strict, "all UI palette entries use only background or text")
+    check(palbuf(14) == 0x0000 and palbuf(15) == 0x0000,
+      "DIM renders at full text contrast")
     check(cgram(1) == 0x7FFF, "NMI drained the scheme into CGRAM (negative ink = bg)")
+    check(cgram(17) == 0x7FFF and cgram(19) == 0x0000,
+      "playheads use the same two-colour negative as cursors")
     check(sram(0x0007) == 1, "scheme persisted in SRAM $0007")
     emu.reset()
     _booted = false

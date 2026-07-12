@@ -382,20 +382,18 @@ drives the splash and the `make dist` filenames.
   the LIVE-mode state strip, the logo on the splash. BG2 is parked (blank or
   subtle backdrop art). Sprites: cursor, playheads (one per track column),
   block-select marquee.
-- **HDMA gradient** on the backdrop colour — a per-scanline CGRAM colour-0
-  ramp. This is the cheap, unmistakably-SNES flourish: every palette in
-  PALETTE.md defines not just the UI colours but a two-colour vertical
-  gradient. One HDMA channel, one table, zero CPU cost per frame.
+- **Solid backdrop** — no HDMA gradient. The hardware UI emits exactly one
+  background and one foreground colour so composite/RF never loses hierarchy
+  to low-contrast intermediate shades.
 - **Font**: same 8×8 font pipeline as the siblings — `makefont.py` renders
   the source PNG/glyph description into `build/font.bin` as 2 bpp tiles.
   The font block in ROM is wrapped in a magic marker (`SNFONT`) so
   `patcher.html` can replace it (§17).
-- **Palettes**: SNES CGRAM is 15-bit BGR — 32,768 colours, by far the
-  richest of the three machines. PALETTE.md defines the factory set
-  (name, 4 UI colours + gradient pair per entry); the palette bank is a
-  marker-wrapped ROM block for the patcher. Keep the *semantic* palette
-  slots identical to the siblings (bg / text / accent / highlight) so
-  palette files are conceptually portable across the family.
+- **Palettes**: SNES CGRAM is 15-bit BGR, but the UI deliberately emits only
+  each scheme's exact background and text colours. PALETTE.md defines the
+  factory set; the marker-wrapped ROM block stores that pair per scheme for the
+  patcher. Semantic accent/dim roles remain in tile attributes, but accent is
+  inversion and dim renders at full text contrast for composite/RF legibility.
 
 ### 6.2 Per-voice metering (new, SNES-only)
 
@@ -803,9 +801,8 @@ Drop a built `sndj.sfc`, then patch any of:
   pre-emphasis amount and target-block budget; audition the **exact console
   sound** (BRR→Gaussian→32 kHz through the JS DSP); live ARAM budget bar
   against the song's echo setting; write back a new pool.
-- **Palettes**: edit the factory set in 15-bit colour with live preview of
-  every screen (goldens re-rendered client-side), including the HDMA
-  gradient pair.
+- **Palettes**: edit each factory scheme's 15-bit background/text pair with a
+  strict two-colour preview of every screen (goldens re-rendered client-side).
 - **Font**: drop a PNG glyph sheet or edit in-place, 8×8.
 - **Factory presets / waves / kits**: replace the instrument-patch bank and
   `default_waves`.
@@ -1045,7 +1042,7 @@ For fast lookup — full rationale in the sections cited:
 | 2 | CPU-owns-everything / SPC700-servant SCB architecture | 3.1 |
 | 3 | Engine tick from SPC700 Timer 0; NMI is video-only | 3.4 |
 | 4 | WLA-DX toolchain (65816 + SPC700 + wlalink) | 4.1 |
-| 5 | BG Mode 1; BG3 text UI; HDMA gradient backdrop | 6.1 |
+| 5 | BG Mode 1; BG3 strict two-colour text UI; solid backdrop | 6.1 |
 | 6 | Button map B/Y/A/Start core; L,R,X,Select are shortcuts only | 7 |
 | 7 | One command column in PHRASE (v1) | 8 |
 | 8 | All-resident samples; no mid-song streaming (v1) | 14.2 |

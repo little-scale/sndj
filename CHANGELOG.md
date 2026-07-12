@@ -5,6 +5,9 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## Unreleased
 
+- Removed the synthesized grey/dim UI shade. Every scheme now emits only its
+  exact foreground and background colours; secondary text uses full contrast
+  and cursors/playheads preserve hierarchy through two-colour inversion.
 - Added a dedicated Link/cross-console wiring guide for XIAO ESP32 → sndj
   IN24 and genmddj OUT → sndj IN, including safe level conversion and staged
   hardware bring-up procedures.

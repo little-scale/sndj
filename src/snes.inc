@@ -85,7 +85,7 @@
 .DEFINE JOY2L    $421A
 .DEFINE JOY2H    $421B
 
-; --- DMA channel 0 (general) / 7 (HDMA gradient) --------------------------
+; --- DMA channel 0 (general) / channel 7 register definitions ------------
 .DEFINE DMAP0    $4300
 .DEFINE BBAD0    $4301
 .DEFINE A1T0L    $4302
@@ -128,11 +128,9 @@
 .DEFINE ATTR_TEXT   $2000     ; palette 0, priority
 .DEFINE ATTR_ACCENT $2400     ; palette 1, priority
 .DEFINE ATTR_HILITE $2800     ; palette 2, priority
-.DEFINE ATTR_DIM    $2C00     ; palette 3, priority
-.DEFINE ATTR_PLAY   $3000     ; palette 4, priority — the playhead cell:
-                              ; negative glyphs in the DIM shade (a soft
-                              ; grey block, distinct from the cursor's
-                              ; full inversion and from plain text)
+.DEFINE ATTR_DIM    $2C00     ; palette 3, priority — semantic dim role,
+                              ; rendered at full text contrast on hardware
+.DEFINE ATTR_PLAY   $3000     ; palette 4, priority — two-colour negative
 
 ; Extra font glyphs (tile indices; ASCII glyphs are tile = char-32)
 .DEFINE GLYPH_BLOCK    64

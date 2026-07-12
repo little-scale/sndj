@@ -4,7 +4,8 @@
 ; maketables.py, patchable in the ROM): 16 bytes each, little-endian
 ; 15-bit BGR words bg, text (rest padding). Two colours per scheme,
 ; genmddj-style: cursors/playheads render as palette negatives (the
-; inverted glyph set) and dim derives from the pair.
+; inverted glyph set). No midpoint/dim colour is synthesized: every
+; visible pixel is exactly bg or text for composite/RF readability.
 ;
 ; palette_apply builds the 16-colour CGRAM image in pal_buf; the NMI
 ; drains it next VBlank (invariant #6). Solid backdrop, no gradient.
@@ -86,7 +87,7 @@ palette_select:
 ;   line 0 TEXT    1=bg  2=text 3=text
 ;   line 1 ACCENT  (negative) same colours as line 0
 ;   line 2 HILITE  (negative) same colours as line 0
-;   line 3 DIM     1=bg  2=dim  3=dim   (dim = bg/text channel average)
+;   line 3 DIM     1=bg  2=text 3=text  (semantic only; full contrast)
 palette_apply:
     and #$07
     sta opt_pal
@@ -102,18 +103,6 @@ palette_apply:
     ; colour 0 = bg
     lda.l pal_schemes + PS_BG,x
     sta.w pal_buf + 0
-    ; dim = per-channel average of bg and text (5-bit fields kept apart
-    ; by masking before the add)
-    lda.l pal_schemes + PS_BG,x
-    and #$7BDE              ; drop each channel's low bit
-    lsr
-    sta pal_tmp
-    lda.l pal_schemes + PS_TEXT,x
-    and #$7BDE
-    lsr
-    clc
-    adc pal_tmp
-    sta pal_tmp             ; dim
     ; lines 0-2: 1=bg, 2=text, 3=text
     lda.l pal_schemes + PS_BG,x
     sta.w pal_buf + 2
@@ -126,10 +115,10 @@ palette_apply:
     sta.w pal_buf + 14
     sta.w pal_buf + 20
     sta.w pal_buf + 22
-    ; line 3: 1=bg, 2=dim, 3=dim
+    ; line 3: DIM retains its semantic attribute but renders full-contrast
     lda.l pal_schemes + PS_BG,x
     sta.w pal_buf + 26
-    lda pal_tmp
+    lda.l pal_schemes + PS_TEXT,x
     sta.w pal_buf + 28
     sta.w pal_buf + 30
     ; colours 4/8/12 stay at bg
@@ -137,13 +126,12 @@ palette_apply:
     sta.w pal_buf + 8
     sta.w pal_buf + 16
     sta.w pal_buf + 24
-    ; palette 4 (ATTR_PLAY): the negative glyph's block draws in the
-    ; DIM shade — holes show the backdrop, so digits read bg-coloured
+    ; palette 4 (ATTR_PLAY): same two-colour negative as the cursor
     sta.w pal_buf2 + 0      ; colour 16 (unused by glyphs; keep bg)
-    lda pal_tmp
-    sta.w pal_buf2 + 2
+    sta.w pal_buf2 + 2      ; inverted glyph ink = bg
+    lda.l pal_schemes + PS_TEXT,x
     sta.w pal_buf2 + 4
-    sta.w pal_buf2 + 6
+    sta.w pal_buf2 + 6      ; inverted glyph field = text
     sep #$20
 .ACCU 8
     lda #$01

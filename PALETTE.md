@@ -2,9 +2,9 @@
 
 The UI is drawn from a **two-colour palette scheme** (background and
 text), genmddj-style: cursors, playheads and titles render as palette
-*negatives* (an inverted copy of the glyph set), and the dim shade
-(rulers, empty cells) derives automatically as the channel average of
-the pair. Eight factory schemes ship in the ROM's marker-wrapped
+*negatives* (an inverted copy of the glyph set). Rulers, empty cells and
+other formerly dimmed elements use the full text colour: no third or
+derived shade is emitted. Eight factory schemes ship in the ROM's marker-wrapped
 `SNPAL0` block (16 bytes each — see the layout below), so tools can
 repaint a built ROM without a toolchain.
 
@@ -18,12 +18,14 @@ SRAM header byte `$0007`).
 |------|-----------|
 | bg | backdrop (colour 0) |
 | text | normal cells |
-| dim | rulers, empty cells — the bg/text channel average |
+| secondary text | rulers, empty cells — full text colour |
 | cursor / selection | palette negative (inverted glyphs) |
 | playheads, titles, meters | palette negative |
 
-Same model as smsggdj/genmddj, so schemes are portable across the
-family.
+The strict two-colour output is deliberate: composite and RF displays can
+erase a mathematically distinct midpoint shade even when it looks clear over
+RGB or in an emulator. Semantic hierarchy comes from position and inversion,
+not reduced contrast.
 
 ## Factory schemes
 
