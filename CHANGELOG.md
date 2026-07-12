@@ -3,36 +3,32 @@
 All notable changes to sndj. First release will be **v0.1**; versions
 increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
-## unreleased
+## v0.12 — 2026-07-12
 
-- **LIVE launch/stop is the A+B gesture, plain B is edit-only** (Seb):
-  hold A and tap B to queue, launch or stop the cursor chain; plain B
-  inserts a chain on an empty cell and is inert on occupied ones — a
-  stray tap can't trigger or overwrite anything mid-performance.
-- **LIVE is a full citizen of the controls** (Seb): A+d-pad navigates
-  the screen map from the launcher (as if on SONG — up OPTIONS, down
-  FILES, right drills into the cursor chain), L/R and Y+←/→ switch
-  tracks, and **B on an empty cell inserts a chain** (SONG's tap
-  insert; B again launches it) instead of queueing a stop — the stop
-  gesture lives on the playing cell.
-- **LIVE: B on the cell a track is playing queues that track's stop**
-  (Seb) — it drains to the phrase boundary under the **X** marker
-  instead of re-triggering the chain you're hearing (B on any other
-  populated cell still queues its chain; SONG's A+B stays the global
-  stop). The X marker now also tracks arrangement playheads, not
-  just LIVE launches.
-- **LIVE cue/stop markers** (Seb): a steady **▸** marks each track's
-  playing cell, a *flashing* **▸** marks a cued chain waiting for its
-  boundary, and an **X** marks a track draining toward a queued stop
-  (**B on an empty cell queues the stop** — the track finishes its
-  phrase and goes quiet).
-- **Cues on silent tracks now fire** — at the next bar (16 rows), so
-  a chain launched on an idle track lands in time with the others
-  (before, a cue on a halted track never fired at all).
+- **LIVE mode grows up into a real clip launcher** (Seb):
+  - **A+B queues, launches and stops.** On a populated cell it
+    queues that chain on its track (launching right away from
+    stopped); on the cell the track is *playing* it queues that
+    track's stop instead — it never re-triggers the chain you're
+    hearing. Queued chains take over at the playing track's phrase
+    boundary; cues on *silent* tracks fire at the next bar (16 rows)
+    so they land in time with the others (before, they never fired
+    at all).
+  - **Plain B is edit-only**: it inserts a chain on an empty cell
+    (A+B then launches it) and is inert on occupied cells — a stray
+    tap can't trigger or overwrite anything mid-performance.
+  - **Markers**: a steady **▸** on each track's playing cell, a
+    *flashing* **▸** on a cued chain waiting for its boundary, an
+    **X** on a track draining toward a queued stop (the X follows
+    arrangement playheads too, not just LIVE launches).
+  - **The launcher is on the map**: A+d-pad navigates from LIVE as
+    if on SONG (up OPTIONS, down FILES, right drills into the cursor
+    chain), and L/R or Y+←/→ switch tracks.
 - Fixed: **the first LIVE launch after power-on started all eight
   tracks** — the pending-launch slots live in boot-zeroed RAM where
   0 reads as "chain 0 queued"; they are now seeded at boot and
-  cleared on stop (regression check `livecue.lua`).
+  cleared on stop (regression check `livecue.lua`, 20 asserts over
+  the whole launch/cue/stop/insert/nav lifecycle).
 - HELP pages reordered (Seb): INSTRUMENT TYPES and SAMPLES AND
   MEMORY are pages 4–5, the command reference pages 6–7.
 - HELP grows two pages (now 8): **SAMPLES AND MEMORY** (the ROM pool
