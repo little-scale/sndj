@@ -42,6 +42,8 @@
                   #fff, #fff 4px, #000 4px, #000 8px); }
   #budgets { position: sticky; top: 0; z-index: 4; background: #000;
              padding: .65rem 0 .4rem; border-bottom: 1px solid #333; }
+  .export-footer { margin-top: 1rem; padding: 1rem; border: 1px solid #fff;
+                   background: #000; }
   .hint { color: #888; font-size: .85rem; }
   #sf2list tr[draggable] { cursor: grab; }
   #sf2list tr[draggable]:active { cursor: grabbing; }
@@ -205,15 +207,6 @@ play button over it, listen for beating. Drums aim lower by design.">&#9833; ref
   <h1><small>palettes</small></h1>
   <table id="pal"></table>
 </div>
-<div id="exportview" hidden>
-  <div class="row">
-    <button class="primary" id="export">export patched ROM</button>
-    <button id="factexport" title="everything factory in one small file:
-pool, kits, boot instruments, FIR presets, palettes">export factory</button>
-    <button id="factimport" title="apply a .sndjfact onto the loaded ROM">import factory</button>
-    <input type="file" id="factfile" hidden accept=".sndjfact">
-  </div>
-</div>
 </div>
 
 <div>
@@ -224,6 +217,15 @@ pool, kits, boot instruments, FIR presets, palettes">export factory</button>
   <table id="sf2list"></table>
 </div>
 </div>
+</div>
+<div class="export-footer" id="exportview" hidden>
+  <div class="row">
+    <button class="primary" id="export">export patched ROM</button>
+    <button id="factexport" title="everything factory in one small file:
+pool, kits, boot instruments, FIR presets, palettes">export factory</button>
+    <button id="factimport" title="apply a .sndjfact onto the loaded ROM">import factory</button>
+    <input type="file" id="factfile" hidden accept=".sndjfact">
+  </div>
 </div>
 <input type="file" id="wavfile" hidden accept=".wav,.sf2">
 
