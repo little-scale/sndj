@@ -5,6 +5,12 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- **LIVE is a full citizen of the controls** (Seb): A+d-pad navigates
+  the screen map from the launcher (as if on SONG — up OPTIONS, down
+  FILES, right drills into the cursor chain), L/R and Y+←/→ switch
+  tracks, and **B on an empty cell inserts a chain** (SONG's tap
+  insert; B again launches it) instead of queueing a stop — the stop
+  gesture lives on the playing cell.
 - **LIVE: B on the cell a track is playing queues that track's stop**
   (Seb) — it drains to the phrase boundary under the **X** marker
   instead of re-triggering the chain you're hearing (B on any other

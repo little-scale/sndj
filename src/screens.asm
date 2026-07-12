@@ -113,6 +113,16 @@ screen_update:
 @splash:
     jmp splash_update
 
+; ui_mode for map lookups: LIVE navigates as SONG (it sits on SONG's
+; map position — Seb, 2026-07-12: A+d-pad must work from the launcher)
+nav_mode:
+    lda ui_mode
+    cmp #SCREEN_LIVE
+    bne +
+    lda #SCREEN_SONG
++
+    rts
+
 ; --- A (screen modifier) held + d-pad: navigate the map -------------------------
 ; Also swallows A-tap (reserved for A+B play-from-cursor later).
 nav_update:
@@ -158,7 +168,7 @@ nav_update:
     sep #$20
 .ACCU 8
     beq @not_down
-    lda ui_mode
+    jsr nav_mode
     cmp #SCREEN_SONG
     bne @down_not_song
     jsr files_init
@@ -211,7 +221,7 @@ nav_update:
     sep #$20
 .ACCU 8
     beq @not_up
-    lda ui_mode
+    jsr nav_mode
     cmp #SCREEN_FILES
     bne @up_not_files
     jsr song_init_screen
@@ -275,7 +285,7 @@ nav_update:
     jmp @try_left
 +
     ; deeper: SONG -> CHAIN -> PHRASE -> INSTR
-    lda ui_mode
+    jsr nav_mode
     cmp #SCREEN_SONG
     bne @r_not_song
     jmp @to_chain
@@ -400,7 +410,7 @@ nav_update:
     sep #$20
 .ACCU 8
     beq @done
-    lda ui_mode
+    jsr nav_mode
     cmp #SCREEN_PHRASE
     beq @to_chain2
     cmp #SCREEN_CHAIN
@@ -473,6 +483,8 @@ chan_update:
     beq @scr_ok
     cmp #SCREEN_SONG
     beq @scr_ok
+    cmp #SCREEN_LIVE
+    beq @scr_ok             ; the launcher shares the SONG cursor
     rts
 @scr_ok:
     lda a_down
@@ -544,7 +556,7 @@ chan_update:
     adc song_cx
     and #$07
     sta es3 + 1
-    lda ui_mode
+    jsr nav_mode            ; LIVE moves the shared cursor like SONG
     cmp #SCREEN_SONG
     bne @lookup
     lda es3 + 1

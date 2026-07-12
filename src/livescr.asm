@@ -145,11 +145,12 @@ live_update:
     jmp live_draw
 
 ; queue the cursor cell's chain on its track (launches now if stopped).
-; An EMPTY cell queues a STOP ($FE): the track finishes its phrase and
-; halts at the boundary — the grid shows an X while it drains. B on
-; the cell the track is PLAYING queues the same stop (Seb, 2026-07-12:
-; don't re-trigger the chain you're hearing); any other cell queues
-; its chain.
+; B on an EMPTY cell inserts a chain, SONG-style, so material can be
+; built without leaving the launcher (Seb, 2026-07-12) — B again then
+; launches it. B on the cell the track is PLAYING queues a STOP ($FE):
+; the track finishes its phrase and halts at the boundary under the X
+; marker (never re-trigger the chain you're hearing). Any other
+; populated cell queues its chain.
 live_queue_cursor:
     jsr song_cursor_cell    ; A = chain under cursor ($FF = empty)
     pha
@@ -162,7 +163,7 @@ live_queue_cursor:
 .ACCU 8
     pla
     cmp #$FF
-    beq @stop_q
+    beq @insert
     ; occupied cell: on the track's playing cell, stop; else launch
     pha
     lda eng_playing
@@ -180,15 +181,14 @@ live_queue_cursor:
     cmp song_cy
     bne @not_playing
     pla                     ; cursor is on the chain being heard
-@stop_q:
-    ; queue a stop (only meaningful on a playing track)
-    lda eng_playing
-    beq @done
-    lda.w trk_phrase,x
-    cmp #$FF
-    beq @done
     lda #$FE
-    sta.w trk_pending,x
+    sta.w trk_pending,x     ; queue its stop (X while it drains)
+    rts
+@insert:
+    ; empty cell: add a chain (SONG's tap insert)
+    jsr song_cell_addr
+    lda ed_lastchain
+    sta.l $7E0000 + SB_SONG,x
     rts
 @not_playing:
     pla

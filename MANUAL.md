@@ -433,9 +433,14 @@ track; from stopped it launches right away.
   phrase boundary. A chain queued on a *silent* track fires at the
   next bar (16 rows) so it lands in time with the others.
 - **B on the cell a track is playing queues its stop** — it never
-  re-triggers the chain you're hearing. **B on an empty cell queues
-  the same stop.** Either way the track finishes its phrase and goes
-  quiet.
+  re-triggers the chain you're hearing. The track finishes its
+  phrase and goes quiet.
+- **B on an empty cell inserts a chain**, exactly like SONG's tap —
+  build material without leaving the launcher, then B again to
+  launch it.
+- **The launcher is still on the map**: A+d-pad navigates from LIVE
+  as if you were on SONG (up OPTIONS, down FILES, right drills into
+  the cursor chain), and L/R or Y+←/→ switch tracks.
 - Launched chains loop on their own cell — LIVE never walks the song
   grid downward.
 

@@ -6,10 +6,11 @@
 -- seeds $FF at boot and on engine_stop.
 --
 -- Also gates the new semantics: a chain queued on a HALTED track fires
--- at the next bar boundary (16 rows); B on an EMPTY cell of a playing
--- track — or on the cell the track is PLAYING (don't re-trigger the
--- chain you're hearing) — queues a STOP ($FE) that drains at the
--- phrase boundary.
+-- at the next bar boundary (16 rows); B on the cell a track is PLAYING
+-- (don't re-trigger the chain you're hearing) queues a STOP ($FE) that
+-- drains at the phrase boundary; B on an EMPTY cell inserts a chain
+-- (ed_lastchain, SONG's tap insert) so material can be built in LIVE;
+-- A+d-pad navigates the map from LIVE as if on SONG.
 --
 -- Non-frozen addresses (src/ram.inc): $E8 trk_pending, $C00 trk_live_row,
 -- $C08 trk_pend_row, $20 trk_chain, $28 trk_phrase.
@@ -47,14 +48,16 @@ gest({ b = true }, 4)                -- cue chain 2 on HALTED V8
 local cued = t
 local fire_until = cued + 220        -- a bar is 16 rows (~2 phrase lengths)
 t = fire_until + 4
-script[t] = { down = true } ; t = t + 2 ; script[t] = {} ; t = t + 2
 script[t] = { b = true } ; t = t + 2 ; script[t] = {} ; t = t + 4
-local stopped_q = t
+local stopped_q = t                  -- B on the playing cell (7,2)
 local drain_until = stopped_q + 220
 t = drain_until + 4
 script[t] = { start = true } ; t = t + 2 ; script[t] = {} ; t = t + 6
 local stopped_chk = t + 4
 t = stopped_chk + 2
+gest({ down = true }, 2)             -- (7,3): empty cell
+gest({ b = true }, 4)                -- B on empty = insert a chain
+local inserted = t
 for _ = 1, 3 do gest({ up = true }, 2) end     -- cursor back to (0,0)
 for _ = 1, 7 do gest({ left = true }, 2) end
 gest({ b = true }, 8)                -- relaunch chain 0 on V1
@@ -64,6 +67,11 @@ local selfstop = t
 local drain2_until = selfstop + 220
 t = drain2_until + 4
 local done = t
+t = done + 2
+script[t] = { a = true } ; t = t + 2
+script[t] = { a = true, right = true } ; t = t + 2
+script[t] = {} ; t = t + 4
+local navved = t
 
 local fired_frame, fired_pending = nil, nil
 local drained_frame = nil
@@ -116,7 +124,7 @@ emu.addEventCallback(function()
       check(fired_pending == 0xFF, "pending slot cleared on fire")
     end
   elseif frames == stopped_q then
-    check(wram(0xE8 + 7) == 0xFE, "B on an empty cell queued a STOP")
+    check(wram(0xE8 + 7) == 0xFE, "B on the playing cell queued a STOP")
   elseif frames > stopped_q and frames <= drain_until then
     if drained_frame == nil and wram(0x2F) == 0xFF then
       drained_frame = frames
@@ -129,6 +137,9 @@ emu.addEventCallback(function()
   elseif frames == stopped_chk then
     check(wram(0x16) == 0, "Start stopped the transport")
     check(wram(0xE8 + 2) == 0xFF, "engine_stop cleared stale pendings")
+  elseif frames == inserted then
+    check(wram(0x2383) == wram(0x18F),
+      "B on an empty cell inserted a chain (SONG-style)")
   elseif frames == relaunched then
     check(wram(0x16) == 1 and wram(0x28) == 0,
       "relaunched chain 0 on track 1")
@@ -141,6 +152,8 @@ emu.addEventCallback(function()
   elseif frames == done then
     check(selfdrain_frame ~= nil, "playing-cell stop drained the track")
     check(wram(0x16) == 1, "transport kept running (track-level stop)")
+  elseif frames == navved then
+    check(wram(0x0C) == 2, "A+Right navigated LIVE -> CHAIN (as SONG)")
     if fails == 0 then
       print("ALL PASS livecue.lua")
       emu.stop(0)
