@@ -15,7 +15,8 @@
   .drop.small { padding: 1rem; }
   .drop.armed { border-color: #fff; color: #fff; }
   .drop.off { opacity: .35; cursor: default; }
-  .cols { display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap; }
+  .cols { display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap;
+          margin-top: 1.25rem; }
   /* each column scrolls on its own: the sf2 list stays put while the
      pool scrolls to the target slot (and vice versa) during drags */
   .cols > div { flex: 1 1 0; min-width: min(100%, 460px); overflow-x: auto;
@@ -39,6 +40,8 @@
   .bar div { height: 100%; background: #fff; }
   .bar div.over { background: repeating-linear-gradient(45deg,
                   #fff, #fff 4px, #000 4px, #000 8px); }
+  #budgets { position: sticky; top: 0; z-index: 4; background: #000;
+             padding: .65rem 0 .4rem; border-bottom: 1px solid #333; }
   .hint { color: #888; font-size: .85rem; }
   #sf2list tr[draggable] { cursor: grab; }
   #sf2list tr[draggable]:active { cursor: grabbing; }
@@ -1124,10 +1127,15 @@ function sf2Prep(s) {
 function auditionSf2(fi, i) {
   const s = sf2fonts[fi].samples[i];
   try {
-    const { prep, rate } = sf2Prep(s);
+    const { prep, rate, mode } = sf2Prep(s);
     const brr = S.brrEncode(prep.pcm, prep.loopBlock);
+    // Melodic trim shortens the stored data by octaves; pool import subtracts
+    // the same value from tuneSemis so playback stays at the root pitch. Apply
+    // that compensation here too, so SF2-list audition matches the pool slot.
+    const trimTune = mode === 'melodic' ? (+$('sftrim').value || 0) : 0;
     audition({ brr, loopBlock: prep.loopBlock,
-               tuneSemis: prep.tuneSemis, tuneFine: prep.tuneFine }, rate);
+               tuneSemis: prep.tuneSemis - trimTune,
+               tuneFine: prep.tuneFine }, rate);
   } catch (err) {
     status('audition failed: ' + err.message, 1);
   }

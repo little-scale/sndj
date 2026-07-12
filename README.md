@@ -65,7 +65,11 @@ await real-hardware bring-up. What works today:
   saves and `.sndj` files with a per-song **play button**;
   `als2sndj.html` — Ableton/.mid/MML in both directions (ALS.md);
   `spcexport.html` — listen, render **WAV**, or export a standard
-  **`.spc`** that plays in any SPC player
+  **`.spc`** that plays in any SPC player. For preparing custom
+  single-sample SoundFonts for the patcher, use
+  [**simple-sf2-editor**](https://github.com/little-scale/simple-sf2-editor):
+  load a WAV, set its root pitch and loop, export SF2, then drag it into
+  the patcher's SoundFont panel.
 
 Still to come: hardware bring-up of sync/MIDI rigs (M12/M14) and the
 sync OUT master; the factory lives in `factory/` and is built to be

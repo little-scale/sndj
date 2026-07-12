@@ -578,7 +578,11 @@ everything runs locally:
   sliders, echo-loop audition, writes the 8 ROM presets), and
   **PALETTES**. Every audition runs through a bit-exact model of the
   console's BRR + Gaussian playback, so what you hear in the browser
-  is what the cart plays.
+  is what the cart plays. The main custom-sample workflow starts in
+  [**simple-sf2-editor**](https://github.com/little-scale/simple-sf2-editor):
+  prepare a WAV's pitch, trim, loop, crossfade and SNES-oriented
+  16-sample alignment there, export SF2, then drag the result into the
+  patcher's SoundFont panel for BRR conversion and ROM-pool import.
 - **savetool.html** — song manager for cart saves (§12).
 - **spcexport.html** — listen to and share your songs: drop a
   `.sndj` (or a cart save and pick a slot) plus the ROM. A **listen**
