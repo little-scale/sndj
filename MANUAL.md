@@ -426,18 +426,20 @@ the hex in on the FIR screen.
 ## 11. Live mode
 
 Set MODE to LIVE on PROJECT (or press **Select**): the SONG grid
-becomes a clip launcher. **B** on a cell queues that chain on its
-track; from stopped it launches right away.
+becomes a clip launcher. **A+B** (the contextual-play gesture) on a
+cell queues that chain on its track; from stopped it launches right
+away. Plain **B** stays an edit key and never touches the transport.
 
 - A chain queued on a *playing* track takes over at the track's next
   phrase boundary. A chain queued on a *silent* track fires at the
   next bar (16 rows) so it lands in time with the others.
-- **B on the cell a track is playing queues its stop** — it never
+- **A+B on the cell a track is playing queues its stop** — it never
   re-triggers the chain you're hearing. The track finishes its
   phrase and goes quiet.
 - **B on an empty cell inserts a chain**, exactly like SONG's tap —
-  build material without leaving the launcher, then B again to
-  launch it.
+  build material without leaving the launcher, then A+B to launch
+  it. B on an occupied cell does nothing (a stray tap can't
+  overwrite or trigger anything mid-set).
 - **The launcher is still on the map**: A+d-pad navigates from LIVE
   as if you were on SONG (up OPTIONS, down FILES, right drills into
   the cursor chain), and L/R or Y+←/→ switch tracks.

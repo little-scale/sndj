@@ -5,6 +5,10 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## unreleased
 
+- **LIVE launch/stop is the A+B gesture, plain B is edit-only** (Seb):
+  hold A and tap B to queue, launch or stop the cursor chain; plain B
+  inserts a chain on an empty cell and is inert on occupied ones — a
+  stray tap can't trigger or overwrite anything mid-performance.
 - **LIVE is a full citizen of the controls** (Seb): A+d-pad navigates
   the screen map from the launcher (as if on SONG — up OPTIONS, down
   FILES, right drills into the cursor chain), L/R and Y+←/→ switch

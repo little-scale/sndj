@@ -30,10 +30,10 @@ local function gest(b, gap) script[t]=b; t=t+2; script[t]={}; t=t+(gap or 2) end
 gest({ start = true }, 4)          -- SONG
 gest({ select = true }, 6)         -- LIVE
 local at_live = t
-gest({ b = true }, 8)              -- launch chain 0 on V1 (immediate: stopped)
+gest({ a = true, b = true }, 8)    -- A+B: launch chain 0 on V1 (stopped)
 local launched = t
 gest({ down = true }, 4)           -- cursor to row 1 (chain 1)
-gest({ b = true }, 4)              -- queue chain 1 (quantised)
+gest({ a = true, b = true }, 4)    -- A+B: queue chain 1 (quantised)
 local queued = t
 -- watch for the boundary switch during the next ~120 frames
 local watch_until = t + 130
@@ -44,13 +44,15 @@ gest({ x = true, right = true }, 4) -- solo V1 (mute = $FE)
 local soloed = t - 2
 gest({ x = true, right = true }, 4) -- solo again -> clear
 local cleared = t - 2
-gest({ start = true }, 6)          -- stop
+gest({ start = true }, 24)         -- stop (long gap: the golden shot
+                                   -- needs the full-grid redraw drained)
 gest({ select = true }, 6)         -- back to SONG
 local done = t + 4
 
 local switch_frame, switch_prow = nil, nil
 local mute_seq = {}
 local envx_seen = false
+local shot2_at = nil
 
 emu.addEventCallback(function() emu.setInput(pad, 0) end, emu.eventType.inputPolled)
 
@@ -61,6 +63,25 @@ emu.addEventCallback(function()
   end
   frames = frames + 1
   if script[frames] then pad = script[frames] end
+
+  -- golden: LIVE after the Start-stop, before Select-back — the only
+  -- deterministic content (playback rows ride the APU tick, and the
+  -- boot->script frame offset jitters a few frames run to run, so the
+  -- capture is gated on the engine actually stopping, +3 to let the
+  -- markers redraw away). Standalone if — inside the elseif chain the
+  -- watch window shadowed it and the shot never fired.
+  if frames > cleared and shot2_at == nil and wram(0x16) == 0 then
+    shot2_at = frames + 12
+  end
+  if shot2_at and frames == shot2_at then
+    local out = os.getenv("SNDJ_LIVE_SHOT")
+    if out then
+      local png = emu.takeScreenshot()
+      local f = io.open(out, "wb")
+      f:write(png)
+      f:close()
+    end
+  end
 
   if frames == 20 then
     -- song data: chain0 -> phrase0 (C-4s), chain1 -> phrase1 (C-5s)
@@ -75,7 +96,7 @@ emu.addEventCallback(function()
   elseif frames == at_live then
     check(wram(0x0C) == 8, "Select opened LIVE")
   elseif frames == launched then
-    check(wram(0x16) == 1, "B launched immediately from stopped")
+    check(wram(0x16) == 1, "A+B launched immediately from stopped")
     check(wram(0x20) == 0, "track 0 playing chain 0")
   elseif frames == queued then
     check(wram(0xE8) == 1, "chain 1 queued on track 0")
@@ -105,14 +126,6 @@ emu.addEventCallback(function()
     local m = wram(0xF0)
     if #mute_seq == 0 or mute_seq[#mute_seq] ~= m then
       mute_seq[#mute_seq + 1] = m
-    end
-
-    local out = os.getenv("SNDJ_LIVE_SHOT")
-    if out then
-      local png = emu.takeScreenshot()
-      local f = io.open(out, "wb")
-      f:write(png)
-      f:close()
     end
   elseif frames == done then
     -- mute grammar: validate the transition sequence (timing-independent)

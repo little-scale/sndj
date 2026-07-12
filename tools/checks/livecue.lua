@@ -39,30 +39,32 @@ local function gest(b, gap) script[t]=b; t=t+2; script[t]={}; t=t+(gap or 2) end
 
 gest({ start = true }, 4)            -- splash -> SONG
 gest({ select = true }, 6)           -- LIVE
-gest({ b = true }, 8)                -- launch chain 0 on V1 (cursor 0,0)
+gest({ b = true }, 4)                -- plain B on occupied (0,0): inert
+local b_inert = t
+gest({ a = true, b = true }, 8)      -- A+B: launch chain 0 on V1 (0,0)
 local launched = t
 gest({ down = true }, 2)             -- cursor -> row 2
 gest({ down = true }, 2)
 for _ = 1, 7 do gest({ right = true }, 2) end  -- cursor -> track 8
-gest({ b = true }, 4)                -- cue chain 2 on HALTED V8
+gest({ a = true, b = true }, 4)      -- A+B: cue chain 2 on HALTED V8
 local cued = t
 local fire_until = cued + 220        -- a bar is 16 rows (~2 phrase lengths)
 t = fire_until + 4
-script[t] = { b = true } ; t = t + 2 ; script[t] = {} ; t = t + 4
-local stopped_q = t                  -- B on the playing cell (7,2)
+script[t] = { a = true, b = true } ; t = t + 2 ; script[t] = {} ; t = t + 4
+local stopped_q = t                  -- A+B on the playing cell (7,2)
 local drain_until = stopped_q + 220
 t = drain_until + 4
 script[t] = { start = true } ; t = t + 2 ; script[t] = {} ; t = t + 6
 local stopped_chk = t + 4
 t = stopped_chk + 2
 gest({ down = true }, 2)             -- (7,3): empty cell
-gest({ b = true }, 4)                -- B on empty = insert a chain
+gest({ b = true }, 4)                -- plain B on empty = insert a chain
 local inserted = t
 for _ = 1, 3 do gest({ up = true }, 2) end     -- cursor back to (0,0)
 for _ = 1, 7 do gest({ left = true }, 2) end
-gest({ b = true }, 8)                -- relaunch chain 0 on V1
+gest({ a = true, b = true }, 8)      -- A+B: relaunch chain 0 on V1
 local relaunched = t
-gest({ b = true }, 4)                -- B on the PLAYING cell = stop it
+gest({ a = true, b = true }, 4)      -- A+B on the PLAYING cell = stop
 local selfstop = t
 local drain2_until = selfstop + 220
 t = drain2_until + 4
@@ -98,8 +100,11 @@ emu.addEventCallback(function()
     poke(0x4300, 49) poke(0x4301, 0)   -- phrase 0: C-4
     poke(0x4340, 52) poke(0x4341, 0)   -- phrase 1: D#4
     poke(0x4380, 56) poke(0x4381, 0)   -- phrase 2: G-4
+  elseif frames == b_inert then
+    check(wram(0x16) == 0 and wram(0x2000) == 0,
+      "plain B on an occupied cell is inert (launch is A+B)")
   elseif frames == launched then
-    check(wram(0x16) == 1, "first-boot B launched the transport")
+    check(wram(0x16) == 1, "first-boot A+B launched the transport")
     check(wram(0x28) == 0, "track 1 playing phrase 0")
     local others_halted = true
     for tr = 1, 7 do
