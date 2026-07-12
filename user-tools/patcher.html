@@ -42,8 +42,12 @@
                   #fff, #fff 4px, #000 4px, #000 8px); }
   #budgets { position: sticky; top: 0; z-index: 4; background: #000;
              padding: .65rem 0 .4rem; border-bottom: 1px solid #333; }
-  .export-footer { margin-top: 1rem; padding: 1rem; border: 1px solid #fff;
-                   background: #000; }
+  .workflow-bar { display: flex; justify-content: space-between;
+                  align-items: center; gap: .8rem 1.5rem; flex-wrap: wrap;
+                  margin-top: .8rem; padding: .75rem 1rem;
+                  border: 1px solid #fff; background: #000; }
+  #impbar { flex: 1 1 720px; }
+  #exportview { flex: 0 1 auto; }
   .hint { color: #888; font-size: .85rem; }
   #sf2list tr[draggable] { cursor: grab; }
   #sf2list tr[draggable]:active { cursor: grabbing; }
@@ -82,23 +86,32 @@ pipeline the factory pool uses: root keys baked, loops landed on BRR
 blocks), audition the decoded BRR, recolour the 8 palette schemes, and
 export a patched ROM. Everything runs locally.</p>
 <div id="status"></div>
-<div class="row" id="impbar">
-  <span class="hint"><b>import settings</b> (the next drag / replace&hellip;):</span>
-  <select id="sfmode">
-    <option value="auto">auto (loop &rarr; melodic, else one-shot)</option>
-    <option value="melodic">melodic (looped, in tune)</option>
-    <option value="oneshot">one-shot (8 kHz kit drum)</option>
-  </select>
-  <label id="sftrimlab">trim semis <input type="number" id="sftrim" value="0"
-    min="0" max="36" style="width:3.5rem"></label>
-  <label id="sfcaplab">cap ms <input type="number" id="sfcap" value="160"
-    min="20" max="500" style="width:4rem"></label>
-  <span class="hint" style="cursor:help; text-decoration:underline dotted"
-    title="melodic: a smpl/sf2 loop imports in tune (root key honoured); without one the whole file loops. Trim +12/+24/+36 stores the data one/two/three octaves lower (half/quarter/eighth size) and bakes the compensating tune into the slot automatically — playback pitch is unchanged, just darker. One-shots: soundfont slots resample to 8 kHz (capped at cap ms), WAVs keep full length; either way the storage rate is baked into the pool tune, so kit-slot tunes stay purely musical. The → column in the soundfont list shows each sample's fate under the current settings.">?</span>
-  <button id="reftone" title="a 523.25 Hz sine — C-5, the exact pitch every
+<div class="workflow-bar">
+  <div class="row" id="impbar">
+    <span class="hint"><b>import settings</b> (the next drag / replace&hellip;):</span>
+    <select id="sfmode">
+      <option value="auto">auto (loop &rarr; melodic, else one-shot)</option>
+      <option value="melodic">melodic (looped, in tune)</option>
+      <option value="oneshot">one-shot (8 kHz kit drum)</option>
+    </select>
+    <label id="sftrimlab">trim semis <input type="number" id="sftrim" value="0"
+      min="0" max="36" style="width:3.5rem"></label>
+    <label id="sfcaplab">cap ms <input type="number" id="sfcap" value="160"
+      min="20" max="500" style="width:4rem"></label>
+    <span class="hint" style="cursor:help; text-decoration:underline dotted"
+      title="melodic: a smpl/sf2 loop imports in tune (root key honoured); without one the whole file loops. Trim +12/+24/+36 stores the data one/two/three octaves lower (half/quarter/eighth size) and bakes the compensating tune into the slot automatically — playback pitch is unchanged, just darker. One-shots: soundfont slots resample to 8 kHz (capped at cap ms), WAVs keep full length; either way the storage rate is baked into the pool tune, so kit-slot tunes stay purely musical. The → column in the soundfont list shows each sample's fate under the current settings.">?</span>
+    <button id="reftone" title="a 523.25 Hz sine — C-5, the exact pitch every
 in-tune melodic slot should sound from its play button (the audition IS
 console note C-5: native rate + the entry tune). Toggle it on, layer the
 play button over it, listen for beating. Drums aim lower by design.">&#9833; ref C-5</button>
+  </div>
+  <div class="row" id="exportview" hidden>
+    <button class="primary" id="export">export patched ROM</button>
+    <button id="factexport" title="everything factory in one small file:
+pool, kits, boot instruments, FIR presets, palettes">export factory</button>
+    <button id="factimport" title="apply a .sndjfact onto the loaded ROM">import factory</button>
+    <input type="file" id="factfile" hidden accept=".sndjfact">
+  </div>
 </div>
 <div class="cols">
 <div>
@@ -217,15 +230,6 @@ play button over it, listen for beating. Drums aim lower by design.">&#9833; ref
   <table id="sf2list"></table>
 </div>
 </div>
-</div>
-<div class="export-footer" id="exportview" hidden>
-  <div class="row">
-    <button class="primary" id="export">export patched ROM</button>
-    <button id="factexport" title="everything factory in one small file:
-pool, kits, boot instruments, FIR presets, palettes">export factory</button>
-    <button id="factimport" title="apply a .sndjfact onto the loaded ROM">import factory</button>
-    <input type="file" id="factfile" hidden accept=".sndjfact">
-  </div>
 </div>
 <input type="file" id="wavfile" hidden accept=".wav,.sf2">
 
