@@ -5,6 +5,9 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
 ## Unreleased
 
+- Added a dedicated Link/cross-console wiring guide for XIAO ESP32 → sndj
+  IN24 and genmddj OUT → sndj IN, including safe level conversion and staged
+  hardware bring-up procedures.
 - Removed all bundled sample recordings, game SoundFonts and the derived
   factory container. The repository now ships a lean, copyright-free project
   factory with 8 authored sounds and 40 blank slots; raw samples, SoundFonts

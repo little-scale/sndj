@@ -526,6 +526,9 @@ the ESP32 Link bridge, drives it with no changes on their side.
 While IN/IN24 is armed, OPTIONS shows a live **RX** clock counter —
 if it climbs, the wire works.
 
+The XIAO-to-SNES and Mega-Drive-to-SNES cable diagrams, level conversion and
+bring-up sequence are in [`LINK-SYNC-WIRING.md`](LINK-SYNC-WIRING.md).
+
 ### MIDI takeover (SYNC: MIDI)
 
 sndj becomes an **8-voice BRR sample module**: keep the transport

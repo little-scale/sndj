@@ -4,6 +4,9 @@ Notes from hardware bring-up. The controller-port sync pinout, level
 shifting and the ESP32 bridge get documented here as the rigs are
 verified (CLAUDE.md §12-13); what's below is verified today.
 
+The build instructions and pin-by-pin adapters for XIAO Link → sndj and
+genmddj OUT → sndj are in [`LINK-SYNC-WIRING.md`](LINK-SYNC-WIRING.md).
+
 ## Reference rig
 
 - **FXPak Pro** (SD2SNES) in a SNES/SFC console is the reference cart.

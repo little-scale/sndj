@@ -129,6 +129,7 @@ Every hardware-relevant bug found so far has a regression check.
 - **CLAUDE.md** — the master plan and agent guide (the contract)
 - **SAVEFORMAT.md** — WRAM song block + SRAM byte layouts
 - **HARDWARE.md** — real-silicon notes and errata
+- **LINK-SYNC-WIRING.md** — XIAO Link/IN24 and genmddj OUT→sndj IN adapters
 - **ALS.md** — the Ableton/MIDI/MML converter's mapping
 - **CHANGELOG.md** — per-milestone user-facing notes
 
