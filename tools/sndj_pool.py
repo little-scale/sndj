@@ -263,7 +263,9 @@ def build_factory():
         root_eff = (s.get('root', 60) or 60) - s.get('corr', 0) / 100.0
         if not 24 <= root_eff <= 108:
             root_eff = 60
-        shift = 61 - root_eff + trim
+        # SF2 roots use MIDI numbering. Console C-5/index 60 is MIDI 72;
+        # phrase byte 61 is its separate, one-based stored representation.
+        shift = 72 - root_eff + trim
         scale = 2 ** (-shift / 12)
         ideal = scale * 32000 / s['rate']
         ls, le = s['loop']

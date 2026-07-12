@@ -46,7 +46,7 @@ def main():
             root_eff = (s.get('root', 60) or 60) - s.get('corr', 0) / 100.0
             if not 24 <= root_eff <= 108:
                 root_eff = 60
-            shift = 61 - root_eff + arg
+            shift = 72 - root_eff + arg
             scale = 2 ** (-shift / 12)
             ideal = scale * 32000 / s['rate']
             ls, le = s['loop']

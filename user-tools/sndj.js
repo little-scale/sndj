@@ -423,7 +423,10 @@ function sf2Melodic(s, trim) {
   if (!s.loop) throw new Error(s.name + ' has no loop');
   let rootEff = (s.root || 60) - (s.corr || 0) / 100;
   if (!(rootEff >= 24 && rootEff <= 108)) rootEff = 60;
-  const shift = 61 - rootEff + trim;
+  // SF2 roots are MIDI notes. Console C-5 is note index 60, which the MIDI
+  // input path maps from MIDI 72 (stored phrase byte 61 is a different,
+  // one-based representation and must not be used as an SF2 root target).
+  const shift = 72 - rootEff + trim;
   const scale = Math.pow(2, -shift / 12);
   const ideal = scale * 32000 / s.rate;
   const [ls, le] = s.loop;
@@ -2006,6 +2009,18 @@ function selftest() {
   assert(pitchForNote(48) === 0x0800, 'C-4 pitch');
   assert(pitchForNote(52) === 0x0A14, 'E-4 pitch');
   assert(pitchForNote(60) === 0x1000, 'C-5 pitch');
+  // A root-keyed A4 sample prepared for native console C-5 must land on
+  // standard C5 (523.251 Hz), including BRR-block loop rounding residual.
+  const sfLoopLen = 3200;
+  const sfPcm = Array.from({ length: sfLoopLen }, (_, i) =>
+    Math.round(Math.sin(2 * Math.PI * 440 * i / 32000) * 20000));
+  const sfPrep = sf2Melodic({ name: 'A4 fixture', pcm: sfPcm, rate: 32000,
+    root: 69, corr: 0, loop: [0, sfLoopLen] }, 0);
+  const sfFactor = (sfPrep.pcm.length - sfPrep.loopBlock * 16) / sfLoopLen;
+  const sfTune = sfPrep.tuneSemis + sfPrep.tuneFine / 256;
+  const sfHz = 440 / sfFactor * Math.pow(2, sfTune / 12);
+  assert(Math.abs(1200 * Math.log2(sfHz / 523.2511306)) < 1,
+    'SF2 root bakes to C-5 (' + sfHz.toFixed(3) + ' Hz)');
   // ---- S-DSP model ----
   // ARAM: directory at $0100 (entry 0 -> $0200), the pad wave above as
   // a looped BRR at $0200, echo buffer up at $E000.
