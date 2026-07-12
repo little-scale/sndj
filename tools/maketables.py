@@ -138,17 +138,25 @@ def tables_inc():
 # 16 kits x 16 slots x 4 bytes (pool sample, tune, vol, flags); vol 0 =
 # empty slot. Marker-wrapped SNKIT0 in ROM; song NEW copies the block
 # verbatim into the song's kit section, and patcher.html edits it.
-# Only kit 0 (SMW percussion) ships filled — the factory boot set stays
-# small so the pool loads on demand (residency follows references).
+# Only kit 0 ships filled — the factory boot set stays small so the pool loads
+# on demand (residency follows references). These indices target the generated
+# placeholder pool when no local factory is supplied.
 # Kits 1-15 are blank canvases for the patcher's kit builder / the
 # console KIT screen. 8 kHz drums: tune -24 ($E8), vol $50.
 
-FACTORY_KITS = [(16, 10)]  # (first pool sample, count)
+FACTORY_KIT0 = [            # (pool sample, tune, volume, flags)
+    (7, 0, 0x50, 0), (8, 0, 0x50, 0), (9, 0, 0x50, 0),
+    (10, -12, 0x50, 0), (11, 0, 0x50, 0), (12, 0, 0x50, 0),
+    (13, 0, 0x50, 0), (14, 0, 0x50, 0), (15, 0, 0x50, 0),
+    (17, -12, 0x50, 0), (21, 0, 0x50, 0), (19, 0, 0x50, 0),
+    (22, 0, 0x50, 0), (0, 0, 0, 0), (0, 0, 0, 0),
+    (23, 0, 0x50, 0),
+]
 
 
 def kits_bin():
-    # the committed factory (.sndjfact from patcher.html) is the truth;
-    # a bare kits.bin also works; else generate from the table
+    # A local factory (.sndjfact from patcher.html) is the truth; a bare
+    # local kits.bin also works; otherwise generate the placeholder table.
     import os.path
     if os.path.exists('factory/factory.sndjfact'):
         with open('factory/factory.sndjfact', 'rb') as f:
@@ -162,10 +170,9 @@ def kits_bin():
         assert len(data) == 1024, 'samples/kits.bin must be 16*16*4 bytes'
         return data
     out = bytearray(16 * 16 * 4)
-    for k, (base, count) in enumerate(FACTORY_KITS):
-        for s in range(count):
-            off = k * 64 + s * 4
-            out[off:off + 4] = bytes((base + s, 0xE8, 0x50, 0))
+    for s, (sample, tune, volume, flags) in enumerate(FACTORY_KIT0):
+        off = s * 4
+        out[off:off + 4] = bytes((sample, tune & 0xFF, volume, flags))
     return bytes(out)
 
 

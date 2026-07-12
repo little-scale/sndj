@@ -112,22 +112,39 @@ function render() {
   tb.innerHTML = '';
   parsed.slots.forEach(s => {
     const tr = document.createElement('tr');
+    const cell = (text, className) => {
+      const td = tr.insertCell();
+      if (className) td.className = className;
+      if (text !== undefined) td.textContent = text;
+      return td;
+    };
     if (s.empty) {
-      tr.innerHTML = '<td>' + s.index + '</td><td class="dim">— empty —</td>' +
-        '<td></td><td></td><td></td>';
+      cell(s.index); cell('— empty —', 'dim'); cell(); cell(); cell();
     } else {
-      const crc = s.ok ? '<span class="ok">ok</span>'
-                       : '<span class="warn">BAD</span>';
       const playing = player && player.idx === s.index;
-      tr.innerHTML = '<td>' + s.index + '</td><td>' + s.name +
-        ' <span class="dim">' + songStats(s.packed) + '</span></td>' +
-        '<td>' + s.size + ' B</td><td>' + crc + ' ' + hex(s.crc) + '</td>' +
-        '<td>' + (pool ? '<button class="primary" data-p="' + s.index + '">' +
-          (playing ? '&#9632; stop' : '&#9654; play') + '</button> ' : '') +
-        '<button data-v="' + s.index + '">view</button> ' +
-        '<button data-x="' + s.index + '">extract</button> ' +
-        '<button data-r="' + s.index + '">rename</button> ' +
-        '<button data-e="' + s.index + '">erase</button></td>';
+      cell(s.index);
+      const name = cell(s.name + ' ');
+      const stats = document.createElement('span');
+      stats.className = 'dim'; stats.textContent = songStats(s.packed);
+      name.appendChild(stats);
+      cell(s.size + ' B');
+      const crc = cell();
+      const verdict = document.createElement('span');
+      verdict.className = s.ok ? 'ok' : 'warn';
+      verdict.textContent = s.ok ? 'ok' : 'BAD';
+      crc.append(verdict, ' ' + hex(s.crc));
+      const actions = cell();
+      const button = (label, key) => {
+        const b = document.createElement('button');
+        b.textContent = label; b.dataset[key] = s.index;
+        actions.append(b, ' ');
+        return b;
+      };
+      if (pool && s.ok) button(playing ? '■ stop' : '▶ play', 'p').className = 'primary';
+      if (s.ok) {
+        button('view', 'v'); button('extract', 'x'); button('rename', 'r');
+      }
+      button('erase', 'e');
     }
     tb.appendChild(tr);
   });
@@ -277,13 +294,20 @@ $('slots').onclick = e => {
     save(bytes, name.replace(/\s+/g, '_') + '.sndj');
     status('extracted slot ' + x);
   } else if (er !== undefined) {
+    if (!confirm('Erase slot ' + er + '? Download the original .srm first if needed.')) return;
     if (player) { player.stop(); player = null; }
-    srm = S.srmErase(srm, +er);
+    try { srm = S.srmErase(srm, +er); }
+    catch (e) { status(e.message, true); return; }
     $('viewer').classList.remove('show');
     status('erased slot ' + er);
     render();
   } else if (rn !== undefined) {
-    const songs = S.srmParse(srm).slots.filter(s => !s.empty)
+    const parsed = S.srmParse(srm);
+    if (parsed.slots.some(s => !s.empty && !s.ok)) {
+      status('corrupt saves are read-only; extract valid songs into a fresh image', true);
+      return;
+    }
+    const songs = parsed.slots.filter(s => !s.empty)
       .map(s => ({ name: s.name, packed: s.packed }));
     const cur = songs[+rn].name;
     const raw = prompt('new name for "' + cur + '" (8 chars, A-Z 0-9 - .):', cur);

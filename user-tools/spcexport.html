@@ -400,10 +400,20 @@ async function take(f) {
     if (!parsed.valid) { note(f.name + ': not an SNDJ1 save', true); return; }
     const used = parsed.slots.filter(s => !s.empty);
     if (!used.length) { note(f.name + ': no songs in this save', true); return; }
-    $('slots').innerHTML = '<table><tr><th>slot</th><th>name</th><th></th></tr>' +
-      used.map(s => '<tr><td>' + s.index + '</td><td>' + s.name +
-        '</td><td><button data-s="' + s.index + '">use</button></td></tr>')
-      .join('') + '</table>';
+    const table = document.createElement('table');
+    const head = table.insertRow();
+    ['slot', 'name', ''].forEach(v => {
+      const th = document.createElement('th'); th.textContent = v; head.appendChild(th);
+    });
+    used.forEach(s => {
+      const row = table.insertRow();
+      row.insertCell().textContent = s.index;
+      row.insertCell().textContent = s.name;
+      const b = document.createElement('button');
+      b.textContent = 'use'; b.dataset.s = s.index;
+      row.insertCell().appendChild(b);
+    });
+    $('slots').replaceChildren(table);
     window.__srmSlots = used;
     status();
     return;

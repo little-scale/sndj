@@ -209,10 +209,11 @@ Any type can go on any of the 8 voices — there are no special
 channels. Eight kits at once is legal. **The first 8 instruments are
 the factory boot set** — their samples land in audio RAM at power-on,
 and the patcher's boot-instruments editor voices all 8 (type, sample
-/ kit / bank, loop, slice count). The stock rows: **00-06 pitched
-SMP melodics** (xylophone, honky-tonk piano, nylon guitar, trombone,
-steel drum, slap bass, crystal) and **07 = KIT 0** (the sndj drum
-kit). Slots 08-63 start as SMP on sample 0, ready to re-voice. Audio RAM only holds what the song *references* —
+  / kit / bank, loop, slice count). In a clean build the placeholder rows are
+  **00-06 pitched SMP sounds** (sine, square, triangle, saw, organ, bass,
+  bell) and **07 = KIT 0** (synthetic percussion). A local factory pack may
+  replace all of them. Slots 08-63 start as SMP on sample 0, ready to re-voice.
+  Audio RAM only holds what the song *references* —
 point an instrument or kit slot at any pool sample and it loads on the
 spot, so the rest of the pool costs nothing until you use it (the ECHO
 screen's RAM/FREE line shows the live balance).
@@ -417,8 +418,8 @@ the hex in on the FIR screen.
   have a soft, rounded character all their own.
 - **KIT** — 16 slots per kit, each slot = pool sample + signed
   semitone tune + volume. On a KIT instrument the phrase's note
-  column picks the slot. Kit one-shots in the factory bank are
-  stored at 8 kHz for that crunchy early-sampler flavour.
+  column picks the slot. Factory authors can deliberately store one-shots at
+  lower rates for a crunchy early-sampler flavour.
 - **NSE** — the note column sets the *global* noise clock (32
   rates). All noise voices share it; the last writer wins. Same
   idiom as the PSG siblings.

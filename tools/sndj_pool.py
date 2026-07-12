@@ -19,14 +19,14 @@ the resample, so they carry 0/0).
   then the BRR data. Each sample is padded so its data never crosses a
   32 KB ROM bank boundary (the console reads with 16-bit in-bank math).
 
-Factory content ("game authentic"): melodic samples extracted from
-soundfonts/*.sf2 plus two drum kits from samples/ (808, 909), trimmed and
-resampled to 32 kHz. If factory/factory.sndjfact exists (the committed
-factory, exported by patcher.html) its pool section is used verbatim;
-a bare samples/pool.bin also works.
+If a local factory/factory.sndjfact exists (exported by patcher.html), its pool
+section is used verbatim; a bare samples/pool.bin also works. Clean checkouts
+use a deterministic, code-generated placeholder pool made from mathematical
+waveforms and seeded noise. No sample recordings or SoundFonts are distributed.
 """
 import math
 import os
+import random
 import struct
 import sys
 import wave
@@ -39,6 +39,7 @@ RESERVED = 0x27FFA          # banks 1-5 minus the 6-byte SNPOOL marker
 BANK0_SPAN = 0x7FFA         # data bytes available in the marker bank
 BANK_SPAN = 0x8000
 MAX_ENTRIES = 56            # ARAM directory slots 0-55 (56-63 are waves)
+PLACEHOLDER_ENTRIES = 48    # established editable factory surface (18 + 30 free)
 
 
 # ---------------------------------------------------------------- ingestion
@@ -307,6 +308,90 @@ def build_factory():
     return entries
 
 
+# Copyright-clean fallback for a fresh checkout. The first 18 entries are
+# usable sounds; the remaining 30 are explicit one-block free slots so the
+# pool retains its stable 48-slot editing surface. Block counts and tuning for
+# the active entries intentionally preserve the established residency/budget
+# boundary tests while the audio itself is newly synthesized here.
+PLACEHOLDER_SLOTS = [       # name, BRR blocks, loop block, semis, fine, voice
+    ('SINE',      138, 124,  -2, 107, 'sine'),
+    ('SQUARE',    741, None, -1,   0, 'square'),
+    ('TRIANGLE',  105,  91,  -2, 123, 'triangle'),
+    ('SAW',       209, 187,  -1,  67, 'saw'),
+    ('ORGAN',     756, None, -1,  37, 'organ'),
+    ('BASS',      172, 157,   0, -80, 'bass'),
+    ('BELL',      551, None, -1,  10, 'bell'),
+    ('KICK',      131, None,  0,  17, 'kick'),
+    ('SNARE',     293, None, -10, -48, 'snare'),
+    ('HAT',       126, None,  0,  -1, 'hat'),
+    ('TOM',        53, None, -24,  0, 'tom'),
+    ('PERC 1',     31, None, -24,  0, 'perc'),
+    ('PERC 2',     80, None, -24,  0, 'perc'),
+    ('WOOD 1',     14, None, -36,  0, 'wood'),
+    ('WOOD 2',     10, None, -36,  0, 'wood'),
+    ('BLIP',       74, None, -36,  0, 'blip'),
+    ('POP',        46, None, -24,  0, 'pop'),
+    ('NOISE',      57, None, -24,  0, 'noise'),
+]
+
+
+def _placeholder_pcm(slot, blocks, voice):
+    """Deterministic 16-bit PCM; no source recordings or sampled instruments."""
+    n = blocks * 16
+    rng = random.Random(0x534E444A + slot)
+    out = []
+    for i in range(n):
+        phase = (i % 64) / 64.0
+        env = 1.0 if voice in ('sine', 'triangle', 'saw', 'bass') \
+            else max(0.0, 1.0 - i / max(1, n - 1))
+        if voice == 'sine':
+            v = math.sin(2 * math.pi * phase)
+        elif voice == 'square':
+            v = 1.0 if phase < 0.5 else -1.0
+        elif voice == 'triangle':
+            v = 1.0 - 4.0 * abs(phase - 0.5)
+        elif voice == 'saw':
+            v = phase * 2.0 - 1.0
+        elif voice == 'organ':
+            v = math.sin(2 * math.pi * phase) * 0.7 + \
+                math.sin(6 * math.pi * phase) * 0.3
+        elif voice == 'bass':
+            v = math.sin(2 * math.pi * phase) * 0.8 + \
+                math.sin(4 * math.pi * phase) * 0.2
+        elif voice == 'bell':
+            v = math.sin(2 * math.pi * phase) * 0.55 + \
+                math.sin(2 * math.pi * phase * 2.73) * 0.45
+        elif voice in ('kick', 'tom'):
+            p = i / max(1, n)
+            freq = (9.0 if voice == 'kick' else 14.0) - p * 7.0
+            v = math.sin(2 * math.pi * p * freq)
+        elif voice in ('snare', 'hat', 'noise'):
+            tone = math.sin(2 * math.pi * phase * (3 if voice == 'snare' else 9))
+            v = rng.uniform(-1.0, 1.0) * (0.8 if voice != 'snare' else 0.65) + tone * 0.2
+            if voice == 'hat' and i % 2:
+                v = -v
+        elif voice == 'wood':
+            v = math.sin(2 * math.pi * phase * 5) * (1.0 if i < n // 3 else 0.35)
+        elif voice == 'blip':
+            v = math.sin(2 * math.pi * phase * 2)
+        elif voice == 'pop':
+            v = (1.0 if i < 12 else math.sin(2 * math.pi * phase * 3) * 0.35)
+        else:
+            v = math.sin(2 * math.pi * phase * 4) * 0.7 + rng.uniform(-0.3, 0.3)
+        out.append(max(-32768, min(32767, int(v * env * 18000))))
+    return out
+
+
+def build_placeholder():
+    entries = []
+    for slot, (name, blocks, loop, semis, fine, voice) in enumerate(PLACEHOLDER_SLOTS):
+        entries.append((name, _placeholder_pcm(slot, blocks, voice),
+                        loop, semis, fine))
+    entries.extend(('-', [0] * 16, None, 0, 0)
+                   for _ in range(PLACEHOLDER_ENTRIES - len(entries)))
+    return entries
+
+
 # ---------------------------------------------------------------- pool image
 def bank_pad(offset, size):
     """Return filler needed so [offset, offset+size) stays in one bank.
@@ -379,10 +464,10 @@ def main(out_path):
         assert data[:8] == b'SNDJPOOL', 'samples/pool.bin: bad magic'
         print(f'sndj_pool: using committed samples/pool.bin ({len(data)} bytes)')
     else:
-        entries = build_factory()
+        entries = build_placeholder()
         data = build_pool(entries)
         names = ' '.join(e[0].replace(' ', '_') for e in entries)
-        print(f'sndj_pool: factory pool: {len(entries)} samples, '
+        print(f'sndj_pool: synthesized placeholder pool: {len(entries)} samples, '
               f'{len(data)} bytes\n  {names}')
     assert len(data) <= RESERVED, f'pool {len(data)} exceeds {RESERVED}'
     data = data + b'\xFF' * (RESERVED - len(data))

@@ -3,6 +3,21 @@
 All notable changes to sndj. First release will be **v0.1**; versions
 increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 
+## Unreleased
+
+- Removed all bundled sample recordings, game SoundFonts and the derived
+  factory container. Clean builds now generate a deterministic synthetic
+  placeholder pool (18 usable sounds + 30 free slots); local samples,
+  SoundFonts and factory exports are ignored by Git.
+- Added the MIT license text and an explicit third-party/audio policy.
+- Browser file handling now validates pool, SF2, RLE, `.sndj`, SRAM and
+  factory-container bounds before allocation or mutation; corrupt saves are
+  read-only rather than silently rebuilt.
+- Fixed exact-capacity ARAM budgeting and ROM markers at the final legal byte.
+- Uploaded filenames/sample names are rendered as text instead of HTML.
+- SF2 mirror tests now generate their own copyright-clean test SoundFont.
+- Added a GitHub Actions clean-build/host-test and bundled-audio gate.
+
 ## v0.12 — 2026-07-12
 
 - **LIVE mode grows up into a real clip launcher** (Seb):

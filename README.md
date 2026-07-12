@@ -34,7 +34,7 @@ await real-hardware bring-up. What works today:
   Strong on the echo loop: the room becomes a plucked string, a
   technique no commercial SNES soundtrack ever shipped); hardware
   ADSR, C-command chord fans, per-instrument VIB/TRM and loop
-  overrides. The factory boots 8 instruments (one per voice) and
+  overrides. The placeholder factory boots 8 instruments (one per voice) and
   audio RAM only holds what songs reference — the rest of the pool
   loads on demand, with the live RAM/FREE balance on the ECHO screen
 - **The complete 24-command set** — one executor shared by phrases and
@@ -72,8 +72,10 @@ await real-hardware bring-up. What works today:
   the patcher's SoundFont panel.
 
 Still to come: hardware bring-up of sync/MIDI rigs (M12/M14) and the
-sync OUT master; the factory lives in `factory/` and is built to be
-extended.
+sync OUT master; local factory packs live in `factory/` and are built to be
+extended. The repository deliberately ships no recorded samples or
+SoundFonts: a clean build uses a small code-generated placeholder set until
+the user supplies a rights-cleared factory (see `THIRD_PARTY.md`).
 
 ## Controls
 
@@ -130,5 +132,5 @@ Every hardware-relevant bug found so far has a regression check.
 - **ALS.md** — the Ableton/MIDI/MML converter's mapping
 - **CHANGELOG.md** — per-milestone user-facing notes
 
-MIT. Built on the work of the SNES/SFC homebrew and reverse-engineering
+MIT — see `LICENSE`. Built on the work of the SNES/SFC homebrew and reverse-engineering
 communities (fullsnes, anomie's docs, the SNES dev wiki).

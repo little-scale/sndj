@@ -7,9 +7,12 @@ tools/emu/cores/
 # macOS
 .DS_Store
 
-# Personal soundfonts: only the three factory-pool fonts are tracked
+# User-supplied audio is intentionally never distributed with the project.
+# Keep local sources and exported factory packs here; the build falls back to
+# a deterministic synthesized placeholder factory when none is present.
+samples/*
+!samples/README.md
 soundfonts/*
-!soundfonts/mario_paint.sf2
-!soundfonts/super_mario_world.sf2
-!soundfonts/super_street_fighter_2.sf2
+!soundfonts/README.md
+factory/*.sndjfact
 __pycache__/

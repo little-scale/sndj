@@ -340,8 +340,8 @@ factory_kits:
 ; types, 8 samples/banks/kits, 8 extras (record byte 7: SLICES-1 high
 ; nibble, LOOP bits 1-2, EON bit 0). Eight = one per voice, and the
 ; MIDI channel mapping (2026-07-11 — was 12; period-correct anyway:
-; classic SNES scores kept ~8-15 samples resident). maketables.py
-; extracts the rows from samples/factory.sndjfact. Bank 6, lda.l.
+; classic SNES scores kept ~8-15 samples resident). maketables.py uses
+; a local factory container or the generated placeholder. Bank 6, lda.l.
     .DB "SNDEF3"
 factory_instr_type: .INCBIN "defaults.bin" SKIP 0 READ 8
 factory_instr_smp:  .INCBIN "defaults.bin" SKIP 8 READ 8

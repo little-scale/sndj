@@ -133,10 +133,14 @@ function poolBankPad(offset, size) {
 }
 
 function poolParse(bytes) {
+  if (!bytes || bytes.length < 16) throw new Error('pool header is truncated');
   const magic = String.fromCharCode(...bytes.slice(0, 8));
   if (magic !== 'SNDJPOOL') throw new Error('bad pool magic');
   if (bytes[8] !== 2) throw new Error('pool format v' + bytes[8]);
   const count = bytes[9];
+  if (count > POOL_MAX_ENTRIES) throw new Error('pool has too many entries');
+  const tableEnd = 16 + count * 16;
+  if (tableEnd > bytes.length) throw new Error('pool table is truncated');
   const entries = [];
   for (let i = 0; i < count; i++) {
     const e = 16 + i * 16;
@@ -144,6 +148,13 @@ function poolParse(bytes) {
     const off = (bytes[e + 8] | (bytes[e + 9] << 8)) * 9;
     const size = (bytes[e + 10] | (bytes[e + 11] << 8)) * 9;
     const loop = bytes[e + 12] | (bytes[e + 13] << 8);
+    if (!size) throw new Error('pool entry ' + i + ' has no BRR data');
+    if (off < tableEnd || off + size > bytes.length) {
+      throw new Error('pool entry ' + i + ' BRR range is outside the file');
+    }
+    if (loop !== 0xFFFF && loop >= size / 9) {
+      throw new Error('pool entry ' + i + ' loop is outside its BRR data');
+    }
     const s8 = v => (v > 127 ? v - 256 : v);
     entries.push({
       name,
@@ -165,7 +176,16 @@ function poolBuild(entries) {
   const base = 16 + entries.length * 16;
   const dataStart = Math.ceil(base / 9) * 9;
   let off = dataStart;
-  for (const e of entries) {
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (!e.brr || !e.brr.length || e.brr.length % 9) {
+      throw new Error('pool entry ' + i + ' BRR length must be a positive multiple of 9');
+    }
+    const blocks = e.brr.length / 9;
+    if (e.loopBlock !== null && e.loopBlock !== undefined &&
+        (!Number.isInteger(e.loopBlock) || e.loopBlock < 0 || e.loopBlock >= blocks)) {
+      throw new Error('pool entry ' + i + ' loop is outside its BRR data');
+    }
     let pad = poolBankPad(off, e.brr.length);
     if (pad) {
       pad = Math.ceil(pad / 9) * 9;
@@ -228,15 +248,24 @@ function rlePack(data) {
 }
 
 function rleUnpack(data, size) {
+  if (!Number.isSafeInteger(size) || size < 0 || size > 0x1000000) {
+    throw new Error('invalid RLE output size');
+  }
   const out = new Uint8Array(size);
   let i = 0, o = 0;
   while (o < size) {
+    if (i >= data.length) throw new Error('truncated RLE stream');
     const c = data[i++];
     if (c < 0x80) {
-      for (let k = 0; k <= c; k++) out[o++] = data[i++];
+      const n = c + 1;
+      if (i + n > data.length || o + n > size) throw new Error('invalid RLE literal');
+      for (let k = 0; k < n; k++) out[o++] = data[i++];
     } else {
+      if (i >= data.length) throw new Error('truncated RLE run');
       const b = data[i++];
-      for (let k = 0; k < c - 0x80 + 3; k++) out[o++] = b;
+      const n = c - 0x80 + 3;
+      if (o + n > size) throw new Error('RLE run exceeds output');
+      for (let k = 0; k < n; k++) out[o++] = b;
     }
   }
   return out;
@@ -299,24 +328,45 @@ function fromImage(img) {
 // patcher imports .sf2 presets exactly like the factory build does.
 
 function sf2Parse(bytes) {
+  if (!bytes || bytes.length < 12) throw new Error('SF2 header is truncated');
+  if (bytes.length > 0x10000000) throw new Error('SF2 is too large');
+  const tag = o => String.fromCharCode(...bytes.slice(o, o + 4));
+  if (tag(0) !== 'RIFF' || tag(8) !== 'sfbk') throw new Error('not an SF2 RIFF');
+  const need = (o, n, what) => {
+    if (!Number.isSafeInteger(o) || o < 0 || o + n > bytes.length) {
+      throw new Error((what || 'SF2 field') + ' is outside the file');
+    }
+  };
   const u16 = o => bytes[o] | (bytes[o + 1] << 8);
   const u32 = o => (bytes[o] | (bytes[o + 1] << 8) | (bytes[o + 2] << 16) |
     (bytes[o + 3] << 24)) >>> 0;
   const chunks = {};
-  const walk = (pos, end) => {
-    while (pos < end - 8) {
-      const cid = String.fromCharCode(...bytes.slice(pos, pos + 4));
+  const riffEnd = 8 + u32(4);
+  if (riffEnd > bytes.length || riffEnd < 12) throw new Error('bad SF2 RIFF size');
+  const walk = (pos, end, depth = 0) => {
+    if (depth > 8) throw new Error('SF2 LIST nesting is too deep');
+    while (pos + 8 <= end) {
+      need(pos, 8, 'SF2 chunk header');
+      const cid = tag(pos);
       const size = u32(pos + 4);
       const body = pos + 8;
-      if (cid === 'LIST') walk(body + 4, body + size);
+      if (body + size > end || body + size > bytes.length) {
+        throw new Error('SF2 chunk ' + cid + ' exceeds its container');
+      }
+      if (cid === 'LIST') {
+        if (size < 4) throw new Error('SF2 LIST is truncated');
+        walk(body + 4, body + size, depth + 1);
+      }
       else chunks[cid] = { off: body, size };
       pos = body + size + (size & 1);
     }
   };
-  walk(12, bytes.length);
+  walk(12, riffEnd);
   if (!chunks.smpl || !chunks.shdr) throw new Error('not an SF2 (no smpl/shdr)');
+  if (chunks.smpl.size % 2) throw new Error('SF2 smpl chunk has an odd size');
   const recs = (name, sz) => {
     if (!chunks[name]) return [];
+    if (chunks[name].size % sz) throw new Error('SF2 ' + name + ' records are truncated');
     const out = [];
     for (let i = 0; i < Math.floor(chunks[name].size / sz); i++) {
       out.push(chunks[name].off + i * sz);
@@ -337,9 +387,11 @@ function sf2Parse(bytes) {
   const instSamples = [];
   for (let i = 0; i < inst.length - 1; i++) {
     const b0 = u16(inst[i] + 20), b1 = u16(inst[i + 1] + 20);
+    if (b0 > b1 || b1 >= ibag.length) throw new Error('SF2 instrument bag range is invalid');
     const sids = new Set();
     for (let bg = b0; bg < b1; bg++) {
       const g0 = u16(ibag[bg]), g1 = u16(ibag[bg + 1]);
+      if (g0 > g1 || g1 > igen.length) throw new Error('SF2 instrument generator range is invalid');
       for (let g = g0; g < g1; g++) {
         if (u16(igen[g]) === 53) sids.add(u16(igen[g] + 2));
       }
@@ -350,8 +402,10 @@ function sf2Parse(bytes) {
   for (let p = 0; p < phdr.length - 1; p++) {
     const pname = str(phdr[p], 20);
     const b0 = u16(phdr[p] + 24), b1 = u16(phdr[p + 1] + 24);
+    if (b0 > b1 || b1 >= pbag.length) throw new Error('SF2 preset bag range is invalid');
     for (let bg = b0; bg < b1; bg++) {
       const g0 = u16(pbag[bg]), g1 = u16(pbag[bg + 1]);
+      if (g0 > g1 || g1 > pgen.length) throw new Error('SF2 preset generator range is invalid');
       for (let g = g0; g < g1; g++) {
         if (u16(pgen[g]) === 41) {
           const sids = instSamples[u16(pgen[g] + 2)];
@@ -365,6 +419,9 @@ function sf2Parse(bytes) {
   const smpl = chunks.smpl.off;
   const out = [];
   const n = Math.floor(chunks.shdr.size / 46) - 1;
+  if (n < 0 || n > 4096) throw new Error('SF2 sample count is invalid');
+  const smplSamples = chunks.smpl.size / 2;
+  let totalSamples = 0;
   for (let i = 0; i < n; i++) {
     const r = chunks.shdr.off + i * 46;
     const start = u32(r + 20), end = u32(r + 24);
@@ -372,6 +429,10 @@ function sf2Parse(bytes) {
     const rate = u32(r + 36);
     const root = bytes[r + 40];
     const corr = bytes[r + 41] > 127 ? bytes[r + 41] - 256 : bytes[r + 41];
+    if (start > end || end > smplSamples) throw new Error('SF2 sample ' + i + ' range is invalid');
+    if (!rate || rate > 768000) throw new Error('SF2 sample ' + i + ' rate is invalid');
+    totalSamples += end - start;
+    if (totalSamples > 0x4000000) throw new Error('SF2 decoded samples are too large');
     const pcm = new Int16Array(end - start);
     for (let k = 0; k < pcm.length; k++) {
       const o = smpl + (start + k) * 2;
@@ -382,7 +443,7 @@ function sf2Parse(bytes) {
       name: str(r, 20), pcm, rate, root, corr,
       // shape-based (ripped fonts set sampleModes unreliably both ways);
       // degenerate loops read as one-shots
-      loop: (le - ls >= 16 && le > ls && ls >= start)
+      loop: (le - ls >= 16 && le > ls && ls >= start && le <= end)
         ? [ls - start, le - start] : null,
       preset: presetOf[i] || null,
     });
@@ -506,11 +567,10 @@ function aramBudget(entries, resident) {
   const sampleBytes = entries.reduce((a, e, i) =>
     a + (inSet(i) ? e.brr.length : 0), 0);
   const end = base + sampleBytes;
-  const endPage = end >> 8;
   let maxEdl = -1;
   for (let edl = 15; edl >= 0; edl--) {
     const ceilPage = edl === 0 ? 0xFF : 0x100 - 8 * edl;
-    if (endPage < ceilPage) { maxEdl = edl; break; }
+    if (end <= (ceilPage << 8)) { maxEdl = edl; break; }
   }
   return {
     sampleBytes, end,
@@ -540,10 +600,11 @@ function srmNew() {
 }
 
 function srmParse(srm) {
+  if (!srm || srm.length < SRM_SIZE) throw new Error('save image is truncated');
   const magic = String.fromCharCode(...srm.slice(0, 5));
   const valid = magic === 'SNDJ1' && srm[5] === 2;
   const slots = [];
-  let free = SRM_HEAP_SZ;
+  const ranges = [];
   for (let s = 0; s < SRM_SLOTS; s++) {
     const e = SRM_DIR + s * 16;
     if (srm[e] !== 0xA5) {
@@ -554,22 +615,43 @@ function srmParse(srm) {
     const size = srm[e + 3] | (srm[e + 4] << 8);
     const crc = srm[e + 5] | (srm[e + 6] << 8);
     const name = String.fromCharCode(...srm.slice(e + 8, e + 16)).trimEnd();
-    const data = srm.slice(SRM_HEAP + off, SRM_HEAP + off + size);
-    free -= size;
-    slots.push({
-      index: s, empty: false, off, size, crc, name,
-      ok: size <= SRM_HEAP_SZ && crc16(data) === crc,
+    const bounds = size <= SRM_HEAP_SZ && off <= SRM_HEAP_SZ - size;
+    const data = bounds ? srm.slice(SRM_HEAP + off, SRM_HEAP + off + size)
+      : new Uint8Array();
+    const slot = {
+      index: s, empty: false, off, size, crc, name, bounds,
+      ok: bounds && crc16(data) === crc,
       packed: data,
-    });
+    };
+    slots.push(slot);
+    if (bounds) ranges.push({ start: off, end: off + size, slot });
   }
+  ranges.sort((a, b) => a.start - b.start);
+  let used = 0, lastEnd = 0;
+  for (const r of ranges) {
+    if (r.start < lastEnd) {
+      r.slot.ok = false;
+      const prior = ranges.find(x => x !== r && x.start < r.end && x.end > r.start);
+      if (prior) prior.slot.ok = false;
+    }
+    used += Math.max(0, r.end - Math.max(r.start, lastEnd));
+    lastEnd = Math.max(lastEnd, r.end);
+  }
+  const free = SRM_HEAP_SZ - used;
   return { valid, slots, free };
 }
 
 // rebuild the image from a song list (packed heap in entry order)
 function srmLayout(songs) {
+  if (!Array.isArray(songs) || songs.length > SRM_SLOTS) {
+    throw new Error('save has too many songs (max ' + SRM_SLOTS + ')');
+  }
   const srm = srmNew();
   let off = 0;
   songs.forEach((song, s) => {
+    if (!song || !song.packed || song.packed.length > 0xFFFF) {
+      throw new Error('song ' + s + ' has an invalid packed payload');
+    }
     if (off + song.packed.length > SRM_HEAP_SZ) {
       throw new Error('songs exceed the 32 KB save');
     }
@@ -591,7 +673,11 @@ function srmLayout(songs) {
 }
 
 function srmSongs(srm) {
-  return srmParse(srm).slots.filter(s => !s.empty)
+  const parsed = srmParse(srm);
+  if (!parsed.valid) throw new Error('not an SNDJ1 v2 save');
+  const bad = parsed.slots.find(s => !s.empty && !s.ok);
+  if (bad) throw new Error('save slot ' + bad.index + ' is corrupt; refusing to rewrite');
+  return parsed.slots.filter(s => !s.empty)
     .map(s => ({ name: s.name, packed: s.packed }));
 }
 
@@ -615,6 +701,7 @@ function srmExtract(srm, slotIdx) {
   const { slots } = srmParse(srm);
   const s = slots[slotIdx];
   if (!s || s.empty) throw new Error('slot ' + slotIdx + ' is empty');
+  if (!s.ok) throw new Error('slot ' + slotIdx + ' is corrupt');
   return sndjFileBuild(s.name, s.packed);
 }
 
@@ -636,12 +723,14 @@ function sndjFileBuild(name, packed) {
 }
 
 function sndjFileParse(bytes) {
+  if (!bytes || bytes.length < 18) throw new Error('.sndj header is truncated');
   if (String.fromCharCode(...bytes.slice(0, 5)) !== 'SNDJ1' || bytes[5] !== 1) {
     throw new Error('not a .sndj file');
   }
   const name = String.fromCharCode(...bytes.slice(6, 14)).trimEnd();
   const size = bytes[14] | (bytes[15] << 8);
   const crc = bytes[16] | (bytes[17] << 8);
+  if (bytes.length !== 18 + size) throw new Error('.sndj size does not match the file');
   const packed = bytes.slice(18, 18 + size);
   if (crc16(packed) !== crc) throw new Error('.sndj CRC mismatch');
   return { name, packed };
@@ -655,7 +744,7 @@ function pitchForNote(note) {  // note 0-95 (C-0..B-7)
 function findMarker(rom, marker) {
   const m = [...marker].map(c => c.charCodeAt(0));
   outer:
-  for (let i = 0; i + m.length < rom.length; i++) {
+  for (let i = 0; i + m.length <= rom.length; i++) {
     for (let k = 0; k < m.length; k++) {
       if (rom[i + k] !== m[k]) continue outer;
     }
@@ -1946,6 +2035,13 @@ function wavBuild(l, r, rate) {
 // ------------------------------------------------------------------ selftest
 function selftest() {
   const assert = (c, m) => { if (!c) throw new Error('selftest: ' + m); };
+  const assertThrows = (fn, text, m) => {
+    try { fn(); } catch (e) {
+      assert(!text || e.message.includes(text), m + ' error message');
+      return;
+    }
+    assert(false, m + ' did not throw');
+  };
   // BRR round-trip on a pad-ish wave
   const src = [];
   for (let i = 0; i < 128; i++) {
@@ -1975,6 +2071,9 @@ function selftest() {
   assert(back[0].brr.length === 72 && back[1].loopBlock === null, 'pool fields');
   assert(back[0].tuneSemis === -3 && back[0].tuneFine === 64 &&
     back[1].tuneSemis === 0, 'pool tune fields');
+  assertThrows(() => poolParse(pool.slice(0, 20)), 'truncated', 'truncated pool');
+  assertThrows(() => poolBuild([{ name: 'BAD', loopBlock: 2,
+    brr: new Uint8Array(9) }]), 'loop', 'bad pool loop');
 
   // srm + .sndj round trip
   const blk2 = new Uint8Array(BLOCK_SZ);
@@ -1993,6 +2092,10 @@ function selftest() {
   assert(!erased.slots[0].empty && erased.slots[0].name === 'SECOND' &&
     erased.slots[0].off === 0 && erased.slots[1].empty,
     'srm erase compacts the list');
+  const damaged = srm.slice();
+  damaged[0x11] = 0xFF; damaged[0x12] = 0x7F;
+  assert(!srmParse(damaged).slots[0].ok, 'srm out-of-range slot rejected');
+  assertThrows(() => srmErase(damaged, 0), 'corrupt', 'corrupt srm rewrite');
   // RLE + CRC + image
   const blk = new Uint8Array(BLOCK_SZ);
   for (let i = PHRASES_OFF + 1; i < PHRASES_OFF + PHRASES_LEN; i += 4) blk[i] = 0xFF;
@@ -2005,6 +2108,12 @@ function selftest() {
   const un = fromImage(rleUnpack(packed, BLOCK_SZ));
   for (let i = 0; i < BLOCK_SZ; i++) assert(un[i] === blk[i], 'rle byte ' + i);
   assert(crc16([...'123456789'].map(c => c.charCodeAt(0))) === 0x29B1, 'crc');
+  assertThrows(() => rleUnpack(Uint8Array.of(0x7F), 8), 'RLE', 'truncated RLE');
+  const exactAram = aramBudget([{ brr: new Uint8Array(0xFF00 - 0x1209) }]);
+  assert(exactAram.maxEdl === 0 && exactAram.overBy === 0,
+    'exact ARAM capacity fits EDL 0');
+  assert(findMarker(Uint8Array.from([0, 1, 83, 78, 68, 74]), 'SNDJ') === 6,
+    'marker ending at final byte');
   // tuning matches the ROM tables
   assert(pitchForNote(48) === 0x0800, 'C-4 pitch');
   assert(pitchForNote(52) === 0x0A14, 'E-4 pitch');

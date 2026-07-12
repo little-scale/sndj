@@ -1,0 +1,27 @@
+name: build and host tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: macos-14
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install assembler
+        run: brew install wla-dx
+      - name: Reject bundled audio assets
+        run: |
+          if git ls-files | grep -Eiq '\.(wav|aiff|aif|mp3|flac|ogg|sf2|sndjfact)$'; then
+            echo 'Tracked audio asset found; sndj distributes no recordings or SoundFonts.'
+            git ls-files | grep -Ei '\.(wav|aiff|aif|mp3|flac|ogg|sf2|sndjfact)$'
+            exit 1
+          fi
+      - name: Build ROM and run host tests
+        run: make all test

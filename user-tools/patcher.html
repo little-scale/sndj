@@ -1081,9 +1081,15 @@ function renderSf2() {
     const hdr = t.insertRow();
     const hc = hdr.insertCell();
     hc.colSpan = 5;
-    hc.innerHTML = '<b>' + (font.collapsed ? '\u25B8' : '\u25BE') + ' ' +
-      font.name + '</b>' + (font.collapsed ?
-        ' <span class="hint">(' + font.samples.length + ' samples)</span>' : '');
+    const title = document.createElement('b');
+    title.textContent = (font.collapsed ? '\u25B8' : '\u25BE') + ' ' + font.name;
+    hc.appendChild(title);
+    if (font.collapsed) {
+      const count = document.createElement('span');
+      count.className = 'hint';
+      count.textContent = ' (' + font.samples.length + ' samples)';
+      hc.appendChild(count);
+    }
     hc.style.color = '#fff';
     hc.style.cursor = 'pointer';
     hc.title = font.collapsed ? 'expand' : 'collapse';
@@ -1104,10 +1110,12 @@ function renderSf2() {
       const m = $('sfmode').value;
       const fate = (m === 'oneshot' || (m === 'auto' && !s.loop))
         ? '1shot' : 'melodic';
-      row.innerHTML =
-        `<td>${i}</td><td>${label}</td><td>${s.root}</td>` +
-        `<td>${s.pcm.length}${s.loop ? ' ↻' : ''}</td>` +
-        `<td class="hint">${fate}</td>`;
+      [i, label, s.root, s.pcm.length + (s.loop ? ' ↻' : ''), fate]
+        .forEach((value, cell) => {
+          const td = row.insertCell();
+          td.textContent = value;
+          if (cell === 4) td.className = 'hint';
+        });
       const play = document.createElement('button');
       play.textContent = 'play';
       play.onclick = () => auditionSf2(fi, i);
@@ -1704,19 +1712,29 @@ function factoryExport() {
 
 async function factoryImport(f) {
   const d = new Uint8Array(await f.arrayBuffer());
+  if (d.length < 16) { status(f.name + ': factory header is truncated', 1); return; }
   const ver = d[8];
   if (String.fromCharCode(...d.slice(0, 8)) !== 'SNDJFACT' || ver < 1 || ver > 4) {
     status(f.name + ': not a SNDJFACT file', 1);
     return;
   }
   const plen = d[12] | (d[13] << 8) | (d[14] << 16);
+  const defaultsLen = ver === 4 ? 24 : ver === 3 ? 36 : ver === 2 ? 24 : 16;
+  const expected = 16 + plen + 1024 + defaultsLen + 64 + 128;
+  if (d.length !== expected) {
+    status(f.name + ': factory size does not match its header', 1);
+    return;
+  }
   let o = 16;
+  let nextEntries;
   try {
-    entries = S.poolParse(d.subarray(o, o + plen));
+    nextEntries = S.poolParse(d.subarray(o, o + plen));
   } catch (err) {
     status('factory pool parse failed: ' + err.message, 1);
     return;
   }
+  // Nothing mutates until the complete container and pool have validated.
+  entries = nextEntries;
   o += plen;
   rom.set(d.subarray(o, o + 1024), kitOff); o += 1024;
   rom.fill(0, defOff, defOff + 24);      // the SNDEF3 block: 8x3

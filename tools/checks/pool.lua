@@ -1,5 +1,5 @@
 -- pool.lua — pool v2 + residency gate: the banked ROM pool parses, only
--- referenced samples upload (factory song: 5 SMP instruments + the 808
+-- referenced samples upload (placeholder song: SMP instruments + one kit
 -- kit), the directory points at intact BRR data, and LSDJ-style kits
 -- trigger the right sample/tune/vol from the note's slot.
 
@@ -117,12 +117,12 @@ emu.addEventCallback(function()
       "kits 1-2 ship empty (blank canvases for the builder)")
     check(wram(0x27A0) == 0 and wram(0x27A1) == 0,
       "instrument 58 defaults to SMP sample 0 (no ARAM until referenced)")
-    -- author a kit test: instrument 7 is factory KIT 0 (the 808)
+    -- author a kit test: instrument 7 is placeholder KIT 0
     poke(0x2000, 0)          -- grid V1r0 = chain 0
     poke(0x3700, 0)          -- chain0 e0 = phrase 0
-    poke(0x4300, 49)         -- C-4 -> slot 0 (808 BD)
+    poke(0x4300, 49)         -- C-4 -> slot 0 (synthetic kick)
     poke(0x4301, 7)          -- instrument 7 = KIT
-    poke(0x4310, 54)         -- F-4 -> slot 5 (808 MC)
+    poke(0x4310, 54)         -- F-4 -> slot 5 (synthetic percussion)
     poke(0x4311, 0xFF)
     poke(0x3200 + 5 * 4 + 1, 12)   -- kit0 slot5 tune = +12 (SB_KITS = $3200)
   elseif frames == 44 then
