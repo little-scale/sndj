@@ -43,7 +43,7 @@ await real-hardware bring-up. What works today:
   ARAM cost, feedback, per-voice sends, 8 patchable FIR curves;
   reconfiguration runs an erratum-safe driver sequence
 - **Sync & MIDI (console side)** — OPTIONS → SYNC: **IN** follows a
-  sibling master (1 clock/row), **IN24** follows the Ableton Link
+  sibling master's one-wire row toggle, **IN24** follows the Ableton Link
   bridge (no reflash), **PULSE** drives Volca/PO gear, and **MIDI**
   turns sndj into an 8-voice sample module (channels 1–8 → V1–V8,
   velocity, program change, pitch bend, CC 7/10/91/74). OUT is

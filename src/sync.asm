@@ -1,18 +1,17 @@
 ; sync.asm — M12: sync clock on controller port 2, genmddj protocol and
 ; numbering (opt_sync: 0 OFF, 1 OUT, 2 PULSE, 3 IN, 4 MIDI, 5 IN24).
 ;
-; The SNES port asymmetry: as a SLAVE we read the family 2-bit counter on
-; the two data lines (D0 = $4017 bit 0, D1 = bit 1 — wire-identical to a
-; genmddj/smsggdj master or the ESP32 Link bridge, no reflash needed);
+; The SNES port asymmetry: as a SLAVE, IN reads a one-wire row toggle on
+; D0 ($4017 bit 0), while IN24 reads the family's full 2-bit counter on
+; D0+D1 (wire-identical to the ESP32 Link bridge, no reflash needed);
 ; as a MASTER the console's one clean output is IOBit ($4201 bit 7), which
 ; drives PULSE (and the MIDI clock, midi.asm). OUT is a dummy for now:
 ; selectable, inert (the single-line row clock arrives with the
 ; cross-sibling "edge IN" decision).
 ;
-; IN/IN24 lessons inherited from genmddj (DESIGN §11 — do not re-derive):
-; one clock per ROW (not per frame), (read - last) & 3 catch-up, WAIT
-; arming with the first change counting as exactly one clock, and the
-; row counter seeded to divisor-1 so the first clock plays row 0.
+; IN: a D0 change is one ROW clock. IN24: (read - last) & 3 catch-up.
+; Both arm in WAIT with the first change counting as exactly one clock,
+; and seed the row counter to divisor-1 so the first clock plays row 0.
 
 .ACCU 8
 .INDEX 16
@@ -100,17 +99,30 @@ sync_stop:
     rts
 
 ; --- per-tick (playing, IN/IN24): accrue external clocks into sync_gctr ---------
-; Skips the poll while the auto-joypad read owns the port (the 2-bit
-; counter is lossless to 3 clocks per poll, so a skipped tick catches up).
+; Skips the poll while the auto-joypad read owns the port. IN is a persistent
+; one-wire D0 toggle (at most one recoverable row per poll); IN24 keeps the
+; 2-bit counter and its lossless catch-up of as many as 3 clocks per poll.
 sync_in_poll:
     lda HVBJOY
     and #$01
     bne @done
     jsr sync_read
     pha                      ; new counter
+    lda opt_sync
+    cmp #SYNC_IN
+    bne @delta24
+    pla                      ; IN: any D0 transition is exactly one row clock
+    pha
+    eor sync_last
+    and #$01
+    bra @have_delta
+@delta24:
+    pla                      ; IN24: modulo-4 counter delta preserves bursts
+    pha
     sec
     sbc sync_last
     and #$03
+@have_delta:
     sta sy_tmp               ; clocks since last poll
     pla
     sta sync_last

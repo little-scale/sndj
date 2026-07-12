@@ -514,14 +514,16 @@ the ESP32 Link bridge, drives it with no changes on their side.
 - **OUT** — reserved (master clock; not wired yet).
 - **PULSE** — analog clock out for Volca / Pocket Operator gear: a
   2 PPQN pulse on pin 6 while playing.
-- **IN** — **follow** a sibling master (one row per clock). Press
+- **IN** — **follow** a sibling master over a single Data1 wire (each
+  change is one row clock). Press
   Start and the transport arms — the top-right shows **WAIT** — then
   locks to the first clock (which plays row 0). The master owns the
   tempo; your groove is ignored until you leave IN. No song-position
   pointer: each unit plays from its own cursor, LSDJ-style.
 - **MIDI** — MIDI note takeover, below.
-- **IN24** — follow a **24 PPQN** source (the Ableton Link bridge);
-  same WAIT-then-lock behaviour, six clocks per row.
+- **IN24** — follow a **24 PPQN** source (the Ableton Link bridge) over
+  the full two-bit Data1+Data2 counter; same WAIT-then-lock behaviour,
+  six clocks per row and up to three-clock catch-up per poll.
 
 While IN/IN24 is armed, OPTIONS shows a live **RX** clock counter —
 if it climbs, the wire works.

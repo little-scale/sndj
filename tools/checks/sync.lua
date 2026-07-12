@@ -1,5 +1,6 @@
 -- sync.lua — M12 gate: SYNC IN / IN24 lock row advance to injected clock
--- edges (2-bit counter presented on the real $4017 read path), WAIT holds
+-- state on the real $4017 read path. IN uses a one-wire D0 row toggle;
+-- IN24 uses the full 2-bit counter. WAIT holds
 -- row 0 silent until the first clock, and PULSE drives IOBit ($4201) at
 -- 2 PPQN. OUT stays a selectable dummy (nothing to assert).
 --
@@ -73,12 +74,14 @@ emu.addEventCallback(function()
     counter = counter + 1
   elseif frames == 82 then
     check(wram(0x17) == 1, "IN advances one row per clock")
-    counter = counter + 2      -- a multi-clock burst (2-bit catch-up)
+    counter = counter + 2      -- only D1 changes; one-wire IN must ignore it
   elseif frames == 92 then
-    check(wram(0x17) == 3, "burst of 2 caught up losslessly (row 3)")
-    check(wram(0x15) == 4, "each row keyed its note")
+    check(wram(0x17) == 1, "IN ignores Data2 and cannot invent row clocks")
+    check(wram(0x15) == 2, "only the two D0 transitions keyed notes")
+    counter = counter + 1      -- the next D0 transition is one more row
   elseif frames == 100 then
-    check(wram(0x17) == 3, "no clock, no advance (master owns the tempo)")
+    check(wram(0x17) == 2, "the next D0 change advances exactly one row")
+    check(wram(0x15) == 3, "one-wire IN keyed the third note")
     pad = { start = true }     -- stop
   elseif frames == 102 then
     pad = {}

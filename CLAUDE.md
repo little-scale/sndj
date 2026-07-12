@@ -41,7 +41,7 @@ hardware forces otherwise:
 5. **Grooves are the tempo** (DESIGN §9 in smsggdj): TMPO is a live readout
    derived from the active groove, not an independent clock.
 6. **Sync family**: `OFF / OUT / PULSE / IN / IN24`, numbered like genmddj;
-   OUT/IN are 1-clock-per-row (lock two machines at any tempo), IN24 is
+   OUT/IN are a one-wire D0 toggle per row (lock two machines at any tempo), IN24 is
    24 PPQN for the Ableton Link ESP32 bridge. Cross-sibling sync is a design
    goal: a Mega Drive and a SNES on one cable must lock (§12).
 7. **Engine split** (genmddj model): the main CPU owns *everything* — song
@@ -637,7 +637,7 @@ special" deliverable in user-facing form.
   link work).
 - **Modes** (⚖ SETTLED — numbered identically to genmddj/smsggdj):
   `OFF / OUT / PULSE / IN / IN24` (+ MIDI in slot 4, as on genmddj).
-  OUT/IN = 1 clock per row; IN24 = 24 PPQN for the Link bridge. In IN
+  OUT/IN = one D0 toggle per row; IN24 = the two-bit 24 PPQN Link counter. In IN
   modes the external clock drives ROW advance (fx keep the APU tick).
   **Status (2026-07-09)**: IN/IN24/PULSE/MIDI built (`src/sync.asm`,
   `src/midi.asm`; checks `sync.lua`/`midi.lua` inject clocks on the
@@ -949,7 +949,7 @@ Commit at every milestone boundary; each has a verification gate
   song load, `sndj_brr.py` + JS mirror, `patcher.html` (samples first,
   then palette/font/presets/settings). Gate: patch a pool in the browser,
   boot it, `checks/pool.lua` verifies directory integrity.
-- **M12 — Sync.** IOBit OUT/IN/PULSE, IN24 ingest, tick lease. 🔩 two-unit
+- **M12 — Sync.** D0-toggle IN, two-bit IN24 ingest, IOBit PULSE, tick lease. 🔩 two-unit
   lock test; 🔩 cross-sibling cable vs genmddj; ESP32 bridge port. Gate:
   emulated-clock check locks row advance to injected edges.
 - **M13 — LIVE mode.** Launcher, quantise, mute/solo, meters in header.

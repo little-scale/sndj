@@ -235,7 +235,7 @@ trk_volr     ds 8    ; TRM dips from it              live volume R
 ap_vol       dw      ; apply_instrument scratch: record VOL L/R pair
 ; --- sync (M12) + MIDI takeover (M14); genmddj numbering ---
 opt_sync     db      ; 0 OFF, 1 OUT (dummy), 2 PULSE, 3 IN, 4 MIDI, 5 IN24 (SRAM $0009)
-sync_last    db      ; IN: 2-bit counter (port 2 D0/D1) read last poll
+sync_last    db      ; IN: D0 toggle / IN24: 2-bit D0+D1 counter, last poll
 sync_wait    db      ; IN: armed — hold silently until the first external clock
 sync_gctr    db      ; IN: accrued clocks toward the next row
 sync_cnt     db      ; PULSE: tick phase within the 12-tick cycle
