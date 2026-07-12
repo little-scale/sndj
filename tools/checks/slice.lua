@@ -4,18 +4,22 @@
 -- synthesizes from the ATK nibble + FADE rate. Editing SLICES on the
 -- INSTR screen rebuilds the residency windows.
 --
--- Blob under test: pool 12 (BONGO 2, 80 blocks, one-shot, tune 0);
--- n = 4 -> step 20 blocks = 180 bytes.
+-- Blob under test: authored one-shot slot 7. Alias step size is derived from
+-- its current BRR block count so factory content can change independently.
 
 local frames = 0
 local _booted = false
 local fails = 0
 local pad = {}
+local R = emu.memType.snesPrgRom
+local POOL = 0x8006
+local SLICE_SAMPLE = 7
 
 local function wram(a) return emu.read(a, emu.memType.snesWorkRam) end
 local function poke(a, v) emu.write(a, v, emu.memType.snesWorkRam) end
 local function dsp(r) return emu.read(r, emu.memType.spcDspRegisters) end
 local function aram(a) return emu.read(a, emu.memType.spcRam) end
+local function rom(a) return emu.read(a, R) end
 
 local function check(cond, msg)
   if cond then
@@ -72,11 +76,11 @@ emu.addEventCallback(function()
   if frames == 30 then
     poke(0x2000, 0)          -- V1 r0 = chain 0
     poke(0x3700, 0)          -- chain 0 e0 = phrase 0
-    -- instrument 0: SLICE of pool 12, 3 slices (the gesture makes it 4),
+    -- instrument 0: SLICE of an authored one-shot, 3 slices (gesture -> 4),
     -- ATK F + FADE 8, TUNE 0
     poke(0x2400, 4)
-    poke(0x2401, 7)
-    poke(0x2406, 0xEF)        -- cancel BD's +17 pool fine
+    poke(0x2401, SLICE_SAMPLE)
+    poke(0x2406, 0)           -- core runner already neutralizes pool tuning
     poke(0x2402, 0x8F)
     poke(0x2407, 0x20)
     poke(0x2409, 0)
@@ -92,14 +96,17 @@ emu.addEventCallback(function()
     check(srcns[2] == srcns[1] + 1 and srcns[3] == srcns[1] + 2
       and srcns[4] == srcns[1] + 3,
       "notes 1-4 walk consecutive slice SRCNs (" .. srcns[1] .. ".." .. srcns[4] .. ")")
-    -- the window's ARAM directory entries step by 20 blocks = 180 bytes
+    -- Equal windows use floor(total BRR blocks / slice count).
     local ok = true
+    local e = POOL + 16 + SLICE_SAMPLE * 16
+    local blocks = rom(e + 10) + rom(e + 11) * 256
+    local step = math.floor(blocks / 4) * 9
     local a0 = aram(0x1000 + srcns[1] * 4) + aram(0x1001 + srcns[1] * 4) * 256
     for k = 1, 3 do
       local ak = aram(0x1000 + (srcns[1] + k) * 4) + aram(0x1001 + (srcns[1] + k) * 4) * 256
-      if ak ~= a0 + k * 288 then ok = false end
+      if ak ~= a0 + k * step then ok = false end
     end
-    check(ok, "4 alias entries at equal 288-byte (32-block) steps (BD/4)")
+    check(ok, "4 alias entries at equal " .. step .. "-byte steps")
     check(pitches[1] == 0x1000 and pitches[4] == 0x1000,
       "slices play at native pitch (notes pick, not tune)")
     check(dsp(0x05) == 0x8F,

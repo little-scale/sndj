@@ -1,34 +1,27 @@
--- pool.lua — pool v2 + residency gate: the banked ROM pool parses, only
--- referenced samples upload (placeholder song: SMP instruments + one kit
--- kit), the directory points at intact BRR data, and LSDJ-style kits
--- trigger the right sample/tune/vol from the note's slot.
+-- pool.lua — pool v2 + residency gate, independent of factory content.
+-- Every boot-referenced sample must be mapped, directory data must match ROM,
+-- loop ownership must be reflected in the directory, and a KIT trigger must
+-- route through a resident pool sample.
 
-local frames = 0
-local _booted = false
-local fails = 0
+local frames, fails, peak = 0, 0, 0
+local booted = false
 local pad = {}
-local kick_peak = 0
 local W = emu.memType.snesWorkRam
 local R = emu.memType.snesPrgRom
+local POOL = 0x8006
 
 local function wram(a) return emu.read(a, W) end
 local function poke(a, v) emu.write(a, v, W) end
+local function rom(a) return emu.read(a, R) end
 local function dsp(r) return emu.read(r, emu.memType.spcDspRegisters) end
 local function aram(a) return emu.read(a, emu.memType.spcRam) end
-local function rom(a) return emu.read(a, R) end
 
 local function check(cond, msg)
-  if cond then
-    print("PASS " .. msg)
-  else
-    print("FAIL " .. msg)
-    fails = fails + 1
-  end
+  if cond then print("PASS " .. msg)
+  else print("FAIL " .. msg); fails = fails + 1 end
 end
 
--- pool starts at PRG offset $8006 (bank 1, after the SNPOOL marker)
-local POOL = 0x8006
-local function pool_entry(i)
+local function entry(i)
   local e = POOL + 16 + i * 16
   return {
     off = (rom(e + 8) + rom(e + 9) * 256) * 9,
@@ -37,121 +30,87 @@ local function pool_entry(i)
   }
 end
 
+local function dirw(slot, word)
+  return aram(0x1000 + slot * 4 + word) +
+    aram(0x1001 + slot * 4 + word) * 256
+end
+
+local function boot_references()
+  local needed = {}
+  for i = 0, 7 do
+    local p = 0x2400 + i * 16
+    local typ, sound = wram(p) & 7, wram(p + 1)
+    if typ == 0 or typ == 3 or typ == 4 then
+      needed[sound] = true
+    elseif typ == 1 then
+      for slot = 0, 15 do
+        local k = 0x3200 + sound * 64 + slot * 4
+        if wram(k + 2) ~= 0 then needed[wram(k)] = true end
+      end
+    end
+  end
+  return needed
+end
+
+local script = {
+  [14] = { start = true }, [16] = {},
+  [44] = { start = true }, [46] = {},
+}
+
 emu.addEventCallback(function() emu.setInput(pad, 0) end, emu.eventType.inputPolled)
 
 emu.addEventCallback(function()
-  if not _booted then
-    if emu.read(1, W) == 0x5D then _booted = true end
+  if not booted then
+    if wram(1) == 0x5D then booted = true end
     return
   end
   frames = frames + 1
-  if frames > 44 and dsp(0x08) > kick_peak then kick_peak = dsp(0x08) end
+  if script[frames] then pad = script[frames] end
+  if frames > 46 then peak = math.max(peak, dsp(0x08)) end
 
-  if frames == 14 then pad = { start = true } end
-  if frames == 17 then pad = {} end
-
-  if frames == 40 then
+  if frames == 38 then
+    local count = rom(POOL + 9)
     check(rom(POOL) == string.byte("S") and rom(POOL + 8) == 2,
       "pool v2 magic in ROM bank 1")
-    local count = rom(POOL + 9)
-    check(count == 48, "factory pool has 48 samples (" .. count .. ")")
-    check(aram(0x1000) == 0x00 and aram(0x1001) == 0x12,
-      "directory slot 0 -> silent stub")
-    check(aram(0x1200) == 0x01, "silent stub BRR (END block) uploaded")
-    -- the boot-resident set is exactly what the factory set references:
-    -- instruments 0-6 (samples 0-6, in scan order) then kit 0's slots
-    -- (samples 16-25); everything else stays in ROM until referenced
-    local order = { 0, 1, 2, 3, 4, 5, 6,
-                    7, 8, 9, 10, 11, 12, 13, 14,
-                    15, 17, 21, 19, 22, 23 }
-    local cursor = 0x1200 + 9
-    local all_ok = true
-    local slot = 1
-    srcn_of = {}
-    for _, s in ipairs(order) do
-      local e = pool_entry(s)
-      local endcur = cursor + e.blocks * 9
-      if slot < 56 and math.floor(endcur / 256) < 0xFF then
-        local dstart = aram(0x1000 + slot * 4) + aram(0x1001 + slot * 4) * 256
-        if dstart ~= cursor then
-          all_ok = false
-          print(string.format("  slot %d: dir %04X != cursor %04X",
-            slot, dstart, cursor))
-          break
-        end
+    check(count > 0 and count <= 56, "pool count is within the 56-slot limit (" .. count .. ")")
+    check(aram(0x1000) == 0x00 and aram(0x1001) == 0x12 and aram(0x1200) == 0x01,
+      "silent directory slot and END block are installed")
+
+    local needed, mapped, data_ok = boot_references(), 0, true
+    for sample in pairs(needed) do
+      local srcn = sample < count and wram(0x97 + sample) or 0
+      if srcn == 0 then data_ok = false
+      else
+        mapped = mapped + 1
+        local e, start = entry(sample), dirw(srcn, 0)
         for k = 0, 8 do
-          local expect = rom(POOL + e.off + k)
-          -- uploads force LOOP onto the final block header (loop-or-not
-          -- is the directory's choice); a 1-block sample's first header
-          -- IS its final one
-          if k == 0 and e.blocks == 1 then expect = expect | 2 end
-          if aram(cursor + k) ~= expect then
-            all_ok = false
-            print(string.format("  slot %d: byte %d mismatch", slot, k))
-            break
-          end
+          local want = rom(POOL + e.off + k)
+          if e.blocks == 1 and k == 0 then want = want | 2 end
+          if aram(start + k) ~= want then data_ok = false end
         end
-        srcn_of[s] = slot
-        cursor = endcur
-        slot = slot + 1
+        local want_loop = e.loop == 0xFFFF and 0x1200 or start + e.loop * 9
+        if dirw(srcn, 2) ~= want_loop then data_ok = false end
       end
     end
-    check(all_ok, "residency: the boot set uploads in reference order (" ..
-      (slot - 1) .. " resident)")
-    check(slot - 1 == 21, "boot set = instr 0-6 + kit 0 exactly (21 samples)")
-    check(srcn_of[7] ~= nil and srcn_of[12] ~= nil,
-      "the factory kit samples made the budget")
-    -- loop ownership: data always ends LOOP+END; a one-shot's directory
-    -- entry loops into the silent stub instead
-    local e7 = pool_entry(7)
-    local s7 = srcn_of[7]
-    local st7 = aram(0x1000 + s7 * 4) + aram(0x1001 + s7 * 4) * 256
-    check(aram(st7 + (e7.blocks - 1) * 9) ==
-      (rom(POOL + e7.off + (e7.blocks - 1) * 9) | 2),
-      "uploads force LOOP+END on the final block")
-    check(aram(0x1002 + s7 * 4) + aram(0x1003 + s7 * 4) * 256 == 0x1200,
-      "one-shot directory entries loop into the silent stub")
-    check(wram(0x3200) == 7 and wram(0x3201) == 0x00 and wram(0x3202) == 0x50,
-      "kit 0 slot 0 = BD (pool 7, slot tune 0 — corrections live in the entry)")
-    check(wram(0x3242) == 0 and wram(0x3282) == 0,
-      "kits 1-2 ship empty (blank canvases for the builder)")
+    check(data_ok and mapped > 0,
+      "all " .. mapped .. " boot-referenced samples map to intact BRR + loop directories")
+
+    -- Author a content-neutral kit using sample 0, which is boot resident.
+    poke(0x2470, 1); poke(0x2471, 0); poke(0x2476, 0)
+    poke(0x3200, 0); poke(0x3201, 0); poke(0x3202, 0x50); poke(0x3203, 0)
+    poke(0x2000, 0); poke(0x3700, 0)
+    poke(0x4300, 49); poke(0x4301, 7)
+  elseif frames == 62 then
+    local srcn = wram(0x97)
+    local pitch = dsp(0x02) + dsp(0x03) * 256
+    check(srcn > 0 and dsp(0x04) == srcn,
+      "KIT slot routed through resident pool sample 0 (SRCN " .. srcn .. ")")
+    check(pitch == 0x1000, string.format("neutral KIT slot plays native pitch ($%04X)", pitch))
+    check(dsp(0x00) == 0x50 and dsp(0x01) == 0x50, "KIT slot volume applied")
+    check(peak > 0, "KIT trigger is audible (ENVX peak " .. peak .. ")")
     check(wram(0x27A0) == 0 and wram(0x27A1) == 0,
-      "instrument 58 defaults to SMP sample 0 (no ARAM until referenced)")
-    -- author a kit test: instrument 7 is placeholder KIT 0
-    poke(0x2000, 0)          -- grid V1r0 = chain 0
-    poke(0x3700, 0)          -- chain0 e0 = phrase 0
-    poke(0x4300, 49)         -- C-4 -> slot 0 (synthetic kick)
-    poke(0x4301, 7)          -- instrument 7 = KIT
-    poke(0x4310, 54)         -- F-4 -> slot 5 (synthetic percussion)
-    poke(0x4311, 0xFF)
-    poke(0x3200 + 5 * 4 + 1, 12)   -- kit0 slot5 tune = +12 (SB_KITS = $3200)
-  elseif frames == 44 then
-    pad = { start = true }
-  elseif frames == 46 then
-    pad = {}
-  elseif frames == 54 then
-    check(wram(0x16) == 1, "playing")
-    -- C-4 -> kit slot 0 -> SW KICK (pool 16)
-    check(dsp(0x04) == srcn_of[7], "kit slot 0 routed to the kick (SRCN " ..
-      tostring(srcn_of[7]) .. ")")
-    check(dsp(0x02) + dsp(0x03) * 256 == 0x1010,
-      "BD kit pitch = native + the entry's +17 fine ($1010)")
-    check(dsp(0x00) == 0x50 and dsp(0x01) == 0x50, "kit slot volume applied")
-    check(kick_peak > 0, "kick envelope ran (peak " .. kick_peak .. ")")
-  elseif frames == 80 then
-    -- row 4: F-4 -> slot 5 (BG 2, pool 12: entry -24), slot tune +12
-    check(dsp(0x04) == srcn_of[12], "kit slot 5 routed to BONGO 2 (SRCN " ..
-      tostring(srcn_of[12]) .. ")")
-    local p5 = dsp(0x02) + dsp(0x03) * 256
-    check(p5 == 0x0800,
-      "slot tune +12 over the entry's -24 lands C-4 ($" ..
-      string.format("%04X", p5) .. ")")
-    if fails == 0 then
-      print("ALL PASS pool.lua")
-      emu.stop(0)
-    else
-      print("FAILED pool.lua: " .. fails)
-      emu.stop(1)
-    end
+      "instrument 58 defaults to SMP sample 0")
+    if fails == 0 then print("ALL PASS pool.lua"); emu.stop(0)
+    else print("FAILED pool.lua: " .. fails); emu.stop(1) end
   end
 end, emu.eventType.endFrame)

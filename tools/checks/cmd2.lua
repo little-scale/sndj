@@ -44,8 +44,8 @@ emu.addEventCallback(function()
   if frames == 30 then
     poke(0x2000, 0)          -- grid: track 0 row 0 = chain 0
     poke(0x3700, 0)          -- chain 0 entry 0 = phrase 0
-    poke(0x2401, 7)          -- instr 0 -> BD
-    poke(0x2406, 0xEF)       -- FINE -17 cancels BD's pool fine: net zero
+    poke(0x2401, 7)          -- instr 0 -> an available pool sound
+    poke(0x2406, 0)          -- core runner already neutralizes pool tuning
     row(0, 49, 0, 6, 0x40)   -- C-4 + F40: fine +64 at trigger
     row(2, 0, 0xFF, 13, 0x20) -- M20: master volume
     row(4, 0, 0xFF, 14, 0x05) -- N05: noise clock

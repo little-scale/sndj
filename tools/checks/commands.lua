@@ -215,7 +215,7 @@ emu.addEventCallback(function()
     poke(0x3700, 0)
     poke(0x3701, 0)
     poke(0x2401, 7)           -- instr 0 -> BD
-    poke(0x2406, 0xEF)        -- FINE -17 cancels the pool fine: exact pitches
+    poke(0x2406, 0)           -- core runner already neutralizes pool tuning
     cur = 1
     phase = "setup"
   end

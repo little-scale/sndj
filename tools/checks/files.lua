@@ -12,10 +12,24 @@ local frames = 0
 local _booted = false
 local fails = 0
 local pad = {}
+local R = emu.memType.snesPrgRom
+local POOL = 0x8006
 
 local function wram(addr) return emu.read(addr, emu.memType.snesWorkRam) end
 local function sram(addr) return emu.read(addr, emu.memType.snesSaveRam) end
 local function poke(a, v) emu.write(a, v, emu.memType.snesWorkRam) end
+local function rom(a) return emu.read(a, R) end
+
+local function resident_max_edl()
+  local bytes, count = 0, rom(POOL + 9)
+  for sample = 0, count - 1 do
+    if wram(0x97 + sample) ~= 0 then
+      local e = POOL + 16 + sample * 16
+      bytes = bytes + (rom(e + 10) + rom(e + 11) * 256) * 9
+    end
+  end
+  return math.min(15, math.floor((0x10000 - (0x1209 + bytes)) / 2048))
+end
 
 local function check(cond, msg)
   if cond then
@@ -113,8 +127,9 @@ emu.addEventCallback(function()
   elseif frames == 580 then
     check(wram(0x4300) == 0, "LOAD on (EMPTY) blanked the working song")
     check(wram(0x3602) == 0xD7, "fresh song re-seeded (magic)")
-    check(wram(0x3603) == 14,
-      "a NEW song auto-opens the delay to the ARAM max (EDL 14)")
+    local expected = resident_max_edl()
+    check(wram(0x3603) == expected,
+      "a NEW song auto-opens the delay to the ARAM max (EDL " .. expected .. ")")
   elseif frames == 640 then
     -- rename: B-hold + Up on the working song's name (empty row);
     -- S -> T (ring: blank, A-Z, specials, digits)

@@ -38,8 +38,8 @@ emu.addEventCallback(function()
     poke(0x3700, 0)          -- chain 0 entry 0 = phrase 0
     poke(0x4300, 49)         -- C-4
     poke(0x4301, 0)          -- instrument 0 (factory SMP)
-    poke(0x2401, 7)           -- BD carries pool fine +17: poke FINE values
-    poke(0x2406, 0x2F)       -- +47 -> net +64 (a quarter semitone)
+    poke(0x2401, 7)           -- available sound; pool tune is neutral here
+    poke(0x2406, 0x40)       -- +64 (a quarter semitone)
   elseif frames == 44 then
     pad = { start = true }
   elseif frames == 46 then
@@ -53,7 +53,7 @@ emu.addEventCallback(function()
     pad = { start = true }   -- stop
   elseif frames == 62 then
     pad = {}
-    poke(0x2406, 0xAF)       -- -81 -> net -64 (borrows from B-3)
+    poke(0x2406, 0xC0)       -- -64 (borrows from B-3)
   elseif frames == 66 then
     pad = { start = true }   -- play again
   elseif frames == 68 then

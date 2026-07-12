@@ -209,10 +209,10 @@ Any type can go on any of the 8 voices — there are no special
 channels. Eight kits at once is legal. **The first 8 instruments are
 the factory boot set** — their samples land in audio RAM at power-on,
 and the patcher's boot-instruments editor voices all 8 (type, sample
-  / kit / bank, loop, slice count). In a clean build the placeholder rows are
-  **00-06 pitched SMP sounds** (sine, square, triangle, saw, organ, bass,
-  bell) and **07 = KIT 0** (synthetic percussion). A local factory pack may
-  replace all of them. Slots 08-63 start as SMP on sample 0, ready to re-voice.
+  / kit / bank, loop, slice count). A clean build uses the eight-instrument
+  rights-cleared project factory; its authored sounds occupy pool slots 00-07.
+  Slots 08-63 start as SMP on sample 0, ready to re-voice, and a personal
+  factory pack may replace the complete boot set.
   Audio RAM only holds what the song *references* —
 point an instrument or kit slot at any pool sample and it loads on the
 spot, so the rest of the pool costs nothing until you use it (the ECHO

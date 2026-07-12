@@ -56,7 +56,7 @@ emu.addEventCallback(function()
     poke(0x2000, 0)          -- grid: track 0 row 0 = chain 0
     poke(0x3700, 0)          -- chain 0 entry 0 = phrase 0
     poke(0x2401, 7)          -- instr 0 -> BD
-    poke(0x2406, 0xEF)       -- FINE -17 cancels BD's pool fine: net zero
+    poke(0x2406, 0)          -- core runner already neutralizes pool tuning
     poke(0x240E, 0x48)       -- instr 0 VIB: speed 4, depth 8
     poke(0x240F, 0x4F)       -- instr 0 TRM: speed 4, depth 15
     row(0, 49, 0, 0, 0)      -- C-4, no command: instrument LFOs alone

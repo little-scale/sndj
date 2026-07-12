@@ -4,8 +4,8 @@
 -- one alias entry: OFF re-points a looped sample's loop at the silent
 -- stub (plays once); ON gives a one-shot a whole-sample loop.
 --
--- Instruments under test: I1 = VIOLIN 1 (pool 1, looped at block 629),
--- forced OFF; I2 -> PERCUSSI (pool 7, one-shot), forced ON.
+-- Instruments under test use the first looped entry (pool 0) forced OFF and
+-- the first authored one-shot (pool 1) forced ON.
 
 local frames = 0
 local _booted = false
@@ -63,25 +63,26 @@ emu.addEventCallback(function()
     poke(0x2080, 1)            -- V2 r0 = chain 1
     poke(0x3700, 0)            -- chain 0 e0 = phrase 0
     poke(0x3720, 1)            -- chain 1 e0 = phrase 1
-    -- I1 = VIOLIN (SMP sample 1, looped); LOOP=1 pre-poke, the gesture
+    -- I1 = SMP sample 0 (looped); LOOP=1 pre-poke, the gesture
     -- nudges it to 2 = one-shot and rebuilds residency
-    poke(0x2411, 1)
+    poke(0x2411, 0)
     poke(0x2417, 0x02)         -- byte7: LOOP override 1 (ON)
-    -- I2 = SMP on PERCUSSI (pool 7, one-shot), LOOP forced ON by poke
+    -- I2 = SMP sample 1 (one-shot), LOOP forced ON by poke
     -- (the same rebuild publishes both aliases)
-    poke(0x2421, 7)
+    poke(0x2421, 1)
     poke(0x2427, 0x02 * 1)     -- placeholder; set properly below
     poke(0x2427, 0x02)         -- byte7: LOOP override 1 (ON)
     poke(0x4300, 49)           -- phrase 0 row 0: C-4, I1
     poke(0x4301, 1)
     poke(0x4340, 49)           -- phrase 1 row 0: C-4, I2
     poke(0x4341, 2)
-    -- V3: I3 untouched (fresh SMP, LOOP=POOL, no alias) — regression
+    -- V3: I3 uses sample 0 untouched (POOL loop, no alias) — regression
     -- for the plx-flags bug that silenced every non-zero instrument
     poke(0x2100, 2)            -- V3 r0 = chain 2
     poke(0x3740, 2)            -- chain 2 e0 = phrase 2
     poke(0x4380, 49)           -- phrase 2 row 0: C-4, I3
     poke(0x4381, 3)
+    poke(0x2431, 0)
   elseif frames == 290 then
     check(wram(0x2417) == 0x04, string.format(
       "B+Right nudged LOOP ON -> OFF (byte7 $%02X, ui %02X)",
@@ -101,14 +102,13 @@ emu.addEventCallback(function()
       "forced loop on a one-shot: whole-sample loop (loop == start)")
     -- voice 2 = I3 (fresh POOL): straight off the pool map, and audible
     local s2 = dsp(0x24)
-    check(s2 > 0 and s2 == wram(0x97 + 3),
+    check(s2 > 0 and s2 == wram(0x97),
       "fresh POOL instrument uses the pool SRCN (" .. s2 .. ")")
     check(dsp(0x28) > 0,
       "fresh POOL instrument sounds (ENVX " .. dsp(0x28) .. ")")
   elseif frames == 425 then
     -- late in the phrase (before row 0 retriggers): the forced
-    -- one-shot violin (~0.3 s) has died; the forced-loop percussion
-    -- (13 ms one-shot looping whole) is still sounding
+    -- short forced one-shot has died; the forced-loop one-shot remains
     check(dsp(0x08) == 0,
       "forced one-shot ended (ENVX " .. dsp(0x08) .. ")")
     check(dsp(0x18) > 0, "forced loop still sounding (ENVX " .. dsp(0x18) .. ")")

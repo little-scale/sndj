@@ -35,7 +35,7 @@ emu.addEventCallback(function()
 
   if frames == 30 then
     poke(0x2401, 7)          -- instr 0 -> BD
-    poke(0x2406, 0xEF)       -- FINE -17 cancels BD's pool fine: net zero
+    poke(0x2406, 0)          -- core runner already neutralizes pool tuning
     -- track 0: chain 0 at row 0; track 7: row 0 EMPTY, chain 1 at row 1
     poke(0x2000, 0)
     poke(0x2000 + 7 * 128 + 1, 1)

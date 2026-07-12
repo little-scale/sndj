@@ -64,7 +64,7 @@ emu.addEventCallback(function()
 
   if frames == 30 then
     poke(0x2401, 7)            -- instr 0 -> BD
-    poke(0x2406, 0xEF)         -- FINE -17 cancels BD's pool fine: net zero
+    poke(0x2406, 0)            -- core runner already neutralizes pool tuning
     poke(0x2450, 2)            -- instr 5 -> WAV bank 0 (all slots ship SMP now)
     poke(0x2451, 0)
     poke(0x036A, 4)            -- SYNC: MIDI (midi_service applies next frame)

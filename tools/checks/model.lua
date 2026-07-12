@@ -92,10 +92,9 @@ emu.addEventCallback(function()
     check(wram(0x3720) == 1, "chain 01 entry0 -> phrase 01")
     check(wram(0x3721) == 12, "chain 01 entry0 transpose +12")
   elseif frames == 194 then
-    -- zero-tune sample for the exact pitch asserts (factory melodics
-    -- carry loop-quantise tune corrections)
+    -- core runner neutralizes pool tuning for these exact pitch asserts
     emu.write(0x2401, 7, emu.memType.snesWorkRam)
-    emu.write(0x2406, 0xEF, emu.memType.snesWorkRam) -- cancel BD's +17 fine
+    emu.write(0x2406, 0, emu.memType.snesWorkRam)
   elseif frames == 192 then
     check(wram(0x000C) == 3, "A+Left climbed back to SONG")
     check(wram(0x3700) == 0, "chain 00 entry0 -> phrase 00")

@@ -18,9 +18,11 @@ jobs:
         run: brew install wla-dx
       - name: Reject bundled audio assets
         run: |
-          if git ls-files | grep -Eiq '\.(wav|aiff|aif|mp3|flac|ogg|sf2|sndjfact)$'; then
-            echo 'Tracked audio asset found; sndj distributes no recordings or SoundFonts.'
-            git ls-files | grep -Ei '\.(wav|aiff|aif|mp3|flac|ogg|sf2|sndjfact)$'
+          audio=$(git ls-files | grep -Ei '\.(wav|aiff|aif|mp3|flac|ogg|sf2|sndjfact)$' |
+            grep -v '^factory/factory\.sndjfact$' || true)
+          if [ -n "$audio" ]; then
+            echo 'Unexpected tracked audio asset found.'
+            echo "$audio"
             exit 1
           fi
       - name: Build ROM and run host tests

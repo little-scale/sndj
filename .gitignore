@@ -15,4 +15,5 @@ samples/*
 soundfonts/*
 !soundfonts/README.md
 factory/*.sndjfact
+!factory/factory.sndjfact
 __pycache__/

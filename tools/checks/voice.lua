@@ -83,7 +83,7 @@ local function onFrame()
     check(wram(0x0015) == 0, "no KONs yet")
     -- zero-tune sample (SW ORCH) so the pitch asserts stay table-exact
     emu.write(0x2401, 7, emu.memType.snesWorkRam)
-    emu.write(0x2406, 0xEF, emu.memType.snesWorkRam) -- cancel BD's +17 fine
+    emu.write(0x2406, 0, emu.memType.snesWorkRam) -- pool tune is neutral in core checks
   elseif frames == 68 then
     check(wram(0x000C) == 1, "navigated SONG -> CHAIN -> PHRASE")
     check(dsp(0x6C) == 0x20, "DSP FLG unmuted, echo idle at EDL 0")

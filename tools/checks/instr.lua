@@ -86,7 +86,7 @@ emu.addEventCallback(function()
     -- drawing so the INSTR screenshot is deterministic (it raced the
     -- pokes by a frame and flapped the golden)
     emu.write(0x2401, 7, emu.memType.snesWorkRam)
-    emu.write(0x2406, 0xEF, emu.memType.snesWorkRam) -- cancel BD's +17 fine
+    emu.write(0x2406, 0, emu.memType.snesWorkRam) -- pool tune is neutral in core checks
   elseif frames == at_instr then
     check(wram(0x000C) == 4, "A+Right opened INSTR from the phrase row")
     check(wram(0x4301) == 0, "phrase row 0 instrument = 00")

@@ -40,7 +40,7 @@ emu.addEventCallback(function()
     poke(0x2000, 0)
     poke(0x3700, 0)
     poke(0x2401, 7)          -- BD
-    poke(0x2406, 0xEF)       -- FINE -17 cancels BD's pool fine: net zero
+    poke(0x2406, 0)          -- core runner already neutralizes pool tuning
     poke(0x4300, 49)         -- r0: C-4
     poke(0x4301, 0)
     poke(0x4302, 9)          -- I

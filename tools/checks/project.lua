@@ -75,7 +75,7 @@ emu.addEventCallback(function()
     poke(0x4300, 49)         -- C-4
     poke(0x4301, 0)
     poke(0x2401, 7)          -- BD
-    poke(0x2406, 0xEF)       -- FINE -17 cancels BD's pool fine: net zero
+    poke(0x2406, 0)          -- core runner already neutralizes pool tuning
   elseif frames == 74 then
     check(wram(0x3601) == 12, "TSP nudged to +12")
   elseif frames == 92 then

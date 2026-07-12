@@ -6,9 +6,15 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
 ## Unreleased
 
 - Removed all bundled sample recordings, game SoundFonts and the derived
-  factory container. Clean builds now generate a deterministic synthetic
-  placeholder pool (18 usable sounds + 30 free slots); local samples,
-  SoundFonts and factory exports are ignored by Git.
+  factory container. The repository now ships a lean, copyright-free project
+  factory with 8 authored sounds and 40 blank slots; raw samples, SoundFonts
+  and personal factory exports remain ignored by Git. If the project factory
+  is absent, clean builds generate a deterministic synthetic fallback.
+- Added an untouched-ROM factory smoke test and made the core emulator checks
+  independent of factory tuning and content. The new boot set leaves enough
+  audio RAM for the maximum 240 ms hardware echo delay.
+- Pinned screenshot tests to the default black palette and refreshed their
+  goldens, preventing local emulator SRAM from changing visual results.
 - Added the MIT license text and an explicit third-party/audio policy.
 - Browser file handling now validates pool, SF2, RLE, `.sndj`, SRAM and
   factory-container bounds before allocation or mutation; corrupt saves are

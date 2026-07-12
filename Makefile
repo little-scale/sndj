@@ -70,17 +70,20 @@ run: all
 	open -a "$(HOME)/.local/opt/Mesen.app" $(ROM)
 
 # emulator-in-the-loop assertions (agent ground truth)
-CHECKS := $(wildcard tools/checks/*.lua)
+CHECKS := $(filter-out tools/checks/factory.lua,$(wildcard tools/checks/*.lua))
 check: all
 	@python3 tools/mesen_setup.py
+	@echo "== tools/checks/factory.lua"
+	@"$(MESEN)" --testrunner $(abspath $(ROM)) $(abspath tools/checks/factory.lua)
 	@for c in $(CHECKS); do \
 	  echo "== $$c"; \
+	  SNDJ_CHECK=$(abspath $$c) \
 	  SNDJ_PHRASE_SHOT=$(abspath $(BUILD)/shot-phrase.png) \
 	  SNDJ_SONG_SHOT=$(abspath $(BUILD)/shot-song.png) \
 	  SNDJ_INSTR_SHOT=$(abspath $(BUILD)/shot-instr.png) \
 	  SNDJ_WAVE_SHOT=$(abspath $(BUILD)/shot-wave.png) \
 	  SNDJ_LIVE_SHOT=$(abspath $(BUILD)/shot-live.png) \
-	  "$(MESEN)" --testrunner $(abspath $(ROM)) $(abspath $$c) || exit 1; \
+	  "$(MESEN)" --testrunner $(abspath $(ROM)) $(abspath tools/check_runner.lua) || exit 1; \
 	done
 
 shot: all

@@ -353,7 +353,7 @@ sndj/
     patcher.html  savetool.html   (FIR designer + kit builder live
                                     inside patcher.html)
     als2sndj.html  spcexport.html  sramconvert.html
-  factory/            optional local factory.sndjfact (ignored by Git)
+  factory/            copyright-free project factory.sndjfact
   samples/            user-supplied local sample sources (ignored by Git)
   soundfonts/         user-supplied local SF2 sources (ignored by Git)
   songs/              bundled demo song(s)
@@ -547,12 +547,11 @@ Instrument parameters worth calling out:
   `xx` — free granular/mangle material, and the closest thing to a
   wave-start command a sampler this size can give.
 
-The repository distributes no recorded samples or SoundFonts. A clean build
-uses the deterministic synthesized placeholder in `tools/sndj_pool.py` (18
-usable sounds + 30 free slots, 8 boot instruments, lean by design). A user's
-rights-cleared factory lives locally in ignored `factory/factory.sndjfact`;
-the patcher exports/imports that same container. `THIRD_PARTY.md` owns the
-distribution policy.
+The repository distributes the copyright-free project
+`factory/factory.sndjfact` but no raw recordings or SoundFonts. If the factory
+is absent, a build uses the deterministic synthesized fallback in
+`tools/sndj_pool.py`. The patcher exports/imports the same container;
+`THIRD_PARTY.md` owns the distribution policy.
 
 ## 10. Command set
 
@@ -738,9 +737,10 @@ rle_z80mirror discipline applied to BRR).
 The pool is **self-describing** (magic header, entry table: name, BRR offset,
 block count, loop block, default tune) and marker-wrapped in upper ROM banks
 so `patcher.html` can find, list, replace, and re-tune entries without a
-toolchain. `make` uses an ignored local `factory/factory.sndjfact` or
-`samples/pool.bin` when deliberately supplied; otherwise it generates the
-copyright-clean placeholder. No user audio is tracked. (Identical format
+toolchain. `make` uses the tracked, copyright-free
+`factory/factory.sndjfact`, or a deliberately supplied `samples/pool.bin`; if
+the factory is absent it generates the copyright-clean fallback. No user audio
+is tracked. (Identical format
 contract to the siblings' pool — genmddj DESIGN §10.3 is the model.)
 
 ---
