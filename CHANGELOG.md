@@ -1,9 +1,11 @@
 # Changelog
 
 All notable changes to sndj. First release will be **v0.1**; versions
-increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → …).
+increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → v0.13 → …).
 
 ## Unreleased
+
+## v0.13 — 2026-07-13
 
 - Removed the synthesized grey/dim UI shade. Every scheme now emits only its
   exact foreground and background colours; secondary text uses full contrast
