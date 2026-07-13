@@ -7,6 +7,12 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → v0.13 → …).
 
 ## v0.13 — 2026-07-13
 
+- Fixed SF2 root-key conversion to match sndj's C-5 reference convention, so
+  imported samples retain the intended pitch when converted and placed in the
+  ROM pool.
+- Reworked the patcher's import/export workflow into a compact top bar, kept
+  ROM and audio-RAM budgets visible while browsing the pool, and made SF2
+  source auditioning clearly separate from the root-pitch converted result.
 - Removed the synthesized grey/dim UI shade. Every scheme now emits only its
   exact foreground and background colours; secondary text uses full contrast
   and cursors/playheads preserve hierarchy through two-colour inversion.
