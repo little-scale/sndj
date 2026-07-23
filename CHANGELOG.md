@@ -1,9 +1,11 @@
 # Changelog
 
 All notable changes to sndj. First release will be **v0.1**; versions
-increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → v0.13 → …).
+increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → v0.13 → v0.14 → …).
 
 ## Unreleased
+
+## v0.14 — 2026-07-23
 
 - SLICE instruments now interpret TABLE TSP as a slice-selection offset and
   retrigger the chosen division while leaving pitch under the instrument's
