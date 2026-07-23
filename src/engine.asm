@@ -2281,8 +2281,9 @@ track_table:
     sta.w trk_volr,x
     jsr track_vol_write
 @no_v:
-    ; TSP column (byte 1): signed semitones off the playing note; the
-    ; result becomes the new base pitch (vibrato rides it)
+    ; TSP column (byte 1): signed semitones off the playing note. For
+    ; SLICE this rotates/retriggers the selected division (pitch remains
+    ; the instrument's TUNE); every other type gets a new base pitch.
     phx
     rep #$30
 .ACCU 16
@@ -2301,6 +2302,48 @@ track_table:
     lda #NOTE_MAX - 1
 @tsp_ok:
     pha
+    ; SLICE notes choose directory aliases rather than pitch. Re-run its
+    ; type-aware trigger with the table-offset note, then schedule a fresh
+    ; KON so tick-clocked tables can sequence chops after the original hit.
+    lda.w trk_instr,x
+    cmp #INSTR_NONE
+    beq @tsp_pitch
+    sta trig_id
+    phx
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR,x
+    and #$07
+    plx
+    cmp #$04
+    bne @tsp_pitch
+    txa
+    sta trig_voice
+    pla
+    sta trig_note
+    phx
+    jsr slice_trigger
+    plx
+    lda last_pitch
+    sta.w trk_pitch_lo,x
+    lda last_pitch + 1
+    sta.w trk_pitch_hi,x
+    lda.w bit_for_track,x
+    ora koff_mask
+    sta koff_mask
+    lda.w bit_for_track,x
+    ora kon_mask
+    sta kon_mask
+    bra @no_tsp
+@tsp_pitch:
     txa
     sta trig_voice
     phx

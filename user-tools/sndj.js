@@ -1925,11 +1925,25 @@ function seqTrackTable(seq, t) {
   if (tsp) {                            // TSP: semitones off the playing note
     let n = (trk.note + i8(tsp)) & 0xFF;
     if (n >= SEQ_NOTE_MAX) n = SEQ_NOTE_MAX - 1;
-    seq.trig.voice = t;
-    seqTrackTuneLoad(seq, t);
-    const p = seqPitchCalc(seq, n);
-    seqPitchWrite(seq, p);
-    trk.pitch = p & 0xFFFF;             // the new base: vibrato rides it
+    const id = trk.instr;
+    if (id !== 0xFF && (b[SEQ_SB.INSTR + id * 16] & 0x07) === 4) {
+      // SLICE notes choose divisions, while TUNE owns pitch. A table TSP
+      // therefore switches and retriggers the chop instead of pitching it.
+      seq.trig.voice = t;
+      seq.trig.id = id;
+      seq.trig.type = 4;
+      seq.trig.note = n;
+      seqSliceTrigger(seq);
+      trk.pitch = seq.lastPitch & 0xFFFF;
+      seq.koffMask |= 1 << t;
+      seq.konMask |= 1 << t;
+    } else {
+      seq.trig.voice = t;
+      seqTrackTuneLoad(seq, t);
+      const p = seqPitchCalc(seq, n);
+      seqPitchWrite(seq, p);
+      trk.pitch = p & 0xFFFF;           // the new base: vibrato rides it
+    }
   }
   seqTableExec(seq, t, b[o + 2], b[o + 3]);
   trk.tblRow = (trk.tblRow + 1) & 0x0F;
@@ -2310,6 +2324,45 @@ function selftest() {
   assert(sawKoff && seq.row === 8, 'seq OFF row keyed voice 0 off');
   for (let k = 0; k < 24; k++) seqTick(seq);     // through row 12
   assert(seq.samplesPerTick === 400, 'seq T 200 -> 400 samples/tick');
+
+  // SLICE transposition: CHAIN TSP rotates the trigger's division, while
+  // TABLE TSP rotates/retriggers it without taking pitch away from TUNE.
+  const sliceChainBlock = sblk.slice();
+  sliceChainBlock[SEQ_SB.INSTR] = 4;              // instrument 0: SLICE
+  sliceChainBlock[SEQ_SB.INSTR + 7] = 0x30;       // 4 divisions
+  sliceChainBlock[SEQ_SB.INSTR + 9] = 0;          // TUNE 0
+  sliceChainBlock[SEQ_SB.INSTR + 12] = 0xFF;      // no table
+  sliceChainBlock[SEQ_SB.CHAINS + 1] = 1;         // CHAIN TSP +1
+  const sliceChainSeq = seqNew(sliceChainBlock, spool);
+  seqTick(sliceChainSeq);
+  assert(sliceChainSeq.dsp.regs[0x04] === sliceChainSeq.sliceBase[0] + 1,
+    'seq SLICE respects CHAIN TSP');
+  assert(sliceChainSeq.dsp.regs[0x02] === 0x00 &&
+    sliceChainSeq.dsp.regs[0x03] === 0x10,
+    'seq CHAIN TSP leaves SLICE pitch under TUNE');
+
+  const sliceTableBlock = sblk.slice();
+  sliceTableBlock[SEQ_SB.INSTR] = 4;
+  sliceTableBlock[SEQ_SB.INSTR + 7] = 0x30;
+  sliceTableBlock[SEQ_SB.INSTR + 9] = 0;
+  sliceTableBlock[SEQ_SB.INSTR + 12] = 0;          // table 0
+  sliceTableBlock[SEQ_SB.INSTR + 13] = 2;          // one row per 2 ticks
+  sliceTableBlock[SEQ_SB.TABLES + 1] = 1;          // row 0 TSP +1
+  sliceTableBlock[SEQ_SB.TABLES + 5] = 2;          // row 1 TSP +2
+  const sliceTableSeq = seqNew(sliceTableBlock, spool);
+  seqTick(sliceTableSeq);
+  assert(sliceTableSeq.dsp.regs[0x04] === sliceTableSeq.sliceBase[0] + 1,
+    'seq SLICE respects TABLE TSP on its trigger tick');
+  seqTick(sliceTableSeq);                         // counter 2 -> 1: no row
+  seqTick(sliceTableSeq);                         // row 1: TSP +2
+  assert(sliceTableSeq.dsp.regs[0x04] === sliceTableSeq.sliceBase[0] + 2,
+    'seq tick-clocked TABLE TSP sequences SLICE divisions');
+  assert(sliceTableSeq.dsp.regs[0x02] === 0x00 &&
+    sliceTableSeq.dsp.regs[0x03] === 0x10,
+    'seq TABLE TSP leaves SLICE pitch under TUNE');
+  assert((sliceTableSeq.koffMask & 1) !== 0 && (sliceTableSeq.konMask & 1) !== 0,
+    'seq tick-clocked TABLE TSP retriggers the selected SLICE');
+
   // audio end-to-end: the first half second must actually sound
   const ren = seqRender(sblk, spool, 0.5);
   assert(ren.l.length === 16000, 'seq render length');

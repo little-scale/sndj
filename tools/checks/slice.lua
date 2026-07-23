@@ -1,8 +1,8 @@
 -- slice.lua — the SLICE instrument type: equal block-aligned divisions of
 -- one pool sample as directory alias entries (zero extra ARAM). The note
--- picks the slice wrapped mod n, pitch is native +/- TUNE, the envelope
--- synthesizes from the ATK nibble + FADE rate. Editing SLICES on the
--- INSTR screen rebuilds the residency windows.
+-- picks the slice wrapped mod n, CHAIN/TABLE TSP rotate that choice, pitch
+-- is native +/- TUNE, and the envelope synthesizes from the ATK nibble +
+-- FADE rate. Editing SLICES on the INSTR screen rebuilds the residency windows.
 --
 -- Blob under test: authored one-shot slot 7. Alias step size is derived from
 -- its current BRR block count so factory content can change independently.
@@ -55,9 +55,14 @@ local script = {
   [290] = { start = true }, [292] = {},
   [386] = { start = true }, [388] = {},
   [400] = { start = true }, [402] = {},
+  [420] = { start = true }, [422] = {},
+  [432] = { start = true }, [434] = {},
+  [452] = { start = true }, [454] = {},
+  [464] = { start = true }, [466] = {},
 }
 
 local srcns, pitches = {}, {}
+local table_kons = 0
 local function collect()
   srcns[#srcns + 1] = dsp(0x04)
   pitches[#pitches + 1] = dsp(0x02) + dsp(0x03) * 256
@@ -122,6 +127,34 @@ emu.addEventCallback(function()
     local p = dsp(0x02) + dsp(0x03) * 256
     check(p == 0x2000,
       string.format("TUNE +12 transposes the whole kit of slices ($%04X)", p))
+  elseif frames == 426 then
+    -- CHAIN TSP changes the note index, hence the selected slice, but not pitch.
+    poke(0x2409, 0)
+    poke(0x240C, 0xFF)      -- no table
+    poke(0x3701, 1)         -- chain entry TSP +1
+    row(0, 1, 0)            -- base slice 0 -> slice 1
+  elseif frames == 444 then
+    check(dsp(0x04) == srcns[2],
+      "CHAIN TSP +1 rotated SLICE from division 0 to 1")
+    local p = dsp(0x02) + dsp(0x03) * 256
+    check(p == 0x1000, "CHAIN TSP left SLICE pitch under TUNE")
+  elseif frames == 458 then
+    -- Tick-clocked table rows should sequence and retrigger new slices without
+    -- pitching them. Row 0 selects slice 1; row 1 later selects slice 2.
+    poke(0x3701, 0)
+    poke(0x240C, 0)         -- table 0
+    poke(0x240D, 2)         -- one table row per 2 ticks
+    poke(0x2801, 1)         -- table row 0: TSP +1
+    poke(0x2805, 2)         -- table row 1: TSP +2
+    row(0, 1, 0)
+    table_kons = wram(0x15)
+  elseif frames == 476 then
+    check(dsp(0x04) == srcns[3],
+      "TABLE TSP +2 rotated SLICE from division 0 to 2")
+    local p = dsp(0x02) + dsp(0x03) * 256
+    check(p == 0x1000, "TABLE TSP left SLICE pitch under TUNE")
+    local kd = (wram(0x15) - table_kons) % 256
+    check(kd >= 2, "tick-clocked TABLE TSP retriggered SLICE (KONs=" .. kd .. ")")
     if fails == 0 then
       print("ALL PASS slice.lua")
       emu.stop(0)

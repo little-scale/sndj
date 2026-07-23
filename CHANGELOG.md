@@ -5,6 +5,10 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → v0.13 → …).
 
 ## Unreleased
 
+- SLICE instruments now interpret TABLE TSP as a slice-selection offset and
+  retrigger the chosen division while leaving pitch under the instrument's
+  TUNE control. CHAIN TSP slice rotation is now covered by the same regression.
+
 ## v0.13 — 2026-07-13
 
 - Fixed SF2 root-key conversion to match sndj's C-5 reference convention, so

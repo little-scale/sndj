@@ -292,7 +292,8 @@ aliases into the sample the song already loaded. Then:
 
 - **The note picks the slice.** Note 1 (C-0) = slice 0, note 2 =
   slice 1, … wrapping past the count — so any melodic line is a valid
-  chop sequence, and transpose commands *rotate the chop*.
+  chop sequence. CHAIN and TABLE **TSP** values *rotate the chop*;
+  a TABLE TSP step retriggers its newly selected slice.
 - **FADE** is the whole envelope story: each slice plays from its
   start toward the end of the sample, fading at the FADE rate
   (`0` = never — slices ring into each other like an open sampler
