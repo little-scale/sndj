@@ -5,9 +5,10 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → v0.13 → v0.14 �
 
 ## Unreleased
 
-- Hardware verified the documented one-wire cross-console sync adapter:
-  genmddj **SYNC OUT** on Mega Drive pin 9 (TR) drives sndj **SYNC IN** on
-  SNES pin 4 (Data1), with Mega Drive pin 8 tied to SNES pin 7 for ground.
+- Hardware verified the documented cross-console sync adapter: genmddj
+  **SYNC OUT** on Mega Drive pin 9 (TR) and pin 7 (TH) connects to SNES pin 4
+  (Data1) and pin 5 (Data2), with Mega Drive pin 8 tied to SNES pin 7 for
+  ground. sndj **SYNC IN** consumes Data1 only; Data2 was present but ignored.
 
 ## v0.14 — 2026-07-23
 

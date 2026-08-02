@@ -18,7 +18,8 @@ carry clock state but not song position or a separate transport command.
 > **Hardware status:** sndj's IN/IN24 counter and row-gating paths pass the
 > emulator-in-the-loop sync test. **genmddj SYNC OUT → sndj SYNC IN was
 > verified on real Mega Drive and SNES/SFC hardware on 2026-08-03**, using the
-> one-wire mapping documented below. The XIAO → sndj IN24 arrangement remains
+> three-conductor counter cable documented below. sndj IN consumed Data1 only;
+> the cable also carried Data2. The XIAO → sndj IN24 arrangement remains
 > the outstanding SNES-facing hardware test.
 
 ## SNES controller port 2
@@ -131,41 +132,45 @@ and use `s` only after the SNES offset has been measured.
 genmddj's OUT mode writes a two-bit counter to controller port 2 TR and TH and
 increments it **once per tracker row**. Its TR/bit-0 line therefore toggles on
 every row. sndj's IN mode reads only that persistent toggle: a changed state is
-one row clock, so TH/Data2 is deliberately left unconnected.
+one row clock. The verified cable also carries TH/bit 1 to Data2, although IN
+deliberately ignores that second line.
 
 ### Cross-console cable
 
 > **Hardware verified 2026-08-03:** a Mega Drive running genmddj in
 > **SYNC OUT** successfully drove a SNES/SFC running sndj in **SYNC IN** with
-> the following signal and ground connections. No Data2 connection is needed.
+> the following three connections. Data2 was present in the tested cable but is
+> not required by the current one-bit IN mode.
 
 | Mega Drive port 2 | Meaning | SNES port 2 |
 |---|---|---|
 | **pin 9, TR** | row toggle (counter bit 0) | **pin 4, Data1** |
+| **pin 7, TH** | counter bit 1 (present, ignored by IN) | **pin 5, Data2** |
 | **pin 8, GND** | common ground | **pin 7, GND** |
 
 Recommended adapter:
 
 ```text
 Mega Drive DE-9 pin 9 (TR) ──[330 Ω–1 kΩ]──► SNES pin 4 (Data1)
+Mega Drive DE-9 pin 7 (TH) ──[330 Ω–1 kΩ]──► SNES pin 5 (Data2)
 Mega Drive DE-9 pin 8 (GND) ─────────────────► SNES pin 7 (GND)
 ```
 
 SNES pin numbers here are shown from the console-socket side: pin 1 is at the
 flat end and pin 7 at the rounded end. The controller plug's mating face is
-mirrored. When repinning a cable shell, confirm pins 4 and 7 from the wire side
-with a continuity meter before applying power.
+mirrored. When repinning a cable shell, confirm pins 4, 5 and 7 from the wire
+side with a continuity meter before applying power.
 
 This is a one-way 5 V-logic connection from the Mega Drive to the SNES input;
 no level translator should be required. The small series resistor is sensible
-fault protection during bring-up. Leave Mega Drive TH/pin 7 unconnected even
-though genmddj continues to drive the unused second counter bit. Do **not**
-connect Mega Drive pin 5 (+5 V) to SNES pin 1 (+5 V), and leave every other pin
-unconnected.
+fault protection during bring-up. The verified cable includes TH → Data2, but
+sndj IN ignores this line, so a minimal IN-only cable may omit it. Do **not**
+connect Mega Drive pin 5 (+5 V) to SNES pin 1 (+5 V), and leave every other
+pin unconnected.
 
 ### Cross-console bring-up procedure
 
-1. With both consoles powered off, connect the two-conductor adapter to controller
+1. With both consoles powered off, connect the three-conductor adapter to controller
    port 2 on each console. Use the normal controllers in port 1.
 2. Set genmddj to **SYNC: OUT** and sndj to **SYNC: IN**.
 3. Start or arm sndj first so that it displays **WAIT**.

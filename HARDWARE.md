@@ -15,19 +15,22 @@ genmddj OUT → sndj are in [`LINK-SYNC-WIRING.md`](LINK-SYNC-WIRING.md).
 
 ## Cross-console row sync (verified 2026-08-03)
 
-The one-wire sync-input path is confirmed on real hardware between a Mega
+The one-bit sync-input path is confirmed on real hardware between a Mega
 Drive running **genmddj SYNC OUT** and a SNES/SFC running **sndj SYNC IN**.
 The working adapter uses controller port 2 on both systems:
 
 ```text
 Mega Drive DE-9 pin 9 (TR) ──[330 Ω–1 kΩ recommended]──► SNES pin 4 (Data1)
+Mega Drive DE-9 pin 7 (TH) ──[330 Ω–1 kΩ recommended]──► SNES pin 5 (Data2)
 Mega Drive DE-9 pin 8 (GND) ────────────────────────────► SNES pin 7 (GND)
 ```
 
-Leave Mega Drive TH/pin 7, both consoles' power pins, and every other contact
-unconnected. Arm sndj first so it shows **WAIT**, then start genmddj. The first
-row-toggle transition starts sndj row 0; genmddj supplies subsequent row timing
-and groove. Full connector-orientation and bring-up notes are in
+The tested cable carried both genmddj counter bits, but sndj IN reacts only to
+Data1; TH → Data2 is therefore compatible but not required for this mode. Leave
+both consoles' power pins and every other contact unconnected. Arm sndj first so
+it shows **WAIT**, then start genmddj. The first row-toggle transition starts
+sndj row 0; genmddj supplies subsequent row timing and groove. Full
+connector-orientation and bring-up notes are in
 [`LINK-SYNC-WIRING.md`](LINK-SYNC-WIRING.md).
 
 ## Silicon errata the code guards against
