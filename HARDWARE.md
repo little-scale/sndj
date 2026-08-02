@@ -13,6 +13,23 @@ genmddj OUT → sndj are in [`LINK-SYNC-WIRING.md`](LINK-SYNC-WIRING.md).
   SRAM: 32 KB, LoROM $70:0000. The boot splash's version + git-hash
   stamp is the stale-flash detector — check it before trusting a test.
 
+## Cross-console row sync (verified 2026-08-03)
+
+The one-wire sync-input path is confirmed on real hardware between a Mega
+Drive running **genmddj SYNC OUT** and a SNES/SFC running **sndj SYNC IN**.
+The working adapter uses controller port 2 on both systems:
+
+```text
+Mega Drive DE-9 pin 9 (TR) ──[330 Ω–1 kΩ recommended]──► SNES pin 4 (Data1)
+Mega Drive DE-9 pin 8 (GND) ────────────────────────────► SNES pin 7 (GND)
+```
+
+Leave Mega Drive TH/pin 7, both consoles' power pins, and every other contact
+unconnected. Arm sndj first so it shows **WAIT**, then start genmddj. The first
+row-toggle transition starts sndj row 0; genmddj supplies subsequent row timing
+and groove. Full connector-orientation and bring-up notes are in
+[`LINK-SYNC-WIRING.md`](LINK-SYNC-WIRING.md).
+
 ## Silicon errata the code guards against
 
 ### APU mailbox port glitch (found v0.1 hardware bring-up, 2026-07-11)

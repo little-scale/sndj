@@ -16,10 +16,10 @@ row, but two changes between polls cancel and cannot be recovered. The wires
 carry clock state but not song position or a separate transport command.
 
 > **Hardware status:** sndj's IN/IN24 counter and row-gating paths pass the
-> emulator-in-the-loop sync test. The ESP32 counter has been verified on real
-> SMS/Mega Drive hardware, and genmddj OUT-to-IN has been verified between two
-> Mega Drives. The two SNES-facing arrangements below are the intended first
-> hardware bring-up and are not yet marked as verified on a real SNES/SFC.
+> emulator-in-the-loop sync test. **genmddj SYNC OUT → sndj SYNC IN was
+> verified on real Mega Drive and SNES/SFC hardware on 2026-08-03**, using the
+> one-wire mapping documented below. The XIAO → sndj IN24 arrangement remains
+> the outstanding SNES-facing hardware test.
 
 ## SNES controller port 2
 
@@ -135,6 +135,10 @@ one row clock, so TH/Data2 is deliberately left unconnected.
 
 ### Cross-console cable
 
+> **Hardware verified 2026-08-03:** a Mega Drive running genmddj in
+> **SYNC OUT** successfully drove a SNES/SFC running sndj in **SYNC IN** with
+> the following signal and ground connections. No Data2 connection is needed.
+
 | Mega Drive port 2 | Meaning | SNES port 2 |
 |---|---|---|
 | **pin 9, TR** | row toggle (counter bit 0) | **pin 4, Data1** |
@@ -147,6 +151,11 @@ Mega Drive DE-9 pin 9 (TR) ──[330 Ω–1 kΩ]──► SNES pin 4 (Data1)
 Mega Drive DE-9 pin 8 (GND) ─────────────────► SNES pin 7 (GND)
 ```
 
+SNES pin numbers here are shown from the console-socket side: pin 1 is at the
+flat end and pin 7 at the rounded end. The controller plug's mating face is
+mirrored. When repinning a cable shell, confirm pins 4 and 7 from the wire side
+with a continuity meter before applying power.
+
 This is a one-way 5 V-logic connection from the Mega Drive to the SNES input;
 no level translator should be required. The small series resistor is sensible
 fault protection during bring-up. Leave Mega Drive TH/pin 7 unconnected even
@@ -156,7 +165,7 @@ unconnected.
 
 ### Cross-console bring-up procedure
 
-1. With both consoles powered off, connect the three-wire adapter to controller
+1. With both consoles powered off, connect the two-conductor adapter to controller
    port 2 on each console. Use the normal controllers in port 1.
 2. Set genmddj to **SYNC: OUT** and sndj to **SYNC: IN**.
 3. Start or arm sndj first so that it displays **WAIT**.

@@ -5,6 +5,10 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → v0.13 → v0.14 �
 
 ## Unreleased
 
+- Hardware verified the documented one-wire cross-console sync adapter:
+  genmddj **SYNC OUT** on Mega Drive pin 9 (TR) drives sndj **SYNC IN** on
+  SNES pin 4 (Data1), with Mega Drive pin 8 tied to SNES pin 7 for ground.
+
 ## v0.14 — 2026-07-23
 
 - SLICE instruments now interpret TABLE TSP as a slice-selection offset and

@@ -531,6 +531,8 @@ if it climbs, the wire works.
 
 The XIAO-to-SNES and Mega-Drive-to-SNES cable diagrams, level conversion and
 bring-up sequence are in [`LINK-SYNC-WIRING.md`](LINK-SYNC-WIRING.md).
+The one-wire **genmddj SYNC OUT → sndj SYNC IN** connection is verified on
+real Mega Drive and SNES/SFC hardware; XIAO **IN24** verification is pending.
 
 ### MIDI takeover (SYNC: MIDI)
 
