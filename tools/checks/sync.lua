@@ -1,6 +1,6 @@
 -- sync.lua — M12 gate: SYNC IN / IN24 lock row advance to injected clock
--- state on the real $4017 read path. IN uses a one-wire D0 row toggle;
--- IN24 uses the full 2-bit counter. WAIT holds
+-- state on the real $4017 read path. IN and IN24 use a one-wire D0 toggle;
+-- IN24 divides its 24-PPQN transitions by six. WAIT holds
 -- row 0 silent until the first clock, and PULSE drives IOBit ($4201) at
 -- 2 PPQN. OUT stays a selectable dummy (nothing to assert).
 --
@@ -24,7 +24,8 @@ local function check(cond, msg)
   end
 end
 
--- the virtual master: a 2-bit counter presented on port 2's data lines
+-- the virtual master: a counter presented on port 2's data lines. The receiver
+-- must count D0 transitions only and ignore changes confined to D1.
 local counter = 0
 local pulses = 0
 local wrio_prev = 0xFF
@@ -101,24 +102,36 @@ emu.addEventCallback(function()
       "IN24: the FIRST clock plays row 0 independently of local BPM" ..
       " (wait=" .. wram(0x036C) .. " pending=" .. wram(0x036D) ..
       " phase=" .. wram(0x036E) .. " row=" .. wram(0x17) .. ")")
-    counter = counter + 3
-  elseif frames == 138 then
-    counter = counter + 3      -- 6 clocks total = one row
-  elseif frames == 146 then
+    counter = counter + 2      -- D1-only change must not become two clocks
+  elseif frames == 136 then
+    check(wram(0x17) == 0 and wram(0x036E) == 0,
+      "IN24 ignores Data2 instead of double-counting it")
+    counter = counter + 1
+  elseif frames == 139 then
+    counter = counter + 1
+  elseif frames == 142 then
+    counter = counter + 1
+  elseif frames == 145 then
+    counter = counter + 1
+  elseif frames == 148 then
+    counter = counter + 1
+  elseif frames == 151 then
+    counter = counter + 1      -- 6 D0 transitions total = one row
+  elseif frames == 158 then
     check(wram(0x17) == 1, "IN24 divides by 6 (24 PPQN -> one row)" ..
       " (pending=" .. wram(0x036D) .. " phase=" .. wram(0x036E) ..
       " row=" .. wram(0x17) .. ")")
     pad = { start = true }     -- stop
-  elseif frames == 148 then
+  elseif frames == 160 then
     pad = {}
-  elseif frames == 156 then
+  elseif frames == 168 then
     poke(0x3612, 150)           -- restore the local clock for PULSE coverage
     poke(0x036A, 2)            -- SYNC: PULSE
     pulses = 0
     pad = { start = true }
-  elseif frames == 158 then
+  elseif frames == 170 then
     pad = {}
-  elseif frames == 278 then
+  elseif frames == 290 then
     -- ~120 frames of ticks at 12 ticks/pulse ~= 10 pulses
     check(pulses >= 7 and pulses <= 13,
       "PULSE drives IOBit at 2 PPQN (" .. pulses .. " pulses/2s)")

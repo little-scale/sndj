@@ -1,15 +1,15 @@
 ; sync.asm — M12: sync clock on controller port 2, genmddj protocol and
 ; numbering (opt_sync: 0 OFF, 1 OUT, 2 PULSE, 3 IN, 4 MIDI, 5 IN24).
 ;
-; The SNES port asymmetry: as a SLAVE, IN reads a one-wire row toggle on
-; D0 ($4017 bit 0), while IN24 reads the family's full 2-bit counter on
-; D0+D1 (wire-identical to the ESP32 Link bridge, no reflash needed);
+; The SNES port asymmetry: as a SLAVE, IN and IN24 both read a one-wire
+; toggle on D0 ($4017 bit 0). IN treats each edge as a row; IN24 treats it
+; as one 24-PPQN clock and divides by six (no bridge reflash needed);
 ; as a MASTER the console's one clean output is IOBit ($4201 bit 7), which
 ; drives PULSE (and the MIDI clock, midi.asm). OUT is a dummy for now:
 ; selectable, inert (the single-line row clock arrives with the
 ; cross-sibling "edge IN" decision).
 ;
-; IN: a D0 change is one ROW clock. IN24: (read - last) & 3 catch-up.
+; IN: a D0 change is one ROW clock. IN24: a D0 change is one MIDI clock.
 ; Both arm in WAIT with the first change counting as exactly one clock.
 ; A four-times-per-frame V-timer IRQ captures changes independently of the
 ; song tempo. IN24 clocks drive engine ticks directly; sync_cnt starts at five
@@ -40,10 +40,10 @@ sync_boot:
     sta sync_shadow          ; boot state is "already applied" (no MIDI edge)
     rts
 
-; --- A = 2-bit counter on port 2's data lines -----------------------------------
+; --- A = one-wire toggle on port 2 Data1 ----------------------------------------
 sync_read:
     lda JOYSER1
-    and #$03
+    and #$01
     rts
 
 ; --- play-start: configure the port + arm a slave (from engine_go) --------------
@@ -199,41 +199,27 @@ sync_irq_poll:
     rts
 
 ; --- IRQ capture: accrue external clocks into sync_gctr -------------------------
-; Skips the poll while auto-joypad owns the port. IN is a persistent one-wire
-; D0 toggle; IN24 keeps the 2-bit counter and recovers as many as three clocks
-; between samples. Musical processing is deliberately deferred until after RTI.
+; Skips the poll while auto-joypad owns the port. Both slave modes use the
+; persistent D0 toggle: IN counts an edge as a row, while IN24 counts it as one
+; 24-PPQN clock. Data2 is deliberately ignored so bit ordering cannot double
+; the clock. Musical processing is deferred until after RTI.
 sync_in_capture:
     lda HVBJOY
     and #$01
     bne @done
     lda JOYSER1
-    and #$03
-    pha                      ; new counter
-    lda opt_sync
-    cmp #SYNC_IN
-    bne @delta24
-    pla                      ; IN: any D0 transition is exactly one row clock
-    pha
-    eor sync_last
     and #$01
-    bra @have_delta
-@delta24:
-    pla                      ; IN24: modulo-4 counter delta preserves bursts
-    pha
-    sec
-    sbc sync_last
-    and #$03
-@have_delta:
-    sta sync_irq_delta       ; clocks since last poll (IRQ-private scratch)
+    pha                      ; new D0 state
+    eor sync_last            ; any D0 transition is exactly one wire clock
+    and #$01
+    sta sync_irq_delta       ; always 0 or 1 (IRQ-private scratch)
     pla
     sta sync_last
     lda sync_irq_delta
     beq @done
     lda sync_wait            ; armed: the first change counts as exactly ONE
-    beq @accrue              ; (never the raw idle->running counter jump)
+    beq @accrue
     stz sync_wait
-    lda #$01
-    sta sync_irq_delta
 @accrue:
     lda sync_gctr            ; pending clocks for main-loop service
     clc

@@ -566,7 +566,7 @@ engine_update:
 
 ; --- prompt IN24 service -------------------------------------------------------
 ; Called after timer-IRQ WAI wakes and at safe checkpoints through each video
-; frame. The IRQ has already accumulated the modulo-4 wire delta in sync_gctr.
+; frame. The IRQ has already accumulated D0 transitions in sync_gctr.
 ; Consume each external 24-PPQN clock as one engine tick so effects and rows
 ; share the external timebase; every sixth tick advances a row, with sync_cnt=5
 ; making the first clock play row 0.

@@ -5,10 +5,12 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → v0.13 → v0.14 �
 
 ## Unreleased
 
-- Reworked **SYNC IN24** timing: a vertical-timer IRQ now samples the two-bit
-  counter four times per video frame, and received 24-PPQN clocks drive engine
+- Reworked **SYNC IN24** timing: a vertical-timer IRQ now samples the Data1
+  toggle four times per video frame, and received 24-PPQN clocks drive engine
   ticks directly. Row timing and tick effects no longer depend on project TMPO,
   reducing input jitter and preventing slow local tempos from missing clocks.
+  Data2 is ignored after hardware testing exposed an exact 2x clock caused by
+  ambiguous two-bit ordering; each Data1 transition is now exactly one clock.
 - Hardware verified the documented cross-console sync adapter: genmddj
   **SYNC OUT** on Mega Drive pin 9 (TR) and pin 7 (TH) connects to SNES pin 4
   (Data1) and pin 5 (Data2), with Mega Drive pin 8 tied to SNES pin 7 for
@@ -35,7 +37,8 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → v0.13 → v0.14 �
   IN24 and genmddj OUT → sndj IN, including safe level conversion and staged
   hardware bring-up procedures.
 - Changed SYNC IN to a one-wire Data1 row-toggle input. Each D0 transition is
-  one row clock; IN24 retains the full two-bit counter and burst catch-up.
+  one row clock; IN24 initially retained the full two-bit counter (superseded
+  by the one-wire IN24 correction in Unreleased).
 - Removed all bundled sample recordings, game SoundFonts and the derived
   factory container. The repository now ships a lean, copyright-free project
   factory with 8 authored sounds and 40 blank slots; raw samples, SoundFonts
@@ -597,8 +600,9 @@ Everything below is what v0.1 is made of, newest first.
   OPTIONS → SYNC now works: **IN** follows a sibling master one row
   per clock, **IN24** follows the 24-PPQN Ableton Link bridge (÷6) —
   both with WAIT arming (Start holds silently, the first clock plays
-  row 0) and lossless 2-bit catch-up, wire-identical to genmddj so no
-  bridge reflash is needed. **PULSE** drives a 2 PPQN Volca/PO clock
+  row 0). This release used 2-bit catch-up, later superseded by the
+  one-wire IN24 receiver documented in Unreleased; no bridge reflash is
+  needed. **PULSE** drives a 2 PPQN Volca/PO clock
   on pin 6. **MIDI** turns sndj into an 8-voice sample module:
   channels 1-8 map onto V1-V8, velocity → level, Program Change →
   instrument, pitch bend ±2 semi, CC 7/10/91/74 = vol/pan/echo/FIR,
