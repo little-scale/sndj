@@ -10,8 +10,10 @@
 ; cross-sibling "edge IN" decision).
 ;
 ; IN: a D0 change is one ROW clock. IN24: (read - last) & 3 catch-up.
-; Both arm in WAIT with the first change counting as exactly one clock,
-; and seed the row counter to divisor-1 so the first clock plays row 0.
+; Both arm in WAIT with the first change counting as exactly one clock.
+; A four-times-per-frame V-timer IRQ captures changes independently of the
+; song tempo. IN24 clocks drive engine ticks directly; sync_cnt starts at five
+; so the first of the six-clock row cycle plays row 0.
 
 .ACCU 8
 .INDEX 16
@@ -56,6 +58,7 @@ sync_play_start:
     stz sync_wait
     stz sync_cnt
     stz sync_gctr
+    jsr sync_irq_disarm
     lda opt_sync
     cmp #SYNC_PULSE
     bne @not_pulse
@@ -76,20 +79,24 @@ sync_play_start:
     sta sync_last
     lda #$01
     sta sync_wait            ; armed: hold row 0 silently until the first clock
-    ; head-start = divisor-1 so the FIRST clock plays row 0
+    ; IN24 phase head-start = divisor-1 so the FIRST clock plays row 0.
+    ; sync_gctr is now only the IRQ-to-main pending-clock queue.
     lda opt_sync
     cmp #SYNC_IN24
     bne @hs_in
     lda #$05
-    sta sync_gctr
+    sta sync_cnt
+    jsr sync_irq_arm
     rts
 @hs_in:
-    stz sync_gctr            ; IN (div 1): 0
+    stz sync_cnt             ; IN has no sub-row clock phase
+    jsr sync_irq_arm
     rts
 
 ; --- transport stop: release the line ------------------------------------------
 sync_stop:
     stz sync_wait
+    jsr sync_irq_disarm
     lda opt_sync
     cmp #SYNC_MIDI
     beq @done                ; MIDI owns the pin while the mode is armed
@@ -98,15 +105,109 @@ sync_stop:
 @done:
     rts
 
-; --- per-tick (playing, IN/IN24): accrue external clocks into sync_gctr ---------
-; Skips the poll while the auto-joypad read owns the port. IN is a persistent
-; one-wire D0 toggle (at most one recoverable row per poll); IN24 keeps the
-; 2-bit counter and its lossless catch-up of as many as 3 clocks per poll.
-sync_in_poll:
+; --- four-times-per-frame vertical IRQ ------------------------------------------
+; V-only IRQ is reprogrammed after every hit. Positions are spread across the
+; whole video period; the PAL fourth sample occurs after auto-joypad has cleared.
+sync_irq_arm:
+    stz sync_irq_slot
+    lda #$10
+    sta VTIMEL
+    stz VTIMEH
+    lda TIMEUP               ; clear a stale IRQ before enabling
+    lda #$A1                 ; NMI + V-IRQ + auto-joypad
+    sta NMITIMEN
+    cli                      ; ordinary modes retain the original IRQ-masked state
+    rts
+
+sync_irq_disarm:
+    sei                      ; close the mask before disabling the timer source
+    lda #$81                 ; NMI + auto-joypad, no timer IRQ
+    sta NMITIMEN
+    lda TIMEUP
+    rts
+
+; The IRQ body and capture path live in bank 6 to keep the packed bank-0 code
+; below the internal header. Vec_IRQ in bank 0 jumps here directly.
+.BANK 6 SLOT 0
+.SECTION "Sync IRQ Capture" FREE
+
+Sync_IRQ_Body:
+    rep #$30
+.ACCU 16
+    pha
+    phx
+    phy
+    phb
+    phd
+    lda #$0000
+    tcd
+    sep #$20
+.ACCU 8
+    lda #$80
+    pha
+    plb
+
+    lda TIMEUP               ; acknowledge the V-timer IRQ
+    jsr sync_irq_next
+    jsr sync_irq_poll
+
+    rep #$30
+.ACCU 16
+    pld
+    plb
+    ply
+    plx
+    pla
+    rti
+.ACCU 8
+
+sync_irq_next:
+    lda sync_irq_slot
+    inc a
+    and #$03
+    sta sync_irq_slot
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    lda video_pal
+    beq @ntsc
+    lda.w sync_vtime_pal,x
+    bra @set
+@ntsc:
+    lda.w sync_vtime_ntsc,x
+@set:
+    sta VTIMEL
+    stz VTIMEH
+    rts
+
+sync_vtime_ntsc: .DB 16, 82, 148, 214
+sync_vtime_pal:  .DB 16, 94, 172, 250
+
+; IRQ entry guard: capture only while a slave transport is running.
+sync_irq_poll:
+    lda eng_playing
+    beq @done
+    lda opt_sync
+    cmp #SYNC_IN
+    beq sync_in_capture
+    cmp #SYNC_IN24
+    beq sync_in_capture
+@done:
+    rts
+
+; --- IRQ capture: accrue external clocks into sync_gctr -------------------------
+; Skips the poll while auto-joypad owns the port. IN is a persistent one-wire
+; D0 toggle; IN24 keeps the 2-bit counter and recovers as many as three clocks
+; between samples. Musical processing is deliberately deferred until after RTI.
+sync_in_capture:
     lda HVBJOY
     and #$01
     bne @done
-    jsr sync_read
+    lda JOYSER1
+    and #$03
     pha                      ; new counter
     lda opt_sync
     cmp #SYNC_IN
@@ -123,24 +224,24 @@ sync_in_poll:
     sbc sync_last
     and #$03
 @have_delta:
-    sta sy_tmp               ; clocks since last poll
+    sta sync_irq_delta       ; clocks since last poll (IRQ-private scratch)
     pla
     sta sync_last
-    lda sy_tmp
+    lda sync_irq_delta
     beq @done
     lda sync_wait            ; armed: the first change counts as exactly ONE
     beq @accrue              ; (never the raw idle->running counter jump)
     stz sync_wait
     lda #$01
-    sta sy_tmp
+    sta sync_irq_delta
 @accrue:
-    lda sync_gctr
+    lda sync_gctr            ; pending clocks for main-loop service
     clc
-    adc sy_tmp
+    adc sync_irq_delta
     sta sync_gctr
     rep #$20
 .ACCU 16
-    lda sy_tmp
+    lda sync_irq_delta
     and #$00FF
     clc
     adc sync_act
@@ -149,6 +250,9 @@ sync_in_poll:
 .ACCU 8
 @done:
     rts
+
+.ENDS
+.BANK 0 SLOT 0
 
 ; --- per-tick (playing, PULSE): IOBit high on tick 0 of every 12 ----------------
 sync_pulse_tick:

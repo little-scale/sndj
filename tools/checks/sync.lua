@@ -4,7 +4,8 @@
 -- row 0 silent until the first clock, and PULSE drives IOBit ($4201) at
 -- 2 PPQN. OUT stays a selectable dummy (nothing to assert).
 --
--- WRAM: opt_sync $036A, sync_wait $036C, sync_gctr $036D, sync_act $036F.
+-- WRAM: opt_sync $036A, sync_wait $036C, pending $036D, phase $036E,
+-- sync_act $036F. IN24 capture is V-timer IRQ driven, independent of APU BPM.
 
 local frames = 0
 local _booted = false
@@ -86,26 +87,32 @@ emu.addEventCallback(function()
   elseif frames == 102 then
     pad = {}
   elseif frames == 110 then
+    poke(0x3612, 80)            -- slow local APU tick: IN24 must ignore it
     poke(0x036A, 5)            -- SYNC: IN24
     pad = { start = true }
   elseif frames == 112 then
     pad = {}
   elseif frames == 126 then
     check(wram(0x036C) == 1, "IN24: WAIT re-armed")
-    check(wram(0x036D) == 5, "IN24 head-start seeded (divisor-1)")
+    check(wram(0x036E) == 5, "IN24 phase head-start seeded (divisor-1)")
     counter = counter + 1      -- first clock completes the head-start
   elseif frames == 132 then
     check(wram(0x036C) == 0 and wram(0x17) == 0,
-      "IN24: the FIRST clock plays row 0")
+      "IN24: the FIRST clock plays row 0 independently of local BPM" ..
+      " (wait=" .. wram(0x036C) .. " pending=" .. wram(0x036D) ..
+      " phase=" .. wram(0x036E) .. " row=" .. wram(0x17) .. ")")
     counter = counter + 3
   elseif frames == 138 then
     counter = counter + 3      -- 6 clocks total = one row
   elseif frames == 146 then
-    check(wram(0x17) == 1, "IN24 divides by 6 (24 PPQN -> one row)")
+    check(wram(0x17) == 1, "IN24 divides by 6 (24 PPQN -> one row)" ..
+      " (pending=" .. wram(0x036D) .. " phase=" .. wram(0x036E) ..
+      " row=" .. wram(0x17) .. ")")
     pad = { start = true }     -- stop
   elseif frames == 148 then
     pad = {}
   elseif frames == 156 then
+    poke(0x3612, 150)           -- restore the local clock for PULSE coverage
     poke(0x036A, 2)            -- SYNC: PULSE
     pulses = 0
     pad = { start = true }

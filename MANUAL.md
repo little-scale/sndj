@@ -524,7 +524,9 @@ the ESP32 Link bridge, drives it with no changes on their side.
 - **MIDI** — MIDI note takeover, below.
 - **IN24** — follow a **24 PPQN** source (the Ableton Link bridge) over
   the full two-bit Data1+Data2 counter; same WAIT-then-lock behaviour,
-  six clocks per row and up to three-clock catch-up per poll.
+  six clocks per row and up to three-clock catch-up per poll. The receiver
+  samples four times per video frame, and those external clocks drive both
+  row timing and tick-based effects independently of the project's TMPO.
 
 While IN/IN24 is armed, OPTIONS shows a live **RX** clock counter —
 if it climbs, the wire works.

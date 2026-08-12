@@ -18,6 +18,7 @@ Vec_NMI:
     tcd                     ; re-assert our direct page (invariant #8)
     sep #$20
 .ACCU 8
+
     lda #$80
     pha
     plb
@@ -89,3 +90,8 @@ Vec_NMI:
     pla
     rti
 .ACCU 8
+
+; Native IRQ vectors enter bank 0. The quarter-frame sampler itself lives in
+; bank 6 (bank 0 is packed to its header), so this fast-mirror stub jumps long.
+Vec_IRQ:
+    jml Sync_IRQ_Body

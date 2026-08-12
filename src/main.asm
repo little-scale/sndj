@@ -68,21 +68,30 @@ main_loop:
 @wait:
     wai
     lda frame_flag
-    beq @wait
+    beq @sync_wake
     stz frame_flag
 
     jsr input_update
     jsr apu_update
     jsr engine_update
+    jsr engine_sync_update
     jsr midi_service
     jsr tick_track
+    jsr engine_sync_update
 
     jsr screen_update
+    jsr engine_sync_update
     jsr hint_tick
     ; chrome draws after the screen so it overlays on every screen
     jsr draw_status
     jsr draw_minimap
+    jsr engine_sync_update
     jmp main_loop
+@sync_wake:
+    ; A maskable V-timer IRQ woke WAI between frames. Its handler only captured
+    ; the counter; drain IN24 ticks here, safely outside interrupt context.
+    jsr engine_sync_update
+    bra @wait
 
 ; fold the streamed APU tick byte into a free-running 16-bit counter
 tick_track:
@@ -291,14 +300,6 @@ font_data:
     .INCBIN "font.bin"
 font_data_end:
 
-; factory palette (marker-wrapped for the patcher)
-    .DB "SNPAL0"
-pal_schemes:
-    .INCBIN "schemes.bin"
-
-
-
-
 ; --- banks 1-3: the self-describing sample pool (tools/sndj_pool.py) ---------
 ; marker-wrapped and padded to POOL_RESERVED so patcher.html can grow it in
 ; place; pool.bin is emitted pre-padded and split across the banks here
@@ -322,6 +323,12 @@ pool_data:
 
 .BANK 6 SLOT 0
 .ORG $0000
+; factory palette (marker-wrapped for the patcher). Runtime reads are already
+; long-addressed, so parking this patchable block here frees scarce code bank 0.
+    .DB "SNPAL0"
+pal_schemes:
+    .INCBIN "schemes.bin"
+
 ; the tri-pixel wordmark (art/sndj-logo.png via makelogo.py); DMA-only
 ; data, so it lives outside the crowded code bank
 logo_data:
@@ -398,7 +405,7 @@ driver_blob_end:
     .DW Vec_Null                     ; ABORT
     .DW Vec_NMI                      ; NMI
     .DW $0000
-    .DW Vec_Null                     ; IRQ
+    .DW Vec_IRQ                      ; IRQ (4x/frame external-sync sampler)
 ; emulation-mode vectors ($FFF0)
     .DW $0000, $0000
     .DW Vec_Null                     ; COP

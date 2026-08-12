@@ -564,6 +564,49 @@ engine_update:
 @done:
     rts
 
+; --- prompt IN24 service -------------------------------------------------------
+; Called after timer-IRQ WAI wakes and at safe checkpoints through each video
+; frame. The IRQ has already accumulated the modulo-4 wire delta in sync_gctr.
+; Consume each external 24-PPQN clock as one engine tick so effects and rows
+; share the external timebase; every sixth tick advances a row, with sync_cnt=5
+; making the first clock play row 0.
+engine_sync_update:
+    lda eng_playing
+    beq @done
+    lda opt_sync
+    cmp #SYNC_IN24
+    bne @done
+    lda sync_wait
+    bne @done
+@next:
+    php
+    sei                      ; IRQ may append to the pending queue
+    lda sync_gctr
+    beq @empty
+    dec sync_gctr
+    plp
+    stz kon_mask
+    stz koff_mask
+    lda sync_cnt
+    inc a
+    cmp #$06
+    bcc @fx_only
+    sbc #$06                 ; carry is set by CMP
+    sta sync_cnt
+    jsr engine_tick_row
+    bra @again
+@fx_only:
+    sta sync_cnt
+    jsr engine_tick_fx
+@again:
+    lda eng_playing          ; a row command may have stopped transport
+    bne @next
+@done:
+    rts
+@empty:
+    plp
+    rts
+
 ; --- one engine tick ------------------------------------------------------------
 engine_tick:
     stz kon_mask
@@ -575,6 +618,9 @@ engine_tick:
     beq @slv_tramp
     cmp #SYNC_IN24
     bne @master
+    ; The external 24-PPQN service runs this mode's ticks between frames.
+    ; Local APU deltas are still consumed by engine_update but do no work.
+    rts
 @slv_tramp:
     jmp engine_tick_slave
 @master:
@@ -707,28 +753,25 @@ eon_sync:
     plx
     rts
 
-; --- SYNC IN/IN24 row gate: external clocks decide the row, one per tick ---------
-; (excess clocks carry in sync_gctr and catch up on following ticks)
+; --- one-wire SYNC IN row gate --------------------------------------------------
+; IN24 is serviced promptly by engine_sync_update; IN retains its established
+; local effect cadence and consumes one captured D0 transition per row.
 engine_tick_slave:
-    jsr sync_in_poll
     lda sync_wait
     bne @hold                ; armed: row 0 stays silent until the first clock
     lda opt_sync
-    cmp #SYNC_IN24
-    beq @div6
-    lda sync_gctr            ; IN: one row per clock
-    beq @hold
-    dec a
-    sta sync_gctr
-    bra @go
-@div6:
-    lda sync_gctr            ; IN24: 24 PPQN, six clocks per row
-    cmp #$06
-    bcc @hold
-    sbc #$06
-    sta sync_gctr
+    cmp #SYNC_IN
+    bne @hold
+    php
+    sei                      ; IRQ may append a row clock during consumption
+    lda sync_gctr
+    beq @empty
+    dec sync_gctr
+    plp
 @go:
     jmp engine_tick_row
+@empty:
+    plp
 @hold:
     jmp engine_tick_fx
 

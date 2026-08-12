@@ -5,6 +5,10 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → v0.13 → v0.14 �
 
 ## Unreleased
 
+- Reworked **SYNC IN24** timing: a vertical-timer IRQ now samples the two-bit
+  counter four times per video frame, and received 24-PPQN clocks drive engine
+  ticks directly. Row timing and tick effects no longer depend on project TMPO,
+  reducing input jitter and preventing slow local tempos from missing clocks.
 - Hardware verified the documented cross-console sync adapter: genmddj
   **SYNC OUT** on Mega Drive pin 9 (TR) and pin 7 (TH) connects to SNES pin 4
   (Data1) and pin 5 (Data2), with Mega Drive pin 8 tied to SNES pin 7 for

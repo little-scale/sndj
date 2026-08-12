@@ -45,7 +45,8 @@ await real-hardware bring-up. What works today:
 - **Sync & MIDI (console side)** — OPTIONS → SYNC: **IN** follows a
   sibling master's one-wire row toggle (**genmddj OUT → sndj IN is verified
   on real Mega Drive/SNES hardware**), **IN24** follows the Ableton Link
-  bridge (no reflash), **PULSE** drives Volca/PO gear, and **MIDI**
+  bridge with four counter samples per video frame and an external 24-PPQN
+  engine clock (no reflash), **PULSE** drives Volca/PO gear, and **MIDI**
   turns sndj into an 8-voice sample module (channels 1–8 → V1–V8,
   velocity, program change, pitch bend, CC 7/10/91/74). OUT is
   reserved pending the cross-sibling wiring decision

@@ -11,9 +11,12 @@ This guide covers two ways to drive **sndj** through SNES/SFC controller port 2:
 
 IN24 uses the bridge's modulo-4 counter: bit 0 and bit 1 form a continuously
 rolling two-bit value, allowing sndj to recover as many as three clocks between
-polls. IN uses only bit 0 as a persistent row toggle: every change means one
-row, but two changes between polls cancel and cannot be recovered. The wires
-carry clock state but not song position or a separate transport command.
+polls. sndj samples that counter four times per video frame; each received
+24-PPQN clock drives an engine tick and every sixth advances a row, independently
+of the project's local tempo. IN uses only bit 0 as a persistent row toggle:
+every change means one row, but two changes between polls cancel and cannot be
+recovered. The wires carry clock state but not song position or a separate
+transport command.
 
 > **Hardware status:** sndj's IN/IN24 counter and row-gating paths pass the
 > emulator-in-the-loop sync test. **genmddj SYNC OUT → sndj SYNC IN was

@@ -278,6 +278,8 @@ opt_kdelay   db      ; OPTIONS timing: frames before d-pad auto-repeat (4-30)
 opt_krate    db      ; OPTIONS timing: frames between repeats (1-8)
 opt_tapwin   db      ; OPTIONS timing: B double-tap window, frames (10-40)
                      ; (the three stay consecutive: OPTIONS indexes them)
+sync_irq_slot db     ; next quarter-frame V-timer sample position (0-3)
+sync_irq_delta db    ; IRQ-private captured delta (never shared with main scratch)
 up_patch     dw      ; bulk upload: byte offset to OR $02 into on the fly
                      ; (the END block's LOOP bit; $FFFF = none)
 hb_lfc       db      ; heartbeat: frame_cnt at the last beat (delta gate)
