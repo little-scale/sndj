@@ -80,6 +80,11 @@ extended. The repository ships one rights-cleared project factory but no raw
 recordings or SoundFonts; personal sources remain ignored (see
 `THIRD_PARTY.md`).
 
+For the shared RP2040-Zero interface, Pico-family MIDI Clock firmware, and
+console-adapter designs, see **[Chipbridge](https://github.com/little-scale/chipbridge)**.
+Chipbridge currently lists SNDJ support for clock sync; MIDI note delivery is
+not yet part of the shared SNDJ hardware path.
+
 ## Controls
 
 The sibling grammar: **the button already held selects what the next
