@@ -1,6 +1,7 @@
 -- tune.lua — instrument FINE (rec byte 6, signed 1/256 semitone) bends the
--- pitch by table interpolation. +64 = +quarter semitone above C-4; -64
--- borrows from B-3. Expected values mirror the asm exactly:
+-- pitch by table interpolation, while TUNE (rec byte 9, signed semitones)
+-- coarsely transposes every pitched type. +64 = +quarter semitone above C-4;
+-- -64 borrows from B-3. Expected values mirror the asm exactly:
 --   C-4 base $0800, C#4 $0879 -> +64: $0800 + (121*64>>8)  = $081E
 --   B-3 $078D, delta 115      -> -64: $078D + (115*192>>8) = $07E3
 
@@ -61,6 +62,54 @@ emu.addEventCallback(function()
   elseif frames == 78 then
     local p = dsp(0x02) + dsp(0x03) * 256
     check(p == 0x07E3, "FINE -64 borrows from B-3 ($" ..
+      string.format("%04X", p) .. ")")
+  elseif frames == 82 then
+    pad = { start = true }   -- stop
+  elseif frames == 84 then
+    pad = {}
+    poke(0x2406, 0)          -- neutral fine
+    poke(0x2409, 12)         -- SMP TUNE +12
+  elseif frames == 88 then
+    pad = { start = true }
+  elseif frames == 90 then
+    pad = {}
+  elseif frames == 100 then
+    local p = dsp(0x02) + dsp(0x03) * 256
+    check(p == 0x1000, "SMP TUNE +12 raises C-4 to C-5 ($" ..
+      string.format("%04X", p) .. ")")
+  elseif frames == 104 then
+    pad = { start = true }   -- stop
+  elseif frames == 106 then
+    pad = {}
+    poke(0x2400, 2)          -- WAV, bank 0
+    poke(0x2401, 0)
+    poke(0x2409, 12)         -- WAV TUNE +12
+  elseif frames == 110 then
+    pad = { start = true }
+  elseif frames == 112 then
+    pad = {}
+  elseif frames == 122 then
+    local p = dsp(0x02) + dsp(0x03) * 256
+    check(p == 0x0860, "WAV TUNE +12 raises its C-4 output one octave ($" ..
+      string.format("%04X", p) .. ")")
+  elseif frames == 126 then
+    pad = { start = true }   -- stop
+  elseif frames == 128 then
+    pad = {}
+    poke(0x3603, 1)          -- 16 ms KARP room
+    poke(0x2400, 5)          -- KARP, wave bank 2
+    poke(0x2401, 2)
+    poke(0x2402, 0x68)       -- BURST 6 | DAMP 8
+    poke(0x2403, 0x70)       -- SUSTAIN
+    poke(0x2409, 3)          -- A-5 +3 -> C-6 resonant partial
+    poke(0x4300, 70)         -- A-5 (note index 69)
+  elseif frames == 132 then
+    pad = { start = true }
+  elseif frames == 134 then
+    pad = {}
+  elseif frames == 146 then
+    local p = dsp(0x02) + dsp(0x03) * 256
+    check(p == 0x10C5, "KARP TUNE +3 selects the C-6 resonant partial ($" ..
       string.format("%04X", p) .. ")")
     if fails == 0 then
       print("ALL PASS tune.lua")

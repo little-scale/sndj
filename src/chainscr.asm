@@ -165,6 +165,8 @@ chain_update:
     sta blk_mode
     lda chain_cy
     sta blk_start
+    lda chain_cx
+    sta.w blk_col
     lda #$01
     sta b_used
     jmp @cursor
@@ -271,6 +273,56 @@ chain_update:
 
 ; --- block mode on CHAIN: 2-byte rows, kind 2 -------------------------------
 chain_block:
+    ; B-held then A cuts; a plain B tap copies on release.
+    lda b_down
+    beq @b_edge
+    rep #$20
+.ACCU 16
+    lda pad_held
+    and #PAD_B
+    sep #$20
+.ACCU 8
+    beq @b_edge
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_A
+    sep #$20
+.ACCU 8
+    beq @b_wait
+    jsr chain_blk_copy
+    jsr chain_blk_clear
+    stz blk_mode
+    stz b_down
+    lda #$01
+    sta b_used
+    sta a_used
+    jmp chain_draw
+@b_edge:
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_B
+    sep #$20
+.ACCU 8
+    beq @b_release
+    lda #$01
+    sta b_down
+    stz b_used
+@b_wait:
+    jmp chain_draw
+@b_release:
+    lda b_down
+    beq @cancel
+    stz b_down
+    lda b_used
+    bne @cancel
+    jsr chain_blk_copy
+    stz blk_mode
+    lda #$01
+    sta b_used
+    jmp chain_draw
+@cancel:
     rep #$20
 .ACCU 16
     lda pad_pressed
@@ -283,20 +335,7 @@ chain_block:
     sta a_used
     jmp chain_draw
 @not_cancel:
-    rep #$20
-.ACCU 16
-    lda pad_pressed
-    and #PAD_B
-    sep #$20
-.ACCU 8
-    beq @not_copy
-    jsr chain_blk_copy
-    stz blk_mode
-    lda #$01
-    sta b_used
-    stz b_down
-    jmp chain_draw
-@not_copy:
+    ; Y remains a direct cut shortcut.
     rep #$20
 .ACCU 16
     lda pad_pressed
@@ -312,7 +351,7 @@ chain_block:
     rep #$20
 .ACCU 16
     lda pad_event
-    and #(PAD_UP | PAD_DOWN)
+    and #PAD_DPAD
     sep #$20
 .ACCU 8
     beq @blk_done
@@ -320,8 +359,8 @@ chain_block:
 @blk_done:
     jmp chain_draw
 
-; carry set when drawn row (tmp0+1) is inside the block
-chain_blk_range_row:
+; carry set when drawn cell (tmp0 column, tmp0+1 row) is inside the block
+chain_blk_range_cell:
     jsr chain_blk_range
     lda tmp0 + 1
     cmp es0
@@ -331,6 +370,16 @@ chain_blk_range_row:
     adc es0 + 1
     dec a
     cmp tmp0 + 1
+    bcc @out
+    jsr chain_blk_col_range
+    lda tmp0
+    cmp es3
+    bcc @out
+    lda es3
+    clc
+    adc es3 + 1
+    dec a
+    cmp tmp0
     bcc @out
     sec
     rts
@@ -359,12 +408,36 @@ chain_blk_range:
     sta es0 + 1
     rts
 
+; block column range -> es3 = first column, es3+1 = count
+chain_blk_col_range:
+    lda.w blk_col
+    cmp chain_cx
+    bcc @fwd
+    lda chain_cx
+    sta es3
+    lda.w blk_col
+    sec
+    sbc chain_cx
+    inc a
+    sta es3 + 1
+    rts
+@fwd:
+    sta es3
+    lda chain_cx
+    sec
+    sbc.w blk_col
+    inc a
+    sta es3 + 1
+    rts
 chain_blk_copy:
     jsr chain_blk_range
+    jsr chain_blk_col_range
     lda #$02
     sta clip_kind
     lda es0 + 1
     sta clip_len
+    lda es3 + 1
+    sta.w clip_width
     rep #$30
 .ACCU 16
     lda ed_chain
@@ -381,13 +454,23 @@ chain_blk_copy:
     clc
     adc es1
     sta es1
-    lda es0 + 1
+    lda es3
     and #$00FF
-    asl
-    sta es2
-    ldy #$0000
-@copy:
-    tya
+    clc
+    adc es1
+    sta es1
+    stz es2
+    sep #$20
+.ACCU 8
+    lda clip_len
+    sta str_buf + 36
+@row:
+    stz str_buf + 37
+@cell:
+    rep #$30
+.ACCU 16
+    lda str_buf + 37
+    and #$00FF
     clc
     adc es1
     tax
@@ -397,22 +480,32 @@ chain_blk_copy:
     pha
     rep #$30
 .ACCU 16
-    tyx
+    lda es2
+    tax
+    inc es2
     sep #$20
 .ACCU 8
     pla
     sta.l $7E7400,x
+    inc str_buf + 37
+    lda str_buf + 37
+    cmp.w clip_width
+    bne @cell
     rep #$30
 .ACCU 16
-    iny
-    cpy es2
-    bne @copy
+    lda es1
+    clc
+    adc #2
+    sta es1
     sep #$20
 .ACCU 8
+    dec str_buf + 36
+    bne @row
     rts
 
 chain_blk_clear:
     jsr chain_blk_range
+    jsr chain_blk_col_range
     rep #$30
 .ACCU 16
     lda ed_chain
@@ -428,21 +521,53 @@ chain_blk_clear:
     asl
     clc
     adc es1
+    sta es1
+    lda es3
+    and #$00FF
+    clc
+    adc es1
+    sta es1
+    sep #$20
+.ACCU 8
+    lda es0 + 1
+    sta str_buf + 36
+@row:
+    stz str_buf + 37
+@cell:
+    lda str_buf + 37
+    clc
+    adc es3
+    beq @phrase
+    lda #$00
+    bra @value
+@phrase:
+    lda #$FF
+@value:
+    pha
+    rep #$30
+.ACCU 16
+    lda str_buf + 37
+    and #$00FF
+    clc
+    adc es1
     tax
     sep #$20
 .ACCU 8
-@row:
-    lda #$FF
+    pla
     sta.l $7E0000 + SB_CHAINS,x
-    lda #$00
-    sta.l $7E0000 + SB_CHAINS + 1,x
+    inc str_buf + 37
+    lda str_buf + 37
+    cmp es3 + 1
+    bne @cell
     rep #$30
 .ACCU 16
-    inx
-    inx
+    lda es1
+    clc
+    adc #2
+    sta es1
     sep #$20
 .ACCU 8
-    dec es0 + 1
+    dec str_buf + 36
     bne @row
     rts
 
@@ -460,7 +585,20 @@ chain_paste:
     lda clip_len
 @have_n:
     sta es0 + 1
-    beq @done
+    bne +
+    jmp @done
++
+    lda #2
+    sec
+    sbc chain_cx
+    cmp.w clip_width
+    bcc @have_w
+    lda.w clip_width
+@have_w:
+    sta es3 + 1
+    bne +
+    jmp @done
++
     rep #$30
 .ACCU 16
     lda ed_chain
@@ -477,20 +615,32 @@ chain_paste:
     clc
     adc es1
     sta es1
-    lda es0 + 1
+    lda chain_cx
     and #$00FF
-    asl
-    sta es2
-    ldy #$0000
-@copy:
-    tyx
+    clc
+    adc es1
+    sta es1
+    stz es2
+    sep #$20
+.ACCU 8
+    lda es0 + 1
+    sta str_buf + 36
+@row:
+    stz str_buf + 37
+@cell:
+    rep #$30
+.ACCU 16
+    lda es2
+    tax
+    inc es2
     sep #$20
 .ACCU 8
     lda.l $7E7400,x
     pha
     rep #$30
 .ACCU 16
-    tya
+    lda str_buf + 37
+    and #$00FF
     clc
     adc es1
     tax
@@ -498,13 +648,38 @@ chain_paste:
 .ACCU 8
     pla
     sta.l $7E0000 + SB_CHAINS,x
+    inc str_buf + 37
+    lda str_buf + 37
+    cmp es3 + 1
+    bne @cell
+    lda.w clip_width
+    sec
+    sbc es3 + 1
+    sta str_buf + 38
+@skip:
+    lda str_buf + 38
+    beq @next_row
     rep #$30
 .ACCU 16
-    iny
-    cpy es2
-    bne @copy
+    inc es2
     sep #$20
 .ACCU 8
+    dec str_buf + 38
+    bra @skip
+@next_row:
+    rep #$30
+.ACCU 16
+    lda es1
+    clc
+    adc #2
+    sta es1
+    sep #$20
+.ACCU 8
+    dec str_buf + 36
+    bne @row
+    stz clip_kind           ; the next double-B can mint/clone again
+    stz clip_len
+    stz.w clip_width
 @done:
     rts
 
@@ -816,11 +991,8 @@ chain_draw:
 chain_cell_attr:
     lda blk_mode
     beq @no_blk_hl
-    jsr chain_blk_range_row
+    jsr chain_blk_range_cell
     bcc @no_blk_hl
-    lda tmp0 + 1
-    cmp chain_cy
-    beq @no_blk_hl
     rep #$20
 .ACCU 16
     lda #ATTR_ACCENT

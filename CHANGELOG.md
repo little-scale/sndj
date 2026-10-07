@@ -1,9 +1,58 @@
 # Changelog
 
 All notable changes to sndj. First release will be **v0.1**; versions
-increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → v0.13 → v0.14 → …).
+increment by **0.01** thereafter
+(v0.1 → v0.11 → v0.12 → v0.13 → v0.14 → v0.15 → …).
 
 ## Unreleased
+
+## v0.15 — 2026-10-07
+
+### Sequencing and playback
+
+- Added per-instrument coarse `TUNE` to every note-pitched type: SMP, WAV,
+  SLICE and KARP. Left/Right edits semitones and Up/Down edits octaves; KIT
+  retains per-slot tuning and NSE retains its CLOCK control.
+- Added `Wxy`, a latched tremolo override: x is speed and y is depth. The
+  override carries across later notes until `W00`, which releases it and
+  restores the undipped live level.
+- `Axy` arpeggio and `R0x` retrigger now remain active across following rows
+  until `A00` or `R00`. New notes inherit the active effect and restart the
+  retrigger cadence cleanly.
+- Fixed `B`, `S` and `U` commands on note rows being overwritten by the note's
+  instrument reload. Command-only rows retain the same behaviour.
+- Delay timing is now strictly row-bounded. With the default six-tick groove,
+  `D05` is the final playable delay and `D06` is silent; a delayed note can no
+  longer leak briefly into a following `K00` row.
+- Fixed WAV `L` slide targets landing one octave above ordinary WAV playback.
+  An `L` row with no earlier note in the current transport now sounds its
+  written note as an anchor instead of sliding stale pitch state.
+- Instrument tremolo now follows the two added voices created by a `C` chord.
+- Fixed arpeggio and other tick effects sounding roughly half-speed on INSTR.
+  The static instrument editor no longer performs a full-screen redraw every
+  frame, while individual Up/Down presses still redraw the cursor immediately.
+
+### Editing and workflow
+
+- PHRASE, CHAIN and SONG block selection is now fully rectangular. The d-pad
+  expands across rows and columns/tracks; copy, cut and paste affect only the
+  selected cells.
+- Fixed block highlighting being one cell short on parts of a selection, and
+  made held-B then A cut blocks consistently on all three grid screens. The
+  existing Y cut shortcut remains available.
+- Block paste is single-use: after one successful paste, double-B immediately
+  returns to its ordinary reference mint/clone behaviour.
+- LIVE cells now support double-B chain mint/clone without touching transport.
+  Single B remains safe and A+B remains the launch gesture.
+- PHRASE Y+Up/Down now follows populated entries in the current chain, skipping
+  blanks, wrapping at the ends, and preserving the edit row and column.
+- Added double-B table mint/clone from the INSTR TBL field. Attached blank
+  tables are reserved instead of being incorrectly reused as free tables.
+- TABLE TSP now distinguishes `--` (no pitch instruction) from explicit `00`
+  (reset to the note's base pitch). Coarse Up/Down editing moves by one octave
+  (12 semitones); Left/Right remains one semitone.
+
+### Synchronisation and hardware
 
 - Reworked **SYNC IN24** timing: a vertical-timer IRQ now samples the Data1
   toggle four times per video frame, and received 24-PPQN clocks drive engine
@@ -15,6 +64,18 @@ increment by **0.01** thereafter (v0.1 → v0.11 → v0.12 → v0.13 → v0.14 �
   **SYNC OUT** on Mega Drive pin 9 (TR) and pin 7 (TH) connects to SNES pin 4
   (Data1) and pin 5 (Data2), with Mega Drive pin 8 tied to SNES pin 7 for
   ground. sndj **SYNC IN** consumes Data1 only; Data2 was present but ignored.
+
+### Internal
+
+- Moved the patcher-locatable font asset to the banked data section. Boot DMA
+  and browser font replacement remain bank-aware while code bank 0 regains
+  space for the engine and editor fixes above.
+
+### Factory content
+
+- Replaced the default factory with the new redistribution-cleared 16-sound
+  pack. Its boot set includes melodic, drum and vocal material while retaining
+  enough audio RAM for the maximum 240 ms echo delay.
 
 ## v0.14 — 2026-07-23
 

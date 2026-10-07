@@ -35,6 +35,7 @@ str_defname: .DB "SONG    "
 .DEFINE CMDID_T 20
 .DEFINE CMDID_U 21
 .DEFINE CMDID_V 22
+.DEFINE CMDID_W 23
 .DEFINE CMDID_X 24
 .DEFINE CMDID_Y 25
 .DEFINE CMDID_Z 26
@@ -481,6 +482,8 @@ engine_go:
     sta.w trk_kill_cnt,x
     sta.w trk_pending,x
     sta.w trk_tbl,x
+    sta.w trk_note,x        ; no legato source exists in this transport yet
+    sta.w trk_trm_cmd,x     ; no latched W override
     lda #$00
     sta.w trk_tbl_spd,x
     sta.w trk_tbl_cnt,x
@@ -490,6 +493,7 @@ engine_go:
     sta.w trk_ret_per,x
     sta.w trk_sl_rate,x
     sta.w trk_arp_ph,x
+    sta.w trk_arp,x
     sta.w trk_vib_ph,x
     sta.w trk_vib,x
     sta.w trk_trm,x
@@ -975,7 +979,8 @@ track_row:
     sta.w trk_prow,x
     jmp @trigger
 @no_hop:
-    ; latch row command + per-row effect resets
+    ; latch this row's command. A/R are persistent effect states and are only
+    ; changed by another A/R command; delay remains row-local.
     lda.w str_buf + 30
     sta.w trk_cmd,x
     lda.w str_buf + 31
@@ -983,8 +988,6 @@ track_row:
     lda #$FF
     sta.w trk_dly_cnt,x     ; pending delay is per-row
     lda #$00
-    sta.w trk_arp_ph,x
-    sta.w trk_ret_per,x     ; retrig re-arms only via R
     sta.w str_buf + 27      ; flags: bit0 = trigger consumed by a command
     ; instrument column selects the track's instrument (empty = keep)
     lda.w str_buf + 29
@@ -1054,12 +1057,17 @@ track_trigger_note:
     lda.l $7E0000 + SB_INSTR + 15,x
     sta tg_vibtrm + 1       ; TRM
     plx
-    ; the instrument's VIB/TRM seed this note's LFOs (a row V overrides
-    ; vibrato after the trigger, for this note only)
+    ; the instrument's VIB/TRM seed this note's LFOs (row V/W commands
+    ; override them after the trigger, for this note only)
     lda tg_vibtrm
     sta.w trk_vib,x
     lda tg_vibtrm + 1
     sta.w trk_trm,x
+    lda.w trk_trm_cmd,x
+    cmp #$FF
+    beq +
+    sta.w trk_trm,x         ; W override survives later note triggers
++
     lda #$00
     sta.w trk_vib_ph,x
     sta.w trk_trm_ph,x
@@ -1197,22 +1205,98 @@ track_trigger_note:
     sta.w trk_pitch_hi,x
     lda #$00
     sta.w trk_sl_rate,x     ; a fresh note ends any slide
+    lda.w trk_ret_per,x
+    beq +
+    sta.w trk_ret_cnt,x     ; a fresh note restarts the latched R cadence
++
     lda.w bit_for_track,x
     ora kon_mask
     sta kon_mask
     jmp grp_fanout
 
-; --- post-trigger commands (X = track): X/P retarget the voice's live
-; volume, V overrides the instrument VIB (all last until the voice
-; reloads its instrument / the next trigger) ------------------------------------
+; --- post-trigger commands (X = track): effects that must win over a note's
+; instrument reload live here. X/P/U retarget volume, V/W override VIB/TRM,
+; B picks a WAV source, and S starts a sweep after the fresh note seeds pitch.
+; The same dispatcher also runs for command-only rows and table commands. -------
 row_cmd_post:
     lda.w trk_cmd,x
+    cmp #CMDID_B
+    bne @not_b
+    ; B: wave bank select for this voice (SRCN = 56 + bank). Doing this
+    ; after a row's note prevents apply_instrument from restoring the bank.
+    lda.w trk_cval,x
+    and #$07
+    clc
+    adc #56
+    tay
+    txa
+    asl
+    asl
+    asl
+    asl
+    ora #DSP_V0SRCN
+    phx
+    jsr apu_dsp_write
+    plx
+    lda #$FF
+    sta.w trk_instr_active,x
+    rts
+@not_b:
+    cmp #CMDID_S
+    bne @not_s
+    ; S xy: sweep up at rate x, or down at rate y. A fresh note clears
+    ; trk_sl_rate, so the sweep must be armed after that trigger.
+    lda.w trk_note,x
+    sta.w trk_sl_note,x
+    lda.w trk_cval,x
+    and #$F0
+    beq @s_down
+    lsr
+    lsr
+    lsr
+    lsr
+    sta.w trk_sl_rate,x
+    lda #$FF
+    sta.w trk_sl_tlo,x
+    lda #$3F
+    sta.w trk_sl_thi,x
+    rts
+@s_down:
+    lda.w trk_cval,x
+    and #$0F
+    sta.w trk_sl_rate,x
+    lda #$00
+    sta.w trk_sl_tlo,x
+    sta.w trk_sl_thi,x
+    rts
+@not_s:
+    cmp #CMDID_U
+    bne @not_u
+    jmp cmd_surround
+@not_u:
     cmp #CMDID_V
     bne @not_v
     lda.w trk_cval,x
     sta.w trk_vib,x
     rts
 @not_v:
+    cmp #CMDID_W
+    bne @not_w
+    lda.w trk_cval,x
+    beq @w_off
+    sta.w trk_trm_cmd,x
+    sta.w trk_trm,x
+    rts
+@w_off:
+    lda #$FF
+    sta.w trk_trm_cmd,x     ; later notes return to their instrument TRM
+    lda #$00
+    sta.w trk_trm,x
+    ; W00 restores the undipped live volume immediately instead of freezing
+    ; the DSP at whichever point of the tremolo was written most recently.
+    jsr fx_trm
+    rts
+@not_w:
     cmp #CMDID_X
     bne @not_x
     ; X: volume/accent — this voice's level, both sides (the family
@@ -1272,6 +1356,27 @@ row_cmd_pre:
     bne @dispatch
     rts
 @dispatch:
+    cmp #CMDID_A
+    bne @not_a
+    lda.w trk_cval,x
+    sta.w trk_arp,x
+    lda #$00
+    sta.w trk_arp_ph,x
+    lda.w trk_cval,x
+    bne @a_done
+    ; A00 releases immediately to the unmodulated base pitch.
+    txa
+    sta trig_voice
+    lda.w trk_pitch_lo,x
+    sta last_pitch
+    lda.w trk_pitch_hi,x
+    sta last_pitch + 1
+    phx
+    jsr voice_pitch_write
+    plx
+@a_done:
+    rts
+@not_a:
     cmp #CMDID_G
     bne @not_g
     ; G xy: write the groove pair directly — x ticks then y ticks
@@ -1295,24 +1400,7 @@ row_cmd_pre:
 @not_g:
     cmp #CMDID_B
     bne @not_b
-    ; B: wave bank select for this voice (SRCN = 56 + bank)
-    lda.w trk_cval,x
-    and #$07
-    clc
-    adc #56
-    tay
-    txa
-    asl
-    asl
-    asl
-    asl
-    ora #DSP_V0SRCN
-    phx
-    jsr apu_dsp_write
-    plx
-    ; the voice now plays a different source than its instrument claims
-    lda #$FF
-    sta.w trk_instr_active,x
+    ; B is post-trigger so an instrument reload cannot overwrite its SRCN.
     rts
 @not_b:
     cmp #CMDID_T
@@ -1470,29 +1558,7 @@ row_cmd_pre:
 @not_f:
     cmp #CMDID_S
     bne @not_s
-    ; S xy: sweep up at rate x, or down at rate y (rides the slide fx)
-    lda.w trk_note,x
-    sta.w trk_sl_note,x
-    lda.w trk_cval,x
-    and #$F0
-    beq @s_down
-    lsr
-    lsr
-    lsr
-    lsr
-    sta.w trk_sl_rate,x
-    lda #$FF
-    sta.w trk_sl_tlo,x
-    lda #$3F
-    sta.w trk_sl_thi,x
-    rts
-@s_down:
-    lda.w trk_cval,x
-    and #$0F
-    sta.w trk_sl_rate,x
-    lda #$00
-    sta.w trk_sl_tlo,x
-    sta.w trk_sl_thi,x
+    ; S is post-trigger because a fresh note clears its slide state.
     rts
 @not_s:
     cmp #CMDID_Q
@@ -1501,7 +1567,8 @@ row_cmd_pre:
 @not_q:
     cmp #CMDID_U
     bne @not_u
-    jmp cmd_surround
+    ; U is post-trigger so an instrument reload cannot restore its volumes.
+    rts
 @not_u:
     cmp #CMDID_Z
     bne @not_z
@@ -1535,9 +1602,11 @@ row_cmd_pre:
     bne @not_r
     lda.w trk_cval,x
     and #$0F
-    bne @r_ok
-    lda #$01
-@r_ok:
+    beq @r_off
+    sta.w trk_ret_per,x
+    sta.w trk_ret_cnt,x
+    rts
+@r_off:
     sta.w trk_ret_per,x
     sta.w trk_ret_cnt,x
     rts
@@ -1545,11 +1614,18 @@ row_cmd_pre:
     cmp #CMDID_D
     bne @not_d
     lda.w str_buf + 28
-    beq @out                ; no note to delay
+    bne +
+    jmp @out                ; no note to delay
++
     cmp #NOTE_OFF
-    beq @out
+    bne +
+    jmp @out
++
     lda.w trk_cval,x
-    beq @out                ; D00 = no delay
+    bne +
+    jmp @out                ; D00 = no delay
++
+    inc a                   ; do not count the row's creation tick as elapsed
     sta.w trk_dly_cnt,x
     lda.w str_buf + 28
     sta.w trk_dly_note,x
@@ -1561,11 +1637,24 @@ row_cmd_pre:
     beq @is_l
     rts
 @is_l:
-    ; slide to the row's note without retriggering
+    ; Slide to the row's note without retriggering. If no note has sounded in
+    ; this transport yet, there is no defined legato source: leave the trigger
+    ; unconsumed so this row becomes the audible anchor instead of sliding a
+    ; stale pitch left behind by an earlier playback context.
     lda.w str_buf + 28
-    beq @out
+    bne +
+    jmp @out
++
     cmp #NOTE_OFF
-    beq @out
+    bne +
+    jmp @out
++
+    lda.w trk_note,x
+    cmp #$FF
+    bne +
+    jmp @out
++
+    lda.w str_buf + 28
     clc
     adc.w trk_tsp,x
     dec a
@@ -1582,6 +1671,34 @@ row_cmd_pre:
     phx
     jsr note_pitch_calc_only
     plx
+    ; WAV notes use a 32-sample loop and therefore play one octave down.
+    ; The ordinary trigger path applies this correction; slide targets must
+    ; use the same pitch domain or C-3 incorrectly lands at C-4.
+    lda.w trk_instr,x
+    cmp #INSTR_NONE
+    beq @l_pitch_ok
+    phx
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR,x
+    and #$07
+    plx
+    cmp #$02
+    bne @l_pitch_ok
+    rep #$20
+.ACCU 16
+    lsr last_pitch
+    sep #$20
+.ACCU 8
+@l_pitch_ok:
     lda last_pitch
     sta.w trk_sl_tlo,x
     lda last_pitch + 1
@@ -1740,7 +1857,7 @@ cmd_surround:
 
 ; --- chord fanout: the C command drives voices X+1/X+2 with its two
 ; nibble offsets. (Per-instrument GRP removed, Seb 2026-07-11 — the
-; record bytes 8/10/11 are reserved; byte 9 stays SLICE TUNE.)
+; record bytes 8/10/11 are reserved; byte 9 is pitched-instrument TUNE.)
 ; trig_note = the (transposed) base note index. Preserves X.
 grp_fanout:
     lda.w trk_instr,x
@@ -2062,14 +2179,26 @@ slice_trigger:
 ; --- KARP trigger: the echo loop is the string (M-KARP) ----------------------------
 ; rec[1] = exciter wave bank (0-7), rec[2] = DAMP (low nibble) + BURST
 ; (high, used by apply_instrument's envelope), rec[3] = SUSTAIN
-; (feedback 0-127). The note's karp_tab entry (EDL 1 or 2 from the song
+; (feedback 0-127), rec[9] = signed TUNE. The transposed note's karp_tab
+; entry (EDL 1 or 2 from the song
 ; header) gives the exciter pitch — the comb partial's exact frequency —
 ; and the 2-tap fractional pull; DAMP scales the pair (which is also
 ; the KS damping lowpass). apply_instrument already set the burst
 ; envelope and forced the voice's echo send. Clobbers X.
 karp_trigger:
-    ; es0 = karp_tab offset: (EDL == 2 ? 384 : 0) + trig_note*4
+    ; es0 = karp_tab offset: (EDL == 2 ? 384 : 0) +
+    ; clamp(trig_note + instrument TUNE)*4
     lda trig_note
+    clc
+    adc trig_semis
+    bpl @note_nonneg
+    lda #$00
+    bra @note_have
+@note_nonneg:
+    cmp #NOTE_MAX
+    bcc @note_have
+    lda #NOTE_MAX - 1
+@note_have:
     rep #$30
 .ACCU 16
     and #$00FF
@@ -2338,6 +2467,10 @@ track_table:
     plx
     cmp #$00
     beq @no_tsp
+    cmp #$80
+    bne @tsp_add
+    lda #$00                ; explicit TABLE 00 resets to the note base
+@tsp_add:
     clc
     adc.w trk_note,x
     cmp #NOTE_MAX
@@ -2509,11 +2642,10 @@ track_fx:
     beq @no_slide
     jsr fx_slide
 @no_slide:
-    ; A retunes per tick and owns the pitch for its row; otherwise the
+    ; A retunes per tick while latched; otherwise the
     ; track vibrato (instrument VIB, V-overridable) rides the base pitch
-    lda.w trk_cmd,x
-    cmp #CMDID_A
-    bne @not_arp
+    lda.w trk_arp,x
+    beq @not_arp
     jsr fx_arp
     bra @pitch_done
 @not_arp:
@@ -2610,11 +2742,11 @@ fx_arp:
     beq @root
     cmp #1
     beq @hi_nib
-    lda.w trk_cval,x
+    lda.w trk_arp,x
     and #$0F
     bra @add
 @hi_nib:
-    lda.w trk_cval,x
+    lda.w trk_arp,x
     lsr
     lsr
     lsr
@@ -2751,6 +2883,39 @@ fx_trm:
     bne @mul
 @dip_have:
     lsr es1                 ; dip 0..112
+    jsr @write_voice
+    ; A C-command chord occupies the two physical voices to the right. They
+    ; received the instrument's starting volumes in grp_fanout; mirror the
+    ; root's tremolo dip onto those live levels as well.
+    lda.w trk_chord,x
+    beq @trm_done
+    txa
+    sta grp_track
+    lda #$01
+    sta grp_m
+    phx
+@member:
+    lda grp_track
+    clc
+    adc grp_m
+    cmp #TRACKS
+    bcs @members_done
+    rep #$30
+.ACCU 16
+    and #$00FF
+    tax
+    sep #$20
+.ACCU 8
+    jsr @write_voice
+    inc grp_m
+    lda grp_m
+    cmp #$03
+    bcc @member
+@members_done:
+    plx
+@trm_done:
+    rts
+@write_voice:
     ; dip the live level (record / X / P), sign-preserved: a negative
     ; (surround) side moves toward zero, never through it
     lda.w trk_voll,x

@@ -48,7 +48,7 @@ press means.** There are no simultaneous-press timing windows.
 |--------|------|
 | **d-pad** | move the cursor |
 | **B** | *edit*: tap = insert / act · hold + d-pad = nudge the value under the cursor (left/right small, up/down big) · double-tap = paste / clone · hold B + tap **A** = cut |
-| **Y** | *context*: hold + ←/→ = previous/next channel · hold + ↑/↓ = previous/next chain, phrase, kit or table (on those screens) · Y+B = block select |
+| **Y** | *context*: hold + ←/→ = previous/next channel · hold + ↑/↓ = previous/next chain, kit or table; on PHRASE it follows the populated entries of the current chain · Y+B = block select |
 | **A** | *screens*: hold + d-pad = navigate the screen map · **A+B** = contextual play (see below) |
 | **Start** | play / stop the whole song from any screen — the arrangement enters at the song cursor row |
 | **L / R** | channel left / right (shortcut for Y+←/→) |
@@ -90,8 +90,13 @@ are shortcuts to things the core grammar can already do.
 ### Block select
 
 Hold **Y** and tap **B** to drop an anchor, then move the cursor: the
-marked region highlights. B copies it, B+A cuts it, double-tap B
-elsewhere pastes it. Works in PHRASE, CHAIN and SONG.
+marked region highlights. On PHRASE the d-pad selects a rectangle across
+both rows and columns, so a one-column NOTE block leaves instruments and
+commands untouched. CHAIN and SONG also select rectangles across their
+columns. B copies it,
+B+A cuts it, and double-tap B elsewhere pastes it from the current cell.
+A block paste is single-use, so the next double-tap returns to mint/clone
+behaviour.
 
 ### Transport
 
@@ -151,6 +156,10 @@ left/right.
 | **FILES** | save / load / rename songs in cart SRAM. |
 | **OPTIONS** | device settings: palette, cloning depth, video readout, SYNC / MIDI takeover (§13a). |
 
+On **PHRASE**, hold **Y** and tap ↑/↓ to move through the populated
+phrase entries in the chain you descended from. Blank entries are skipped and
+the chain wraps, while your phrase row and column stay put.
+
 ## 4. Making a song
 
 The data model, bottom-up:
@@ -188,7 +197,9 @@ The INSTR screen groups its fields — identity / envelope / mix / tune
 KIT keeps envelope and echo but drops VOL, FINE and VIB (the kit
 slots own volume and tune); NSE drops SAMPLE and everything pitched;
 WAV shows everything with SAMPLE reading **BANK**; SLICE swaps the
-ADSR for **ATTACK + FADE** and gains **TUNE**. The **INSTR number is
+ADSR for **ATTACK + FADE**. **TUNE** appears on every note-pitched type
+(SMP, WAV, SLICE and KARP); KIT slots own their tuning and NSE uses CLOCK.
+The **INSTR number is
 itself the first field** — nudge it (B + d-pad) to switch which
 instrument you're editing, or **Y + ↑/↓** flips previous/next (TABLE
 and PHRASE answer the same gesture).
@@ -210,8 +221,8 @@ channels. Eight kits at once is legal. **The first 8 instruments are
 the factory boot set** — their samples land in audio RAM at power-on,
 and the patcher's boot-instruments editor voices all 8 (type, sample
   / kit / bank, loop, slice count). A clean build uses the eight-instrument
-  rights-cleared project factory; its authored sounds occupy pool slots 00-07.
-  Slots 08-63 start as SMP on sample 0, ready to re-voice, and a personal
+  rights-cleared project factory; its authored sounds occupy pool slots 00-15.
+  Instrument slots 08-63 start as SMP on sample 0, ready to re-voice, and a personal
   factory pack may replace the complete boot set.
   Audio RAM only holds what the song *references* —
 point an instrument or kit slot at any pool sample and it loads on the
@@ -226,6 +237,10 @@ screen's RAM/FREE line shows the live balance).
 - **VOL L / R** — signed! A negative volume inverts that side's
   phase: instant width. (The `U` command does this per row.)
 - **FINE** — signed fine-tune, 1/256ths of a semitone.
+- **TUNE** — signed coarse transpose in semitones for SMP, WAV, SLICE and
+  KARP. Left/Right moves one semitone; Up/Down moves one octave. On SLICE it
+  transposes the whole slice set without changing which division a note picks;
+  on KARP it selects the corresponding resonant partial.
 - **LOOP** (SMP) — **POOL** plays the sample as it was imported;
   **ON** forces a loop (a one-shot loops whole — drones and textures
   from any hit); **OFF** forces one-shot (a looped pad becomes a
@@ -249,7 +264,9 @@ screen's RAM/FREE line shows the live balance).
 - **TBL / TBS** — attach a table (`--` = none) and set its clock:
   TBS `1`–`F` runs a table row every n ticks; TBS `0` is *note-sync*
   — each new note advances the table one row (great for cycling
-  chords, sample-offsets, pan patterns).
+  chords, sample-offsets, pan patterns). Double-tap **B** on TBL to
+  mint a blank table from `--`, or clone the attached table and point
+  this instrument at the independent copy.
 
 ### KARP — the room as a string
 
@@ -315,12 +332,14 @@ A table is 16 rows of **V · TSP · CMD**, run per tick while the voice
 plays — automation that belongs to the instrument, not the phrase:
 
 - **V** — set the voice's level (01–7F, like the `X` command)
-- **TSP** — transpose the playing note by signed semitones
+- **TSP** — transpose the playing note by signed semitones. `--` leaves the
+  current pitch unchanged; explicit `00` resets it to the note's base pitch
 - **CMD** — one command + value, the exact PHRASE letters
 
-`00` in any column means "no change", so blank rows are silent
-passthroughs. `H` in the command column hops to a table row, making
-loops:
+`--` means "no change", so blank rows are silent passthroughs. In TSP,
+tapping B inserts an explicit `00`; B+A clears it back to `--`. This allows a
+table to return to the note's base pitch after an earlier transpose. `H` in
+the command column hops to a table row, making loops:
 
 ```
 row 0  V20  --  ---     pull the voice down
@@ -349,10 +368,10 @@ Values are hex (`xy` = two nibbles).
 
 | Cmd | Name | What it does |
 |-----|------|--------------|
-| `A xy` | arpeggio | cycle root, +x, +y semitones each tick |
+| `A xy` | arpeggio | latch a root, +x, +y semitone cycle; `A00` stops it |
 | `B 0x` | wave bank | switch a WAV voice to bank x (wave-sequencing) |
 | `C xy` | chord | fan +x / +y semitones onto the two voices to the right; `C00` chord off |
-| `D 0x` | delay | trigger this row's note x ticks late |
+| `D 0x` | delay | trigger this row's note x ticks late, if that tick exists in the current groove row. With a 6-tick row, `D05` is the last audible delay and `D06` does not trigger |
 | `F xy` | fine tune | per-track detune, signed 1/256 semitones |
 | `G xy` | groove | set the groove pair: x ticks / y ticks per row (G66 straight, G84 swing) |
 | `H 0x` | hop | jump to the next chain entry (in tables: to table row x) |
@@ -364,11 +383,12 @@ Values are hex (`xy` = two nibbles).
 | `N 0x` | noise clock | set the global noise rate (shared by all NSE voices) |
 | `P xy` | pan | position: `00` left, `80` centre, `FF` right |
 | `Q xy` | GAIN override | hardware envelope ramp: mode x (1 direct, 2 lin↓, 3 exp↓, 4 lin↑, 5 bent↑) value/rate y; `Q00` back to ADSR |
-| `R 0x` | retrigger | re-strike the note every x ticks |
+| `R 0x` | retrigger | latch a re-strike every x ticks; `R00` stops it |
 | `S xy` | sweep | pitch sweep up at rate x or down at rate y |
 | `T xy` | tempo | set BPM (hex; `96` = 150) |
 | `U xy` | surround | invert L (x≠0) / R (y≠0) phase for width |
 | `V xy` | vibrato | override the instrument's VIB for this note: speed x, depth y (`V00` = off) |
+| `W xy` | tremolo | latch a TRM override across following notes: speed x, depth y; `W00` releases it, stops the current tremolo and restores the undipped level |
 | `X xy` | volume | accent: set this voice's level (both sides, `00`-`7F`); persists like `P` until the voice reloads its instrument |
 | `Y 0x` | FIR preset | switch the echo filter curve (global) |
 | `Z 0x` | pitch-mod | enable (`Z01`) / disable modulation by the left voice |
@@ -439,9 +459,10 @@ away. Plain **B** stays an edit key and never touches the transport.
   re-triggers the chain you're hearing. The track finishes its
   phrase and goes quiet.
 - **B on an empty cell inserts a chain**, exactly like SONG's tap —
-  build material without leaving the launcher, then A+B to launch
-  it. B on an occupied cell does nothing (a stray tap can't
-  overwrite or trigger anything mid-set).
+  build material without leaving the launcher, then A+B to launch it.
+  **Double-tap B** mints a fresh chain on an empty cell or clones the
+  referenced chain on a populated cell; neither gesture touches transport.
+  A single B on an occupied cell remains inert.
 - **The launcher is still on the map**: A+d-pad navigates from LIVE
   as if you were on SONG (up OPTIONS, down FILES, right drills into
   the cursor chain), and L/R or Y+←/→ switch tracks.

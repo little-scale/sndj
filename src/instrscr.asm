@@ -1,7 +1,7 @@
 ; instrscr.asm — the INSTR screen: field-list editor over the 16-byte
 ; instrument record, grouped (identity / envelope / mix / tune+motion /
 ; chord / table) and type-aware: fields a type doesn't use are hidden
-; (KIT slots own their volume+tune; NSE has no sample or pitch).
+; (KIT slots own their volume+tune; NSE has no sample or pitched tune).
 ; B held + d-pad nudges the field (L/R = 1, U/D = 4, clamped); B tap
 ; auditions C-4 with this instrument; Y + up/down flips instruments.
 ; Edits invalidate every voice's loaded-instrument shadow so changes
@@ -38,7 +38,7 @@ if_fields:
     .DB 6,  0, $FF, 255  ; 16 FINE (signed 1/256 semitone; free wrap)
     .DB 14, 0, $FF, 255  ; 17 VIB speed/depth nibbles (free wrap)
     .DB 15, 0, $FF, 255  ; 18 TRM speed/depth nibbles (free wrap)
-    .DB 9,  0, $FF, 255  ; 19 TUNE (SLICE: signed semitones; free wrap)
+    .DB 9,  0, $FF, 255  ; 19 TUNE (pitched types: signed semitones; free wrap)
     .DB 8,  0, $03, 3    ; 20 GRP
     .DB 9,  0, $FF, 24   ; 21 OFS 1
     .DB 10, 0, $FF, 24   ; 22 OFS 2
@@ -63,7 +63,7 @@ if_vis:
     .DB $15              ; FINE (KIT: slot+pool tune; NSE: no pitch)
     .DB $15              ; VIB  (pitch wobble: SMP/WAV/SLICE)
     .DB $1D              ; TRM  (KIT: slot volume domain)
-    .DB $10              ; TUNE (SLICE only)
+    .DB $35              ; TUNE (SMP/WAV/SLICE/KARP; KIT slots own it)
     .DB $00, $00, $00, $00   ; GRP+OFS removed (Seb 2026-07-11): the C
                              ; command's chords + echo/envelopes cover it;
                              ; record bytes stay reserved so indices hold
@@ -159,6 +159,7 @@ instr_init:
     lda #SCREEN_INSTR
     sta ui_mode
     stz if_cur
+    stz tap_live
     jsr text_clear
     stz text_x
     lda #1
@@ -171,7 +172,11 @@ instr_init:
 .ACCU 8
     ldx #str_instr
     jsr text_puts
-    rts
+    ; INSTR is a static editor view: draw it once on entry, then redraw only
+    ; when an edit changes its contents/cursor. Repainting its full dynamic
+    ; layout every frame used more than one frame on hardware, collapsing two
+    ; audio ticks into one visible A/V/W effect step.
+    jmp instr_draw
 
 ; load field if_cur's descriptor into str_buf+36.. and X = record-relative
 ; byte offset (SB_INSTR + ed_instr*16 + field offset)
@@ -300,7 +305,7 @@ instr_update:
 @no_start:
     lda a_down
     beq @edit_ok
-    jmp instr_draw
+    rts
 @edit_ok:
     ; Y held + up/down: previous / next instrument (as PHRASE/TABLE do)
     rep #$20
@@ -321,6 +326,7 @@ instr_update:
     dec a
     and #(INSTR_COUNT - 1)
     sta ed_instr
+    stz tap_live
     jsr if_cur_fix
     jmp instr_draw
 @y_dn:
@@ -335,10 +341,11 @@ instr_update:
     inc a
     and #(INSTR_COUNT - 1)
     sta ed_instr
+    stz tap_live
     jsr if_cur_fix
     jmp instr_draw
 @y_done:
-    jmp instr_draw
+    rts
 @no_y:
     ; B edges
     rep #$20
@@ -364,12 +371,35 @@ instr_update:
     stz b_down
     lda b_used
     bne @cursor
+    ; The TBL reference follows the SONG/CHAIN mint-and-clone grammar.
+    ; Other fields keep the ordinary one-tap instrument audition.
+    lda if_cur
+    cmp #24
+    bne @audition
+    lda tap_live
+    beq @table_single
+    lda frame_cnt
+    sec
+    sbc tap_timer
+    cmp.w opt_tapwin
+    beq +
+    bcs @table_single
++
+    stz tap_live
+    jsr instr_table_dtap
+    bra @draw
+@table_single:
+    lda frame_cnt
+    sta tap_timer
+    lda #$01
+    sta tap_live
+@audition:
     ; tap: audition this instrument at C-4
     lda ed_instr
     sta ed_lastinstr
     lda #48
     jsr audition_note
-    bra @draw
+    bra @idle
 @b_held:
     rep #$20
 .ACCU 16
@@ -377,9 +407,10 @@ instr_update:
     and #PAD_DPAD
     sep #$20
 .ACCU 8
-    beq @draw
+    beq @idle
     lda #$01
     sta b_used
+    stz tap_live
     jsr if_nudge
     bra @draw
 @cursor:
@@ -400,6 +431,8 @@ instr_update:
     jsr if_field_vis
     bcc @up_next
     sta if_cur
+    stz tap_live
+    jmp @draw
 @nu:
     rep #$20
 .ACCU 16
@@ -407,7 +440,7 @@ instr_update:
     and #PAD_DOWN
     sep #$20
 .ACCU 8
-    beq @draw
+    beq @idle
     lda if_cur
 @dn_next:
     inc a
@@ -418,8 +451,51 @@ instr_update:
     jsr if_field_vis
     bcc @dn_next
     sta if_cur
+    stz tap_live
+    jmp @draw
 @draw:
     jmp instr_draw
+@idle:
+    rts
+
+; Double-tap B on TBL: nil mints an unreferenced blank table; an existing
+; table is cloned, and this instrument is repointed to the fresh copy.
+instr_table_dtap:
+    jsr instr_table_addr
+    lda.l $7E0000 + SB_INSTR,x
+    cmp #TABLE_COUNT
+    bcc @clone
+    jsr find_free_table
+    bcs @out
+    bra @point
+@clone:
+    jsr clone_table
+    bcs @out
+@point:
+    pha
+    jsr instr_table_addr
+    pla
+    sta.l $7E0000 + SB_INSTR,x
+@out:
+    rts
+
+; X = instrument-record-relative offset of the current TBL byte. Callers add
+; SB_INSTR in the long operand, matching if_desc/if_get_x.
+instr_table_addr:
+    lda ed_instr
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    clc
+    adc #12
+    tax
+    sep #$20
+.ACCU 8
+    rts
 
 ; after an instrument switch the cursor may sit on a hidden field
 if_cur_fix:

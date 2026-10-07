@@ -703,8 +703,10 @@ trig_tune_pool:
     plx
     rts
 
-; trig_tune_load: tune context for instrument trig_id (record FINE byte
-; plus, for SMP/NSE, the pool entry default of its sample). Clobbers np_*.
+; trig_tune_load: tune context for instrument trig_id. SMP/WAV add the
+; record's signed TUNE byte to their usual pool/wavetable correction; KARP
+; exposes TUNE to its partial selector. SLICE applies TUNE in slice_trigger,
+; where notes select divisions rather than pitch. Clobbers np_*.
 trig_tune_load:
     phx
     rep #$30
@@ -722,13 +724,15 @@ trig_tune_load:
     sta np_fine
     lda.l $7E0000 + SB_INSTR,x
     and #$07
-    beq @pool               ; SMP
+    beq @pool_coarse        ; SMP
     cmp #$03
-    beq @pool               ; NSE
+    beq @pool               ; NSE (pitch context is unused)
     cmp #$04
     beq @pool               ; SLICE: the blob's default tune applies
     cmp #$02
     beq @wav
+    cmp #$05
+    beq @karp
     stz trig_semis          ; KIT: per-slot tune overrides at trigger
     lda np_fine
     sta trig_fine
@@ -744,6 +748,26 @@ trig_tune_load:
     clc
     adc #<-52
     sta trig_fine
+    lda.l $7E0000 + SB_INSTR + 9,x
+    clc
+    adc trig_semis
+    sta trig_semis
+    plx
+    rts
+@karp:
+    lda.l $7E0000 + SB_INSTR + 9,x
+    sta trig_semis          ; karp_trigger uses this to select the partial
+    stz trig_fine           ; fractional tuning is not meaningful to the room
+    plx
+    rts
+@pool_coarse:
+    lda.l $7E0000 + SB_INSTR + 1,x
+    and #$3F
+    jsr trig_tune_pool
+    lda.l $7E0000 + SB_INSTR + 9,x
+    clc
+    adc trig_semis
+    sta trig_semis
     plx
     rts
 @pool:

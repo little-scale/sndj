@@ -52,8 +52,10 @@ emu.addEventCallback(function()
     row(6, 0, 0xFF, 26, 0x01) -- Z01: pitch-mod on
     row(8, 0, 0xFF, 17, 0x35) -- Q35: GAIN exp-dec rate 5
     row(10, 0, 0xFF, 17, 0x00) -- Q00: back to ADSR
-    row(12, 0, 0xFF, 21, 0x11) -- U11: invert both phases
-    row(14, 0, 0xFF, 19, 0x0F) -- S0F: sweep down
+    -- U and S deliberately share rows with notes: instrument reload used to
+    -- overwrite both commands before their effects could be heard.
+    row(12, 49, 0, 21, 0x11)   -- C-4 + U11: invert both phases
+    row(14, 49, 0, 19, 0x0F)   -- C-4 + S0F: sweep down
     -- second phrase pass never happens: chain has only entry 0 and the
     -- block loops, so extend the test into phrase rows via a C command
     -- on its own row 15 with a fresh note
@@ -79,12 +81,12 @@ emu.addEventCallback(function()
     check(dsp(0x05) >= 0x80, "Q00 restored the ADSR")
   elseif frames == 126 then
     check(dsp(0x00) == 0xB0 and dsp(0x01) == 0xB0,
-      "U11 inverted both volume phases ($50 -> $B0)")
+      "same-row U11 inverted both volume phases ($50 -> $B0)")
   elseif frames == 133 then
     sweep_a = dsp(0x02) + dsp(0x03) * 256
   elseif frames == 136 then
     sweep_b = dsp(0x02) + dsp(0x03) * 256
-    check(sweep_b < sweep_a, "S0F sweeps the pitch down (" ..
+    check(sweep_b < sweep_a, "same-row S0F sweeps the pitch down (" ..
       string.format("%04X -> %04X", sweep_a, sweep_b) .. ")")
   elseif frames == 148 then
     -- row 15: C47 chord (offsets +4/+7 on the next two voices)

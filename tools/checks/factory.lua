@@ -51,7 +51,7 @@ local function factory_shape()
   local count, active = rom(POOL + 9), 0
   for i = 0, count - 1 do if entry(i).blocks > 1 then active = active + 1 end end
   check(count == 48, "factory exposes 48 editable pool slots")
-  check(active == 8, "factory has 8 authored sounds (" .. active .. ")")
+  check(active == 16, "factory has 16 authored sounds (" .. active .. ")")
 
   local needed = {}
   for i = 0, 7 do

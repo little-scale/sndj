@@ -64,8 +64,10 @@ emu.addEventCallback(function()
     poke(0x242C, 1)          -- instr 2: TBL = 1
     poke(0x242D, 0)          -- TBS = note-sync
     -- table 1: M values per note (CMD col = bytes 2/3)
+    poke(0x2841, 12)         -- first note: +12 semitones
     poke(0x2842, 13)
     poke(0x2843, 0x10)
+    poke(0x2845, 0x80)       -- second note: explicit 00 pitch reset
     poke(0x2846, 13)
     poke(0x2847, 0x20)
     -- table 0
@@ -100,9 +102,13 @@ emu.addEventCallback(function()
   elseif frames == 86 then
     -- row 6: instr 2, note-sync: exactly one row ran (M10), no more
     check(dsp(0x0C) == 0x10, "TBS 0: first note ran one table row (M10)")
+    check(dsp(0x02) + dsp(0x03) * 256 == 0x1000,
+      "TABLE TSP +12 raised the note one octave")
   elseif frames == 102 then
     -- row 7: the next note advanced to row 1 (M20)
     check(dsp(0x0C) == 0x20, "TBS 0: the next note advanced the table (M20)")
+    check(dsp(0x02) + dsp(0x03) * 256 == 0x0800,
+      "TABLE explicit TSP 00 reset the note to its base pitch")
     if fails == 0 then
       print("ALL PASS table.lua")
       emu.stop(0)

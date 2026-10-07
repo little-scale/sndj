@@ -85,7 +85,7 @@ phrase_update:
     beq @edit_y
     jmp phrase_draw
 @edit_y:
-    ; Y held + up/down: previous / next phrase (genmddj A+up/down)
+    ; Y held + up/down: previous / next populated phrase in this chain
     rep #$20
 .ACCU 16
     lda pad_held
@@ -100,12 +100,7 @@ phrase_update:
     sep #$20
 .ACCU 8
     beq @y_dn
-    lda ed_phrase
-    dec a
-    bpl @y_set
-    lda #(PHRASE_COUNT - 1)
-@y_set:
-    sta ed_phrase
+    jsr phrase_chain_prev
     jmp phrase_draw_hdr
 @y_dn:
     rep #$20
@@ -115,13 +110,7 @@ phrase_update:
     sep #$20
 .ACCU 8
     beq @edit_ok
-    lda ed_phrase
-    inc a
-    cmp #PHRASE_COUNT
-    bcc @y_set2
-    lda #$00
-@y_set2:
-    sta ed_phrase
+    jsr phrase_chain_next
     jmp phrase_draw_hdr
 @edit_ok:
 
@@ -149,6 +138,8 @@ phrase_update:
     sta blk_mode
     lda cur_y
     sta blk_start
+    lda ed_col
+    sta.w blk_col
     lda #$01
     sta b_used              ; swallow the release tap
     jmp @dpad_cursor
@@ -250,6 +241,47 @@ phrase_update:
     jsr cursor_move
 @draw:
     jmp phrase_draw
+
+; Follow the phrase order of the chain that led to this screen. Empty chain
+; entries are skipped and the 16-row list wraps. If the chain has no populated
+; entries, a complete scan restores chain_cy and leaves ed_phrase unchanged.
+phrase_chain_prev:
+    lda #16
+    sta str_buf + 36
+@scan:
+    lda chain_cy
+    dec a
+    and #$0F
+    sta chain_cy
+    jsr chain_cursor_phrase
+    cmp #$FF
+    bne @found
+    dec str_buf + 36
+    bne @scan
+    rts
+@found:
+    sta ed_phrase
+    stz tap_live
+    rts
+
+phrase_chain_next:
+    lda #16
+    sta str_buf + 36
+@scan:
+    lda chain_cy
+    inc a
+    and #$0F
+    sta chain_cy
+    jsr chain_cursor_phrase
+    cmp #$FF
+    bne @found
+    dec str_buf + 36
+    bne @scan
+    rts
+@found:
+    sta ed_phrase
+    stz tap_live
+    rts
 
 phrase_draw_hdr:
     lda #7
@@ -636,7 +668,59 @@ cell_nudge:
 
 ; --- block mode: rows [min(blk_start,cur_y) .. max] -----------------------------
 phrase_block:
-    ; A cancels
+    ; Preserve the global ordered grammar in block mode: B must already be
+    ; held when A arrives to cut. A plain B tap copies on release, so pressing
+    ; B no longer exits before the player has a chance to tap A.
+    lda b_down
+    beq @b_edge
+    rep #$20
+.ACCU 16
+    lda pad_held
+    and #PAD_B
+    sep #$20
+.ACCU 8
+    beq @b_edge
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_A
+    sep #$20
+.ACCU 8
+    beq @b_wait
+    jsr phrase_blk_copy
+    jsr phrase_blk_clear
+    stz blk_mode
+    stz b_down
+    lda #$01
+    sta b_used
+    sta a_used
+    jmp phrase_draw
+@b_edge:
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_B
+    sep #$20
+.ACCU 8
+    beq @b_release
+    lda #$01
+    sta b_down
+    stz b_used
+@b_wait:
+    jmp phrase_draw
+@b_release:
+    lda b_down
+    beq @cancel
+    stz b_down
+    lda b_used
+    bne @cancel
+    jsr phrase_blk_copy
+    stz blk_mode
+    lda #$01
+    sta b_used
+    jmp phrase_draw
+@cancel:
+    ; plain A cancels
     rep #$20
 .ACCU 16
     lda pad_pressed
@@ -649,21 +733,7 @@ phrase_block:
     sta a_used
     jmp phrase_draw
 @not_cancel:
-    ; B = copy + exit; Y = cut + exit
-    rep #$20
-.ACCU 16
-    lda pad_pressed
-    and #PAD_B
-    sep #$20
-.ACCU 8
-    beq @not_copy
-    jsr phrase_blk_copy
-    stz blk_mode
-    lda #$01
-    sta b_used
-    stz b_down
-    jmp phrase_draw
-@not_copy:
+    ; Y remains a direct cut shortcut for existing users.
     rep #$20
 .ACCU 16
     lda pad_pressed
@@ -676,11 +746,11 @@ phrase_block:
     stz blk_mode
     jmp phrase_draw
 @not_cut:
-    ; d-pad stretches (rows only)
+    ; d-pad stretches the rectangle from its anchor in both dimensions
     rep #$20
 .ACCU 16
     lda pad_event
-    and #(PAD_UP | PAD_DOWN)
+    and #PAD_DPAD
     sep #$20
 .ACCU 8
     beq @blk_done
@@ -688,8 +758,8 @@ phrase_block:
 @blk_done:
     jmp phrase_draw
 
-; carry set when the drawn row (tmp0+1) is inside the block
-phrase_blk_range_row:
+; carry set when the drawn cell (column tmp0, row tmp0+1) is in the block
+phrase_blk_range_cell:
     jsr phrase_blk_range
     lda tmp0 + 1
     cmp es0
@@ -699,6 +769,16 @@ phrase_blk_range_row:
     adc es0 + 1
     dec a
     cmp tmp0 + 1
+    bcc @out
+    jsr phrase_blk_col_range
+    lda tmp0
+    cmp es3
+    bcc @out
+    lda es3
+    clc
+    adc es3 + 1
+    dec a
+    cmp tmp0
     bcc @out
     sec
     rts
@@ -728,14 +808,39 @@ phrase_blk_range:
     sta es0 + 1
     rts
 
-; copy the block rows into the clipboard ($7E:7400)
+; block column range -> es3 = first column, es3+1 = count
+phrase_blk_col_range:
+    lda.w blk_col
+    cmp ed_col
+    bcc @fwd
+    lda ed_col
+    sta es3
+    lda.w blk_col
+    sec
+    sbc ed_col
+    inc a
+    sta es3 + 1
+    rts
+@fwd:
+    sta es3
+    lda ed_col
+    sec
+    sbc.w blk_col
+    inc a
+    sta es3 + 1
+    rts
+
+; Copy the selected rectangle into the clipboard, packed row-major.
 phrase_blk_copy:
     jsr phrase_blk_range
+    jsr phrase_blk_col_range
     lda #$01
     sta clip_kind
     lda es0 + 1
     sta clip_len
-    ; src base = phrase*64 + first*4 -> es1 ; count*4 -> es2 (word)
+    lda es3 + 1
+    sta.w clip_width
+    ; source row base = phrase*64 + first_row*4 + first_col
     rep #$30
 .ACCU 16
     lda ed_phrase
@@ -751,14 +856,23 @@ phrase_blk_copy:
     clc
     adc es1
     sta es1
-    lda es0 + 1
+    lda es3
     and #$00FF
-    asl
-    asl
-    sta es2
-    ldy #$0000
-@copy:
-    tya
+    clc
+    adc es1
+    sta es1
+    stz es2
+    sep #$20
+.ACCU 8
+    lda clip_len
+    sta str_buf + 36
+@row:
+    stz str_buf + 37
+@cell:
+    rep #$30
+.ACCU 16
+    lda str_buf + 37
+    and #$00FF
     clc
     adc es1
     tax
@@ -768,23 +882,33 @@ phrase_blk_copy:
     pha
     rep #$30
 .ACCU 16
-    tyx
+    lda es2
+    tax
+    inc es2
     sep #$20
 .ACCU 8
     pla
     sta.l $7E7400,x
+    inc str_buf + 37
+    lda str_buf + 37
+    cmp.w clip_width
+    bne @cell
     rep #$30
 .ACCU 16
-    iny
-    cpy es2
-    bne @copy
+    lda es1
+    clc
+    adc #4
+    sta es1
     sep #$20
 .ACCU 8
+    dec str_buf + 36
+    bne @row
     rts
 
-; clear the block rows (cut): note 0, instr $FF, cmd 0, val 0
+; Clear only the selected cells: note/cmd/value = 0, instrument = $FF.
 phrase_blk_clear:
     jsr phrase_blk_range
+    jsr phrase_blk_col_range
     rep #$30
 .ACCU 16
     lda ed_phrase
@@ -799,30 +923,58 @@ phrase_blk_clear:
     asl
     clc
     adc es1
+    sta es1
+    lda es3
+    and #$00FF
+    clc
+    adc es1
+    sta es1
+    sep #$20
+.ACCU 8
+    lda es0 + 1
+    sta str_buf + 36
+@row:
+    stz str_buf + 37
+@cell:
+    lda str_buf + 37
+    clc
+    adc es3
+    cmp #1
+    bne @zero
+    lda #INSTR_NONE
+    bra @value
+@zero:
+    lda #$00
+@value:
+    pha
+    rep #$30
+.ACCU 16
+    lda str_buf + 37
+    and #$00FF
+    clc
+    adc es1
     tax
     sep #$20
 .ACCU 8
-@row:
-    lda #$00
+    pla
     sta.l $7E0000 + SB_PHRASES,x
-    lda #INSTR_NONE
-    sta.l $7E0000 + SB_PHRASES + 1,x
-    lda #$00
-    sta.l $7E0000 + SB_PHRASES + 2,x
-    sta.l $7E0000 + SB_PHRASES + 3,x
+    inc str_buf + 37
+    lda str_buf + 37
+    cmp es3 + 1
+    bne @cell
     rep #$30
 .ACCU 16
-    inx
-    inx
-    inx
-    inx
+    lda es1
+    clc
+    adc #4
+    sta es1
     sep #$20
 .ACCU 8
-    dec es0 + 1
+    dec str_buf + 36
     bne @row
     rts
 
-; B double-tap: paste the clipboard at the cursor row (clamped to row 15)
+; B double-tap: paste at the cursor cell, clipping at row 15 / column 3.
 phrase_paste:
     lda clip_kind
     cmp #$01
@@ -837,7 +989,20 @@ phrase_paste:
     lda clip_len
 @have_n:
     sta es0 + 1
-    beq @done
+    bne +
+    jmp @done
++
+    lda #4
+    sec
+    sbc ed_col
+    cmp.w clip_width
+    bcc @have_w
+    lda.w clip_width
+@have_w:
+    sta es3 + 1
+    bne +
+    jmp @done
++
     rep #$30
 .ACCU 16
     lda ed_phrase
@@ -853,21 +1018,32 @@ phrase_paste:
     clc
     adc es1
     sta es1
-    lda es0 + 1
+    lda ed_col
     and #$00FF
-    asl
-    asl
-    sta es2
-    ldy #$0000
-@copy:
-    tyx
+    clc
+    adc es1
+    sta es1
+    stz es2
+    sep #$20
+.ACCU 8
+    lda es0 + 1
+    sta str_buf + 36
+@row:
+    stz str_buf + 37
+@cell:
+    rep #$30
+.ACCU 16
+    lda es2
+    tax
+    inc es2
     sep #$20
 .ACCU 8
     lda.l $7E7400,x
     pha
     rep #$30
 .ACCU 16
-    tya
+    lda str_buf + 37
+    and #$00FF
     clc
     adc es1
     tax
@@ -875,13 +1051,40 @@ phrase_paste:
 .ACCU 8
     pla
     sta.l $7E0000 + SB_PHRASES,x
+    inc str_buf + 37
+    lda str_buf + 37
+    cmp es3 + 1
+    bne @cell
+    ; A right-edge-clipped paste skips the uncopied source columns before
+    ; continuing with the first cell of the next clipboard row.
+    lda.w clip_width
+    sec
+    sbc es3 + 1
+    sta str_buf + 38
+@skip:
+    lda str_buf + 38
+    beq @next_row
     rep #$30
 .ACCU 16
-    iny
-    cpy es2
-    bne @copy
+    inc es2
     sep #$20
 .ACCU 8
+    dec str_buf + 38
+    bra @skip
+@next_row:
+    rep #$30
+.ACCU 16
+    lda es1
+    clc
+    adc #4
+    sta es1
+    sep #$20
+.ACCU 8
+    dec str_buf + 36
+    bne @row
+    stz clip_kind           ; block paste is single-use; restore double-B grammar
+    stz clip_len
+    stz.w clip_width
 @done:
     rts
 
@@ -1019,14 +1222,11 @@ phrase_draw:
 ; attr for the cell (col tmp0, row tmp0+1): accent under cursor, dim if the
 ; row is empty-ish, text otherwise
 cell_attr:
-    ; block-select rows render hilite (cursor accent wins)
+    ; selected rectangle cells render hilite (cursor accent wins)
     lda blk_mode
     beq @no_blk_hl
-    jsr phrase_blk_range_row
+    jsr phrase_blk_range_cell
     bcc @no_blk_hl
-    lda tmp0 + 1
-    cmp cur_y
-    beq @no_blk_hl
     rep #$20
 .ACCU 16
     lda #ATTR_ACCENT

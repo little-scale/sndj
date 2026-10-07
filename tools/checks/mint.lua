@@ -1,7 +1,8 @@
 -- mint.lua — minting and cloning (genmddj §4): B double-tap on an empty
 -- SONG/CHAIN reference cell mints the next free blank chain/phrase; on
 -- a populated cell it clones (SONG chains honour OPTIONS CLONE
--- SLIM/DEEP; phrase clones are always independent).
+-- SLIM/DEEP; phrase clones are always independent). INSTR TBL follows the
+-- same rule: -- mints a blank table and a number clones it.
 --
 -- WRAM: grid $2000, chains $3700 (32 ea), phrases $4300 (64 ea),
 -- opt_clone $322.
@@ -48,6 +49,17 @@ local script = {
   [120] = { up = true }, [122] = {},
   [126] = { b = true }, [128] = {},
   [130] = { b = true }, [132] = {},
+  -- CHAIN -> PHRASE -> INSTR, then wrap the field cursor up to TBL.
+  [142] = { a = true }, [144] = { a = true, right = true }, [146] = {},
+  [152] = { a = true }, [154] = { a = true, right = true }, [156] = {},
+  [162] = { up = true }, [164] = {},
+  [168] = { up = true }, [170] = {},
+  -- TBL --: mint table 0.
+  [176] = { b = true }, [178] = {},
+  [180] = { b = true }, [182] = {},
+  -- TBL 00: clone to table 1.
+  [194] = { b = true }, [196] = {},
+  [198] = { b = true }, [200] = {},
 }
 
 emu.addEventCallback(function() emu.setInput(pad, 0) end, emu.eventType.inputPolled)
@@ -87,6 +99,23 @@ emu.addEventCallback(function()
   elseif frames == 136 then
     check(wram(0x3760) == 4, "phrase clone is always an independent copy (4)")
     check(wram(0x4400) == 49, "the phrase clone copied its rows")
+  elseif frames == 158 then
+    -- Start from no attached table; the factory tables themselves are blank.
+    poke(0x2400 + wram(0x90) * 16 + 12, 0xFF)
+  elseif frames == 174 then
+    check(wram(0x0C) == 4 and wram(0x91) == 24,
+      "navigation reached the INSTR TBL field (screen=" .. wram(0x0C) ..
+      ", field=" .. wram(0x91) .. ")")
+  elseif frames == 188 then
+    local p = 0x2400 + wram(0x90) * 16 + 12
+    check(wram(p) == 0, "INSTR TBL -- minted blank table 00 (got " ..
+      wram(p) .. ")")
+    poke(0x2800, 0x55)       -- make the clone observable
+  elseif frames == 206 then
+    local p = 0x2400 + wram(0x90) * 16 + 12
+    check(wram(p) == 1, "INSTR TBL 00 cloned and repointed to 01 (got " ..
+      wram(p) .. ")")
+    check(wram(0x2840) == 0x55, "the cloned table copied its rows")
     if fails == 0 then
       print("ALL PASS mint.lua")
       emu.stop(0)

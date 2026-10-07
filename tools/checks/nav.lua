@@ -41,13 +41,19 @@ gest(72, "left")      -- GROOVE -> FILES
 gest(80, "up")        -- FILES -> SONG
 gest(88, "right")     -- SONG -> CHAIN (needs content)
 gest(96, "right")     -- CHAIN -> PHRASE
-gest(104, "right")    -- PHRASE -> INSTR
-gest(112, "right")    -- INSTR -> TABLE
-gest(120, "up")       -- TABLE -> HELP
-gest(128, "down")     -- HELP -> TABLE
-gest(136, "left")     -- TABLE -> INSTR
-gest(144, "up")       -- INSTR -> WAVE
-gest(152, "right")    -- WAVE: A+Right = bank select, NOT a screen move
+script[104] = { y = true }
+script[106] = { y = true, down = true } -- PHRASE: skip blank chain row 1
+script[108] = {}
+script[112] = { y = true }
+script[114] = { y = true, up = true }   -- PHRASE: wrap back to row 0
+script[116] = {}
+gest(124, "right")    -- PHRASE -> INSTR
+gest(132, "right")    -- INSTR -> TABLE
+gest(140, "up")       -- TABLE -> HELP
+gest(148, "down")     -- HELP -> TABLE
+gest(156, "left")     -- TABLE -> INSTR
+gest(164, "up")       -- INSTR -> WAVE
+gest(172, "right")    -- WAVE: A+Right = bank select, NOT a screen move
 
 emu.addEventCallback(function() emu.setInput(pad, 0) end, emu.eventType.inputPolled)
 
@@ -76,15 +82,29 @@ emu.addEventCallback(function()
     check(wram(0x0C) == 11, "FILES A+Right -> GROOVE")
   elseif frames == 78 then
     check(wram(0x0C) == 5, "GROOVE A+Left -> FILES")
+  elseif frames == 100 then
+    -- Current chain row 0 is phrase 0. Row 1 remains blank; row 2 is phrase 2.
+    poke(0x3702, 0xFF)
+    poke(0x3704, 2)
+    poke(0x000F, 7)         -- PHRASE row and column must survive navigation
+    poke(0x0019, 2)
+  elseif frames == 110 then
+    check(wram(0x001E) == 2 and wram(0x0018) == 2,
+      "PHRASE Y+Down follows chain order and skips blanks")
+    check(wram(0x000F) == 7 and wram(0x0019) == 2,
+      "PHRASE chain navigation preserves edit row/column")
   elseif frames == 118 then
+    check(wram(0x001E) == 0 and wram(0x0018) == 0,
+      "PHRASE Y+Up wraps to the previous populated chain entry")
+  elseif frames == 138 then
     check(wram(0x0C) == 14, "spine reached TABLE")
-  elseif frames == 126 then
+  elseif frames == 146 then
     check(wram(0x0C) == 15, "TABLE A+Up -> HELP")
-  elseif frames == 134 then
+  elseif frames == 154 then
     check(wram(0x0C) == 14, "HELP A+Down -> TABLE")
-  elseif frames == 150 then
+  elseif frames == 170 then
     check(wram(0x0C) == 7, "INSTR A+Up -> WAVE")
-  elseif frames == 158 then
+  elseif frames == 178 then
     check(wram(0x0C) == 7, "WAVE A+Right stays (bank select, no KIT hop)")
     if fails == 0 then
       print("ALL PASS nav.lua")

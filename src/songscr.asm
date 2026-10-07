@@ -178,6 +178,8 @@ song_update:
     sta blk_mode
     lda song_cy
     sta blk_start
+    lda song_cx
+    sta.w blk_col
     lda #$01
     sta b_used
     jmp @cursor
@@ -621,6 +623,56 @@ song_cell_cut:
 
 ; --- block mode on SONG: 1-byte cells along the cursor track, kind 3 --------
 song_block:
+    ; B-held then A cuts; a plain B tap copies on release.
+    lda b_down
+    beq @b_edge
+    rep #$20
+.ACCU 16
+    lda pad_held
+    and #PAD_B
+    sep #$20
+.ACCU 8
+    beq @b_edge
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_A
+    sep #$20
+.ACCU 8
+    beq @b_wait
+    jsr song_blk_copy
+    jsr song_blk_clear
+    stz blk_mode
+    stz b_down
+    lda #$01
+    sta b_used
+    sta a_used
+    jmp song_draw
+@b_edge:
+    rep #$20
+.ACCU 16
+    lda pad_pressed
+    and #PAD_B
+    sep #$20
+.ACCU 8
+    beq @b_release
+    lda #$01
+    sta b_down
+    stz b_used
+@b_wait:
+    jmp song_draw
+@b_release:
+    lda b_down
+    beq @cancel
+    stz b_down
+    lda b_used
+    bne @cancel
+    jsr song_blk_copy
+    stz blk_mode
+    lda #$01
+    sta b_used
+    jmp song_draw
+@cancel:
     rep #$20
 .ACCU 16
     lda pad_pressed
@@ -633,20 +685,7 @@ song_block:
     sta a_used
     jmp song_draw
 @not_cancel:
-    rep #$20
-.ACCU 16
-    lda pad_pressed
-    and #PAD_B
-    sep #$20
-.ACCU 8
-    beq @not_copy
-    jsr song_blk_copy
-    stz blk_mode
-    lda #$01
-    sta b_used
-    stz b_down
-    jmp song_draw
-@not_copy:
+    ; Y remains a direct cut shortcut.
     rep #$20
 .ACCU 16
     lda pad_pressed
@@ -662,7 +701,7 @@ song_block:
     rep #$20
 .ACCU 16
     lda pad_event
-    and #(PAD_UP | PAD_DOWN)
+    and #PAD_DPAD
     sep #$20
 .ACCU 8
     beq @blk_done
@@ -691,31 +730,56 @@ song_blk_range:
     sta es0 + 1
     rts
 
+; block column range -> es3 = first track, es3+1 = count
+song_blk_col_range:
+    lda.w blk_col
+    cmp song_cx
+    bcc @fwd
+    lda song_cx
+    sta es3
+    lda.w blk_col
+    sec
+    sbc song_cx
+    inc a
+    sta es3 + 1
+    rts
+@fwd:
+    sta es3
+    lda song_cx
+    sec
+    sbc.w blk_col
+    inc a
+    sta es3 + 1
+    rts
 song_blk_copy:
     jsr song_blk_range
+    jsr song_blk_col_range
     lda #$03
     sta clip_kind
     lda es0 + 1
     sta clip_len
-    ; src = track*128 + first
+    lda es3 + 1
+    sta.w clip_width
+    stz es2
+    stz es2 + 1
+    lda clip_len
+    sta str_buf + 36
+    lda es0
+    sta str_buf + 38       ; source row
+@row:
+    stz str_buf + 37       ; column within selection
+@cell:
+    lda es3
+    clc
+    adc str_buf + 37
     rep #$30
 .ACCU 16
-    lda song_cx
     and #$00FF
     xba
-    lsr
+    lsr                    ; track * 128
     sta es1
-    lda es0
+    lda str_buf + 38
     and #$00FF
-    clc
-    adc es1
-    sta es1
-    lda es0 + 1
-    and #$00FF
-    sta es2
-    ldy #$0000
-@copy:
-    tya
     clc
     adc es1
     tax
@@ -725,45 +789,56 @@ song_blk_copy:
     pha
     rep #$30
 .ACCU 16
-    tyx
+    lda es2
+    tax
+    inc es2
     sep #$20
 .ACCU 8
     pla
     sta.l $7E7400,x
-    rep #$30
-.ACCU 16
-    iny
-    cpy es2
-    bne @copy
-    sep #$20
-.ACCU 8
+    inc str_buf + 37
+    lda str_buf + 37
+    cmp.w clip_width
+    bne @cell
+    inc str_buf + 38
+    dec str_buf + 36
+    bne @row
     rts
 
 song_blk_clear:
     jsr song_blk_range
+    jsr song_blk_col_range
+    lda es0 + 1
+    sta str_buf + 36
+    lda es0
+    sta str_buf + 38
+@row:
+    stz str_buf + 37
+@cell:
+    lda es3
+    clc
+    adc str_buf + 37
     rep #$30
 .ACCU 16
-    lda song_cx
     and #$00FF
     xba
     lsr
     sta es1
-    lda es0
+    lda str_buf + 38
     and #$00FF
     clc
     adc es1
     tax
     sep #$20
 .ACCU 8
-@row:
     lda #$FF
     sta.l $7E0000 + SB_SONG,x
-    rep #$30
-.ACCU 16
-    inx
-    sep #$20
-.ACCU 8
-    dec es0 + 1
+    inc str_buf + 37
+    lda str_buf + 37
+    cmp es3 + 1
+    bne @cell
+    inc str_buf + 38
+    dec str_buf + 36
     bne @row
     rts
 
@@ -782,32 +857,49 @@ song_paste:
     lda clip_len
 @have_n:
     sta es0 + 1
-    beq @done
+    bne +
+    jmp @done
++
+    lda #TRACKS
+    sec
+    sbc song_cx
+    cmp.w clip_width
+    bcc @have_w
+    lda.w clip_width
+@have_w:
+    sta es3 + 1
+    bne +
+    jmp @done
++
+    stz es2
+    stz es2 + 1
+    lda es0 + 1
+    sta str_buf + 36
+    lda song_cy
+    sta str_buf + 38
+@row:
+    stz str_buf + 37
+@cell:
     rep #$30
 .ACCU 16
-    lda song_cx
-    and #$00FF
-    xba
-    lsr
-    sta es1
-    lda song_cy
-    and #$00FF
-    clc
-    adc es1
-    sta es1
-    lda es0 + 1
-    and #$00FF
-    sta es2
-    ldy #$0000
-@copy:
-    tyx
+    lda es2
+    tax
+    inc es2
     sep #$20
 .ACCU 8
     lda.l $7E7400,x
     pha
+    lda song_cx
+    clc
+    adc str_buf + 37
     rep #$30
 .ACCU 16
-    tya
+    and #$00FF
+    xba
+    lsr
+    sta es1
+    lda str_buf + 38
+    and #$00FF
     clc
     adc es1
     tax
@@ -815,13 +907,31 @@ song_paste:
 .ACCU 8
     pla
     sta.l $7E0000 + SB_SONG,x
+    inc str_buf + 37
+    lda str_buf + 37
+    cmp es3 + 1
+    bne @cell
+    lda.w clip_width
+    sec
+    sbc es3 + 1
+    sta str_buf + 39
+@skip:
+    lda str_buf + 39
+    beq @next_row
     rep #$30
 .ACCU 16
-    iny
-    cpy es2
-    bne @copy
+    inc es2
     sep #$20
 .ACCU 8
+    dec str_buf + 39
+    bra @skip
+@next_row:
+    inc str_buf + 38
+    dec str_buf + 36
+    bne @row
+    stz clip_kind           ; the next double-B can mint/clone again
+    stz clip_len
+    stz.w clip_width
 @done:
     rts
 
@@ -846,12 +956,9 @@ song_cell_attr:
 .ACCU 8
     rts
 @not_cursor:
-    ; block-select rows on the cursor track render hilite
+    ; selected rectangle cells render hilite
     lda blk_mode
     beq @no_blk_hl
-    lda tmp0
-    cmp song_cx
-    bne @no_blk_hl
     jsr song_blk_range
     lda tmp1                ; absolute row of this cell
     cmp es0
@@ -861,6 +968,16 @@ song_cell_attr:
     adc es0 + 1
     dec a
     cmp tmp1
+    bcc @no_blk_hl
+    jsr song_blk_col_range
+    lda tmp0
+    cmp es3
+    bcc @no_blk_hl
+    lda es3
+    clc
+    adc es3 + 1
+    dec a
+    cmp tmp0
     bcc @no_blk_hl
     rep #$20
 .ACCU 16

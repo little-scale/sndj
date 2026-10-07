@@ -297,6 +297,10 @@ trk_live_row ds 8    ; LIVE: the song row each track's playing chain was
 trk_pend_row ds 8    ; LIVE: the row of the QUEUED chain (cue marker)
 eng_barrow   db      ; rows since play start, mod 16 (the LIVE bar)
 eng_barflag  db      ; this row tick starts a bar (halted launches fire)
+trk_arp      ds 8    ; latched A-command intervals (xy; 0 = off)
+trk_trm_cmd  ds 8    ; latched W override ($FF = use instrument TRM)
+blk_col      db      ; rectangular block anchor column
+clip_width   db      ; rectangular clipboard width
 .ENDE
 
 ; Shadow of the BG3 tilemap (32x32 words). NMI DMAs this to VRAM every frame;

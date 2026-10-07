@@ -150,6 +150,139 @@ clone_phrase:
     clc
     rts
 
+; --- table mint/clone support -------------------------------------------------
+; A blank table is only free when no instrument points at it. This matters for
+; freshly minted tables: their all-zero contents must not make a later mint
+; silently reuse the same slot.
+; A = table id -> carry set when referenced by any instrument; clobbers X.
+table_is_referenced:
+    sta cl_src
+    stz cl_i
+@instr:
+    lda cl_i
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl                     ; instrument * 16
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_INSTR + 12,x
+    cmp cl_src
+    beq @yes
+    inc cl_i
+    lda cl_i
+    cmp #INSTR_COUNT
+    bcc @instr
+    clc
+    rts
+@yes:
+    sec
+    rts
+
+; first unreferenced all-zero table -> A (carry set: none)
+find_free_table:
+    stz cl_dst
+@table:
+    lda cl_dst
+    jsr table_is_referenced
+    bcs @next_table
+    lda cl_dst
+    rep #$30
+.ACCU 16
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    asl
+    asl                     ; table * 64
+    tax
+    sep #$20
+.ACCU 8
+    lda #64
+    sta cl_n
+@byte:
+    lda.l $7E0000 + SB_TABLES,x
+    bne @next_table
+    rep #$30
+.ACCU 16
+    inx
+    sep #$20
+.ACCU 8
+    dec cl_n
+    bne @byte
+    lda cl_dst
+    clc
+    rts
+@next_table:
+    inc cl_dst
+    lda cl_dst
+    cmp #TABLE_COUNT
+    bcc @table
+    sec
+    rts
+
+; clone table A into a fresh slot -> A = new id (carry set: no room)
+clone_table:
+    sta cl_csrc
+    jsr find_free_table
+    bcc @have
+    rts
+@have:
+    sta cl_cdst
+    rep #$30
+.ACCU 16
+    lda cl_csrc
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    asl
+    asl
+    sta cl_i
+    lda cl_cdst
+    and #$00FF
+    asl
+    asl
+    asl
+    asl
+    asl
+    asl
+    sta cl_j
+    sep #$20
+.ACCU 8
+    lda #64
+    sta cl_n
+@copy:
+    rep #$30
+.ACCU 16
+    lda cl_i
+    tax
+    sep #$20
+.ACCU 8
+    lda.l $7E0000 + SB_TABLES,x
+    pha
+    rep #$30
+.ACCU 16
+    lda cl_j
+    tax
+    inc cl_i
+    inc cl_j
+    sep #$20
+.ACCU 8
+    pla
+    sta.l $7E0000 + SB_TABLES,x
+    dec cl_n
+    bne @copy
+    lda cl_cdst
+    clc
+    rts
+
 ; --- clone chain A into a fresh slot -> A = new id (carry set: no room) ----------
 ; SLIM shares the phrases; DEEP (opt_clone = 1) copies them too, with
 ; duplicate entries staying consistent inside the clone.

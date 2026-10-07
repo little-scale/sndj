@@ -37,7 +37,7 @@ await real-hardware bring-up. What works today:
   overrides. The rights-cleared project factory boots 8 instruments (one per
   voice), and audio RAM only holds what songs reference — the rest of the pool
   loads on demand, with the live RAM/FREE balance on the ECHO screen
-- **The complete 24-command set** — one executor shared by phrases and
+- **The complete 25-command set** — one executor shared by phrases and
   tables (summary below)
 - **Echo & FIR** — the SNES's room as an instrument: delay with live
   ARAM cost, feedback, per-voice sends, 8 patchable FIR curves;
@@ -103,7 +103,7 @@ press means** — no simultaneous-press timing windows.
 
 ## Row commands
 
-24 letters, the same grammar in phrases and tables — `MANUAL.md` has
+25 letters, the same grammar in phrases and tables — `MANUAL.md` has
 the full reference:
 
 > **A** arpeggio · **B** wave bank · **C** chord fan · **D** delay ·
@@ -111,7 +111,7 @@ the full reference:
 > **I** play-count mask · **J** pass-transpose · **K** kill ·
 > **L** slide · **M** master volume · **N** noise clock · **P** pan ·
 > **Q** GAIN override · **R** retrig · **S** sweep · **T** tempo ·
-> **U** surround · **V** vibrato override · **X** volume/accent ·
+> **U** surround · **V** vibrato override · **W** tremolo override · **X** volume/accent ·
 > **Y** FIR preset · **Z** pitch-mod
 
 ## Building
@@ -138,6 +138,7 @@ Every hardware-relevant bug found so far has a regression check.
 - **SAVEFORMAT.md** — WRAM song block + SRAM byte layouts
 - **HARDWARE.md** — real-silicon notes and errata
 - **LINK-SYNC-WIRING.md** — XIAO Link/IN24 and genmddj OUT→sndj IN adapters
+- **HARDWARE-TEST-CHECKLIST.md** — real-console checks for the current development changes
 - **ALS.md** — the Ableton/MIDI/MML converter's mapping
 - **CHANGELOG.md** — per-milestone user-facing notes
 

@@ -2,9 +2,11 @@
 
 sndj does not distribute third-party sample recordings or SoundFonts.
 
-`factory/factory.sndjfact` is the copyright-free project factory authored by
-little-scale and released under the repository's MIT license. It contains
-eight lean original sounds plus blank expansion slots.
+`factory/factory.sndjfact` is the project's redistribution-cleared factory
+pack. It contains sixteen sounds made by little-scale or sourced from material
+cleared for free redistribution, plus blank expansion slots. Original material
+in the pack is released under the repository's MIT license; any separately
+licensed source material retains its applicable licence.
 
 If that factory is absent, `tools/sndj_pool.py` generates a fallback from
 mathematical waveforms and seeded noise so incomplete source packages remain

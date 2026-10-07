@@ -1,5 +1,5 @@
 -- commands.lua — M7 gate: the command executor, one sub-test per command:
--- P K D G H A V L R T. Song data is poked directly into the WRAM song block
+-- P K D G H A V W L R T. Song data is poked directly into the WRAM song block
 -- (the pad grammar is covered by the other suites); each test plays the song
 -- from the SONG screen and asserts on DSP registers / engine state.
 
@@ -24,7 +24,8 @@ local function check(cond, msg)
 end
 
 -- command ids
-local CA, CD, CG, CH, CK, CL, CP, CR, CT, CV = 1, 4, 7, 8, 11, 12, 16, 18, 20, 22
+local CA, CB, CC, CD, CG, CH, CK, CL, CP, CR, CT, CV, CW =
+  1, 2, 3, 4, 7, 8, 11, 12, 16, 18, 20, 22, 23
 
 local function clear_phrase(p)
   local base = 0x4300 + p * 64
@@ -89,7 +90,65 @@ end, {
   end,
 }, 50)
 
--- 4. G: writes the groove pair directly (G22 = 2/2 ticks, double rate)
+-- 4. Delay boundary: a six-tick row has creation tick 0 plus ticks 1-5.
+-- D06 therefore expires outside the row and must not trigger at all.
+T("D boundary", function()
+  clear_phrase(0)
+  tests.dk_kons = wram(0x15)
+  row(0, 0, 61, 0, CD, 6)
+end, {
+  [18] = function()
+    local d = (wram(0x15) - tests.dk_kons) % 256
+    check(d == 0, "D06 stayed silent beyond a six-tick row")
+  end,
+}, 26)
+
+-- 5. B on the same row as a WAV note must win over apply_instrument's bank.
+T("B/WAV", function()
+  clear_phrase(0)
+  poke(0x2460, 2)           -- instrument 6: WAV
+  poke(0x2461, 0)           -- record bank 0 -> SRCN 56
+  poke(0x2466, 0)
+  row(0, 0, 49, 6, CB, 3)   -- command selects bank 3 -> SRCN 59
+end, {
+  [12] = function()
+    check(dsp(0x04) == 59, "same-row B03 selected WAV SRCN 59")
+  end,
+}, 22)
+
+-- 6. WAV L target uses the same one-octave correction as a normal trigger.
+T("L/WAV", function()
+  clear_phrase(0)
+  poke(0x2460, 2)
+  poke(0x2461, 0)
+  poke(0x2466, 0)
+  row(0, 0, 49, 6, 0, 0)
+  row(0, 4, 61, 0xFF, CL, 16)
+end, {
+  [12] = function() tests.wav_root = pitch0() end,
+  [70] = function()
+    check(pitch0() == tests.wav_root * 2,
+      "WAV L slide landed exactly one octave above its audible root")
+  end,
+}, 78)
+
+-- 7. Instrument tremolo follows both member voices of a C chord.
+T("TRM chord", function()
+  clear_phrase(0)
+  poke(0x2460, 0)           -- instrument 6: SMP
+  poke(0x2461, 7)
+  poke(0x2462, 0x8F)
+  poke(0x2463, 0xE0)
+  poke(0x2464, 0x50)
+  poke(0x2465, 0x50)
+  poke(0x2466, 0)
+  poke(0x246F, 0x4F)        -- TRM speed 4, depth 15
+  tests.trm_equal = false
+  tests.trm_dip = false
+  row(0, 0, 49, 6, CC, 0x47)
+end, {}, 30)
+
+-- 8. G: writes the groove pair directly (G22 = 2/2 ticks, double rate)
 T("G", function()
   clear_phrase(0)
   row(0, 0, 49, 0, CG, 0x22)
@@ -128,11 +187,14 @@ end)
 T("A", function()
   clear_phrase(0)
   row(0, 0, 49, 0, CA, 0x47)
-  for r = 1, 15 do row(0, r, 0, 0xFF, CA, 0x47) end
+  row(0, 4, 0, 0xFF, CA, 0x00)
 end, {
   [20] = function()
     local seen, okset = {}, true
     tests.arp_probe = { seen = seen }
+  end,
+  [36] = function()
+    check(pitch0() == 0x0800, "A00 released the latched arpeggio to its base")
   end,
 }, 44)
 
@@ -143,7 +205,45 @@ T("V", function()
   for r = 1, 15 do row(0, r, 0, 0xFF, CV, 0x48) end
 end, {}, 44)
 
--- 8. L: slide C-4 -> C-5 (rate 16 = 64 units/tick: completes in 32 ticks,
+-- 8. W: same-row tremolo override persists into a later plain note, then
+-- command-only W00 releases back to the instrument setting.
+T("W", function()
+  clear_phrase(0)
+  poke(0x2460, 0)           -- instrument 6: SMP, no instrument tremolo
+  poke(0x2461, 7)
+  poke(0x2462, 0x8F)
+  poke(0x2463, 0xE0)
+  poke(0x2464, 0x50)
+  poke(0x2465, 0x50)
+  poke(0x2466, 0)
+  poke(0x246F, 0x00)
+  tests.w_dip = false
+  tests.w_inherited_dip = false
+  row(0, 0, 49, 6, CW, 0x4F)
+  row(0, 2, 52, 6, 0, 0)
+  row(0, 4, 0, 0xFF, CW, 0x00)
+end, {
+  [36] = function()
+    check(dsp(0x00) == 0x50 and dsp(0x01) == 0x50,
+      "command-only W00 stopped tremolo and restored base volume")
+  end,
+}, 44)
+
+-- An L row at transport start has no legato source. It must sound its written
+-- note as the anchor, not inherit stale pitch from a previous screen/play.
+T("L anchor", function()
+  clear_phrase(0)
+  tests.la_kons = wram(0x15)
+  row(0, 0, 61, 0, CL, 7)
+end, {
+  [10] = function()
+    local d = (wram(0x15) - tests.la_kons) % 256
+    check(d == 1 and pitch0() == 0x1000,
+      "first-row L triggered its C-5 anchor without stale slide state")
+  end,
+}, 20)
+
+-- 9. L: slide C-4 -> C-5 (rate 16 = 64 units/tick: completes in 32 ticks,
 -- well inside the 96-tick phrase loop that would otherwise restart it)
 T("L", function()
   clear_phrase(0)
@@ -169,12 +269,18 @@ end, {
 T("R", function()
   clear_phrase(0)
   row(0, 0, 49, 0, CR, 3)
-  for r = 1, 15 do row(0, r, 0, 0xFF, CR, 3) end
+  row(0, 8, 0, 0xFF, CR, 0)
   tests.r_kons = wram(0x15)
 end, {
-  [60] = function()
+  [44] = function()
     local d = (wram(0x15) - tests.r_kons) % 256
-    check(d >= 12, "R03 retriggered repeatedly (" .. d .. " KON ticks)")
+    check(d >= 10, "R03 persisted across empty rows (" .. d .. " KON ticks)")
+  end,
+  [54] = function()
+    tests.r_off_kons = wram(0x15)
+  end,
+  [66] = function()
+    check(wram(0x15) == tests.r_off_kons, "R00 stopped the latched retrigger")
   end,
 }, 70)
 
@@ -259,6 +365,17 @@ emu.addEventCallback(function()
       if p < vib_lo then vib_lo = p end
       if p > vib_hi then vib_hi = p end
     end
+    if t.name == "TRM chord" and dt >= 4 and dt <= 24 then
+      local v0, v1, v2 = dsp(0x00), dsp(0x10), dsp(0x20)
+      if v0 == v1 and v1 == v2 then tests.trm_equal = true end
+      if v0 < 0x50 then tests.trm_dip = true end
+    end
+    if t.name == "W" and dt >= 2 and dt <= 11 and dsp(0x00) < 0x50 then
+      tests.w_dip = true
+    end
+    if t.name == "W" and dt >= 14 and dt <= 23 and dsp(0x00) < 0x50 then
+      tests.w_inherited_dip = true
+    end
     if dt >= t.len then
       if t.name == "A" then
         local n = 0
@@ -271,6 +388,15 @@ emu.addEventCallback(function()
         check(vib_lo >= 0x0700 and vib_hi <= 0x0900,
           "V48 depth bounded ($" .. string.format("%04X", vib_lo) .. "-$" ..
           string.format("%04X", vib_hi) .. ")")
+      end
+      if t.name == "TRM chord" then
+        check(tests.trm_equal, "instrument tremolo matched all C-chord voices")
+        check(tests.trm_dip, "C-chord tremolo produced an audible volume dip")
+      end
+      if t.name == "W" then
+        check(tests.w_dip, "same-row W4F overrode zero instrument TRM")
+        check(tests.w_inherited_dip,
+          "W4F remained active on the following note without a W command")
       end
       pad = { start = true }   -- stop
       phase = "stopping"

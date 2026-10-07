@@ -7,7 +7,7 @@
 ; restores them; interrupt entry re-asserts.
 ; ============================================================================
 
-.DEFINE VERSION "0.14"       ; drives the splash and `make dist` filenames
+.DEFINE VERSION "0.15"       ; drives the splash and `make dist` filenames
 
 .MEMORYMAP
   DEFAULTSLOT 0
@@ -294,12 +294,6 @@ str_version:
 str_stamp:
     .DB BUILD_STAMP, 0
 
-; font, marker-wrapped so patcher.html can locate and replace it
-    .DB "SNFONT"
-font_data:
-    .INCBIN "font.bin"
-font_data_end:
-
 ; --- banks 1-3: the self-describing sample pool (tools/sndj_pool.py) ---------
 ; marker-wrapped and padded to POOL_RESERVED so patcher.html can grow it in
 ; place; pool.bin is emitted pre-padded and split across the banks here
@@ -323,6 +317,14 @@ pool_data:
 
 .BANK 6 SLOT 0
 .ORG $0000
+; font, marker-wrapped so patcher.html can locate and replace it. The boot
+; loader already supplies the source bank to DMA, so this patchable asset can
+; live with the other banked data instead of consuming scarce code-bank space.
+    .DB "SNFONT"
+font_data:
+    .INCBIN "font.bin"
+font_data_end:
+
 ; factory palette (marker-wrapped for the patcher). Runtime reads are already
 ; long-addressed, so parking this patchable block here frees scarce code bank 0.
     .DB "SNPAL0"

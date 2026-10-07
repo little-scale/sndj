@@ -3,7 +3,8 @@
 ; transpose, and ONE command through the shared phrase executor. Zero
 ; means "no change" in every column. An instrument's TABLE field starts
 ; its table from the top at every trigger; H inside a table hops the
-; table's own rows.
+; table's own rows. V/CMD zero means no change; TSP uses zero for -- and
+; $80 for an explicit 00 reset so both states are editable.
 ;
 ;   B tap        insert (V: $40 · TSP: +12 · CMD: last letter + value)
 ;   B + d-pad    nudge (letters step; values L/R = 1, U/D = 16)
@@ -160,7 +161,7 @@ table_update:
 @tap_not_v:
     cmp #$01
     bne @tap_not_tsp
-    lda #12                 ; TSP: +1 octave
+    lda #$80                ; TSP: explicit 00 (zero is the -- sentinel)
     sta.l $7E0000,x
     jmp @draw
 @tap_not_tsp:
@@ -255,6 +256,12 @@ table_update:
 tb_nudge:
     lda #16
     sta tmp2
+    lda tb_x
+    cmp #$01
+    bne +
+    lda #12                ; TSP coarse edit is one octave, not one hex nibble
+    sta tmp2
++
     jsr nudge_delta         ; -> tmp1+1
     lda tmp1 + 1
     bne @have
@@ -269,10 +276,18 @@ tb_nudge:
     beq @val
     cmp #$00
     beq @vcol
-    ; TSP: free signed wrap (like kit TUNE)
+    ; TSP: zero is -- (no instruction), while $80 encodes explicit 00.
+    ; Nonzero offsets keep their ordinary signed byte representation.
     lda.l $7E0000,x
+    cmp #$80
+    bne @tsp_add
+    lda #$00
+@tsp_add:
     clc
     adc es3 + 1
+    bne @tsp_wr
+    lda #$80                ; landing on zero means an explicit pitch reset
+@tsp_wr:
     sta.l $7E0000,x
     rts
 @vcol:
@@ -358,8 +373,20 @@ table_draw:
     sta text_x
     jsr tb_attr
     jsr tb_cell
+    sta str_buf + 33
     cmp #$00
     beq @h_empty
+    lda tmp0
+    cmp #$01
+    bne @h_value
+    lda str_buf + 33
+    cmp #$80
+    bne @h_value
+    lda #$00                ; encoded explicit zero displays as 00
+    bra @h_draw
+@h_value:
+    lda str_buf + 33
+@h_draw:
     jsr text_hex8
     bra @next
 @h_empty:
@@ -405,7 +432,9 @@ table_draw:
     inc tmp0
     lda tmp0
     cmp #$04
-    bne @cells
+    beq +
+    jmp @cells
++
     ; running-position marker (any live track inside this table)
     lda #14
     sta text_x

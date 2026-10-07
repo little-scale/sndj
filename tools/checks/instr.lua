@@ -57,7 +57,12 @@ t = t + 20                                -- let the packed layout settle
                                           -- (VRAM queue drains over several
                                           -- frames; +8 raced it and flapped)
 local shot_at = t - 2
-local after_edit = t + 4
+local tune_select = t
+t = t + 2
+chord({ up = true })                     -- TUNE coarse nudge: +12
+local tune_edited = t + 2
+local after_edit = tune_edited + 2
+t = t + 4
 gest({ a = true, left = true })           -- back to PHRASE
 local at_phrase = t + 2
 gest({ start = true })                    -- play (phrase mode)
@@ -104,6 +109,13 @@ emu.addEventCallback(function()
       f:close()
       print("info: instr screenshot -> " .. out)
     end
+  elseif frames == tune_select then
+    -- Select the visible SMP TUNE field directly; the B+Up gesture still
+    -- travels through the real INSTR editor and its octave-step logic.
+    emu.write(0x91, 19, emu.memType.snesWorkRam)
+  elseif frames == tune_edited then
+    check(wram(0x2409) == 12, "SMP TUNE B+Up edits by one octave")
+    emu.write(0x2409, 0, emu.memType.snesWorkRam) -- keep chord expectations C-4
   elseif frames == after_edit then
     check(wram(0x4302) == 3 and wram(0x4303) == 0x47,
       "C47 sits on the phrase row")

@@ -3,7 +3,7 @@
 ; launch gesture) queues the cursor cell's chain on its track,
 ; launching at that track's next phrase boundary (quantised); on the
 ; cell the track is playing it queues that track's stop. Plain B is
-; edit-only (insert a chain on an empty cell). X held + up/down mutes
+; edit-only (insert; double-tap to mint/clone). X held + up/down mutes
 ; the cursor track, X held + left/right solos it. Muted tracks dash
 ; the header (signal metering is out for now). Select toggles LIVE
 ; from anywhere.
@@ -12,6 +12,8 @@
 .INDEX 16
 
 live_init:
+    stz tap_live
+    stz b_down
     lda ui_mode
     cmp #SCREEN_LIVE
     beq +
@@ -125,17 +127,60 @@ live_update:
 @x_done:
     jmp live_draw
 @no_x:
-    ; plain B is EDIT, never transport: insert a chain on an empty
-    ; cell (Seb, 2026-07-12 — launching is the A+B gesture only)
+    ; Plain B is EDIT, never transport. Resolve taps on release so the
+    ; same-cell double-tap can mint/clone without touching launch state.
     rep #$20
 .ACCU 16
     lda pad_pressed
     and #PAD_B
     sep #$20
 .ACCU 8
-    beq @no_b
+    beq @no_b_press
+    lda #$01
+    sta b_down
+    stz b_used
+@no_b_press:
+    rep #$20
+.ACCU 16
+    lda pad_held
+    and #PAD_B
+    sep #$20
+.ACCU 8
+    bne @draw
+    lda b_down
+    beq @cursor
+    stz b_down
+    lda b_used
+    bne @cursor
+    lda tap_live
+    beq @single
+    lda frame_cnt
+    sec
+    sbc tap_timer
+    cmp.w opt_tapwin
+    bcs @single
+    stz tap_live
+    jsr song_dtap           ; LIVE cells hold the same chain refs as SONG
+    bra @draw
+@single:
+    lda frame_cnt
+    sta tap_timer
+    lda #$01
+    sta tap_live
+    ; Remember the pre-tap reference for a possible second tap. As on SONG,
+    ; the first tap also inserts the last chain when the cell was empty.
+    jsr song_cursor_cell
+    sta mint_prev
+    cmp #$FF
+    beq @was_empty
+    stz mint_empty
+    bra @draw
+@was_empty:
+    lda #$01
+    sta mint_empty
     jsr live_edit_cursor
-@no_b:
+    bra @draw
+@cursor:
     ; plain cursor movement (reuses the SONG cursor + window)
     rep #$20
 .ACCU 16
@@ -197,7 +242,7 @@ live_queue_cursor:
 @done:
     rts
 
-; plain B: edit-only — insert a chain (SONG's tap insert) on an empty
+; plain B: edit-only — insert a chain (SONG's first-tap insert) on an empty
 ; cell so material can be built without leaving the launcher; A+B then
 ; launches it. Occupied cells are inert (performance safety: a stray B
 ; must never overwrite or trigger anything).
