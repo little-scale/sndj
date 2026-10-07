@@ -77,6 +77,12 @@ increment by **0.01** thereafter
   pack. Its boot set includes melodic, drum and vocal material while retaining
   enough audio RAM for the maximum 240 ms echo delay.
 
+### Acknowledgements
+
+- Special thanks to [Esther Skyscraper](https://www.instagram.com/esther.skyscraper/)
+  for their detailed testing, contributions and thoughtful suggestions that
+  helped shape this release.
+
 ## v0.14 — 2026-07-23
 
 - SLICE instruments now interpret TABLE TSP as a slice-selection offset and
